@@ -331,3 +331,5 @@ export function BiblePanel({
     </div>
   );
 }
+
+// fix: v1.1
