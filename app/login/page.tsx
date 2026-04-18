@@ -1,7 +1,7 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { BookOpen, Globe } from 'lucide-react';
+import { BookOpen, Code } from 'lucide-react';
 
 export default function LoginPage() {
   return (
@@ -19,12 +19,12 @@ export default function LoginPage() {
 
         <div className="space-y-4">
           <button
-            onClick={() => signIn('google', { callbackUrl: '/' })}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors"
+            onClick={() => signIn('github', { callbackUrl: '/' })}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-stone-800 text-white rounded-lg hover:bg-stone-900 transition-colors"
           >
-            <Globe className="w-5 h-5 text-blue-500" />
-            <span className="text-stone-700 font-medium">
-              Google로 계속하기
+            <Code className="w-5 h-5" />
+            <span className="font-medium">
+              GitHub로 계속하기
             </span>
           </button>
         </div>

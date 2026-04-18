@@ -1,5 +1,5 @@
-import NextAuth from 'next-auth';
-import Google from 'next-auth/providers/google';
+import NextAuth from "next-auth"
+import GitHub from "next-auth/providers/github"
 import { createClient } from '@supabase/supabase-js';
 
 // Defense: Check required env vars
@@ -14,16 +14,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// NextAuth v5 configuration
-const authConfig = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    GitHub({
+      clientId: process.env.GITHUB_ID,
+      clientSecret: process.env.GITHUB_SECRET,
     }),
   ],
   callbacks: {
-    async signIn({ user, account }: { user: any; account: any }) {
+    async signIn({ user, account, profile }) {
       try {
         const { data: existingUser } = await supabase
           .from('users')
@@ -44,7 +43,7 @@ const authConfig = {
             name: user.name,
             image: user.image,
             role: role,
-            provider: 'google',
+            provider: 'github',
             provider_account_id: account?.providerAccountId,
           });
         }
@@ -54,10 +53,7 @@ const authConfig = {
         return true;
       }
     },
-    
-    async session({ session, token }: { session: any; token: any }) {
-      if (!session) return { user: null };
-      
+    async session({ session, token }) {
       if (session?.user?.email) {
         try {
           const { data: userData } = await supabase
@@ -74,23 +70,18 @@ const authConfig = {
           console.error('Session callback error:', error);
         }
       }
-      return session || { user: null };
+      return session;
     },
-    
-    async jwt({ token, user }: { token: any; user: any }) {
+    async jwt({ token, user }) {
       if (user) token.id = user.id;
       return token;
     },
   },
   pages: {
-    signIn: '/login',
+    signIn: "/login",
   },
   session: {
-    strategy: 'jwt' as const,
+    strategy: 'jwt',
   },
   trustHost: true,
-};
-
-// NextAuth v5 handlers pattern - CORRECT WAY
-const { handlers } = NextAuth(authConfig);
-export const { GET, POST } = handlers;
+})
