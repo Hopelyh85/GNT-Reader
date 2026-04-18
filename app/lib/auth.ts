@@ -1,4 +1,4 @@
-import { getServerSession } from 'next-auth';
+import { auth } from "@/auth";
 import { createClient } from '@supabase/supabase-js';
 
 // User roles
@@ -42,7 +42,7 @@ export const getServiceSupabase = () => {
 
 // Get current session user
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  const session = await getServerSession();
+  const session = await auth();
   if (!session?.user?.email) return null;
   
   const supabase = getServiceSupabase();
