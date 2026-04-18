@@ -1,0 +1,476 @@
+{
+  "ἐγγίζω": {
+    "transliteration": "engizo",
+    "definition": "가까이 오다, 가까이 하다, 다가오다 (동사, 현재 능동태 직설법)",
+    "strongs": "G1448",
+    "frequency": "Used 42 times"
+  },
+  "ἤγγικεν": {
+    "transliteration": "engiken",
+    "definition": "가까이 왔다, 다가왔다 (ἐγγίζω의 완료 능동태 직설법 3인칭 단수)",
+    "strongs": "G1448",
+    "frequency": "Perfect indicative of engizo"
+  },
+  "γεννάω": {
+    "transliteration": "gennao",
+    "definition": "낳다, 발생시키다, 생산하다 (동사, 현재 능동태 직설법)",
+    "strongs": "G1080",
+    "frequency": "Used 42 times"
+  },
+  "ἐγέννησεν": {
+    "transliteration": "egennesen",
+    "definition": "낳았다, 발생시켰다 (γεννάω의 부정과거 능동태 직설법 3인칭 단수)",
+    "strongs": "G1080",
+    "frequency": "Aorist indicative of gennao"
+  },
+  "κηρύσσω": {
+    "transliteration": "kerusso",
+    "definition": "전파하다, 선포하다 (동사, 현재 능동태 직설법)",
+    "strongs": "G2784",
+    "frequency": "Used 61 times"
+  },
+  "ἐκήρυξαν": {
+    "transliteration": "ekeruxan",
+    "definition": "전파했다, 선포했다 (κηρύσσω의 부정과거 능동태 직설법 3인칭 복수)",
+    "strongs": "G2784",
+    "frequency": "Aorist indicative of kerusso"
+  },
+  "γίνομαι": {
+    "transliteration": "ginomai",
+    "definition": "되다, 일어나다, 생기다 (동사, 현재 중간태 직설법)",
+    "strongs": "G1096",
+    "frequency": "Root of egeneto"
+  },
+  "ἑτοιμάζω": {
+    "transliteration": "hetoimazo",
+    "definition": "준비하다, 예비하다 (동사, 현재 능동태 직설법)",
+    "strongs": "G2090",
+    "frequency": "Used 40 times"
+  },
+  "Ἑτοιμάσατε": {
+    "transliteration": "hetoimasate",
+    "definition": "준비하라!, 예비하라! (hetoimazo의 부정과거 능동태 명령법 2인칭 복수)",
+    "strongs": "G2090",
+    "frequency": "Imperative form of hetoimazo"
+  },
+  "ἐγένετο": {
+    "transliteration": "egeneto",
+    "definition": "되다, 일어나다, 태어나다 (ginomai의 부정과거 중간태 3인칭 단수)",
+    "strongs": "G1096",
+    "frequency": " Occurs 669 times in the NT"
+  },
+  "λόγος": {
+    "transliteration": "logos",
+    "definition": "말씀, 말, 이유, 계산 (명사, 남성)",
+    "strongs": "G3056",
+    "frequency": "Most important term in John 1:1"
+  },
+  "θεός": {
+    "transliteration": "theos",
+    "definition": "하나님, 신 (명사, 남성)",
+    "strongs": "G2316",
+    "frequency": "Used 1317 times"
+  },
+  "Ἰησοῦς": {
+    "transliteration": "Iesous",
+    "definition": "예수, 구원자 (명사, 남성 고유명사)",
+    "strongs": "G2424",
+    "frequency": "Used 917 times"
+  },
+  "Χριστός": {
+    "transliteration": "Christos",
+    "definition": "그리스도, 기름부음 받은 자 (명사, 남성 고유명사)",
+    "strongs": "G5547",
+    "frequency": "Used 529 times"
+  },
+  "κύριος": {
+    "transliteration": "kurios",
+    "definition": "주, 주인, 하나님 (명사, 남성)",
+    "strongs": "G2962",
+    "frequency": "Used 717 times"
+  },
+  "πνεῦμα": {
+    "transliteration": "pneuma",
+    "definition": "영, 바람, 숨 (명사, 중성)",
+    "strongs": "G4151",
+    "frequency": "Used 379 times"
+  },
+  "ἀγάπη": {
+    "transliteration": "agape",
+    "definition": "사랑, 헌신적 사랑 (명사, 여성)",
+    "strongs": "G26",
+    "frequency": "Used 116 times"
+  },
+  "ἀλήθεια": {
+    "transliteration": "aletheia",
+    "definition": "진리, 참됨 (명사, 여성)",
+    "strongs": "G225",
+    "frequency": "Used 109 times"
+  },
+  "δόξα": {
+    "transliteration": "doxa",
+    "definition": "영광, 존귀 (명사, 여성)",
+    "strongs": "G1391",
+    "frequency": "Used 166 times"
+  },
+  "σάρξ": {
+    "transliteration": "sarx",
+    "definition": "육체, 몸, 인성 (명사, 여성)",
+    "strongs": "G4561",
+    "frequency": "Used 147 times"
+  },
+  "ζωή": {
+    "transliteration": "zoe",
+    "definition": "생명, 삶 (명사, 여성)",
+    "strongs": "G2222",
+    "frequency": "Used 134 times"
+  },
+  "φῶς": {
+    "transliteration": "phos",
+    "definition": "빛 (명사, 중성)",
+    "strongs": "G5457",
+    "frequency": "Used 73 times"
+  },
+  "σκοτία": {
+    "transliteration": "skotia",
+    "definition": "어둠 (명사, 여성)",
+    "strongs": "G4653",
+    "frequency": "Used 16 times"
+  },
+  "ἀρχή": {
+    "transliteration": "arche",
+    "definition": "시작, 태초, 권세 (명사, 여성)",
+    "strongs": "G746",
+    "frequency": "Used 55 times"
+  },
+  "ἦν": {
+    "transliteration": "en",
+    "definition": "이다, 있었다 (eimi의 미완료 직설법 3인칭 단수)",
+    "strongs": "G2258",
+    "frequency": "Imperfect of eimi"
+  },
+  "ἐν": {
+    "transliteration": "en",
+    "definition": "안에, 속에 (전치사, 여격)",
+    "strongs": "G1722",
+    "frequency": "Most common preposition"
+  },
+  "καί": {
+    "transliteration": "kai",
+    "definition": "그리고, 또한, 또 (접속사)",
+    "strongs": "G2532",
+    "frequency": "Used 9281 times"
+  },
+  "ὁ": {
+    "transliteration": "ho",
+    "definition": "그, 이 (정관사, 주격 남성 단수)",
+    "strongs": "G3588",
+    "frequency": "Most common word in NT"
+  },
+  "αὐτός": {
+    "transliteration": "autos",
+    "definition": "그, 그의, 그 자신 (대명사/형용사)",
+    "strongs": "G846",
+    "frequency": "Used 5598 times"
+  },
+  "ὅτι": {
+    "transliteration": "hoti",
+    "definition": "왜냐하면, ~라고, ~이기 때문에 (접속사/대명사)",
+    "strongs": "G3754",
+    "frequency": "Used 1296 times"
+  },
+  "εἰς": {
+    "transliteration": "eis",
+    "definition": "~로, ~안으로, ~에게 (전치사, 대격)",
+    "strongs": "G1519",
+    "frequency": "Used 1773 times"
+  },
+  "οὐ": {
+    "transliteration": "ou",
+    "definition": "아니다, 없다 (부정 부사)",
+    "strongs": "G3756",
+    "frequency": "Most common negative"
+  },
+  "ἵνα": {
+    "transliteration": "hina",
+    "definition": "~하기 위하여, ~하도록 (종속접속사)",
+    "strongs": "G2443",
+    "frequency": "Used 663 times"
+  },
+  "γάρ": {
+    "transliteration": "gar",
+    "definition": "왜냐하면, 그러므로 (접속사)",
+    "strongs": "G1063",
+    "frequency": "Used 1067 times"
+  },
+  "πᾶς": {
+    "transliteration": "pas",
+    "definition": "모든, 각각의 (형용사, 3성)",
+    "strongs": "G3956",
+    "frequency": "Used 1243 times"
+  },
+  "ἀπό": {
+    "transliteration": "apo",
+    "definition": "~로부터, 떨어져서 (전치사, 속격)",
+    "strongs": "G575",
+    "frequency": "Used 646 times"
+  },
+  "ἐπί": {
+    "transliteration": "epi",
+    "definition": "위에, ~위로, 때에 (전치사, 4격/여격)",
+    "strongs": "G1909",
+    "frequency": "Used 890 times"
+  },
+  "μετά": {
+    "transliteration": "meta",
+    "definition": "~와 함께, ~후에 (전치사, 여격/대격)",
+    "strongs": "G3326",
+    "frequency": "Used 469 times"
+  },
+  "πρός": {
+    "transliteration": "pros",
+    "definition": "~에게, ~를 향하여 (전치사, 대격)",
+    "strongs": "G4314",
+    "frequency": "Used 700 times"
+  },
+  "διά": {
+    "transliteration": "dia",
+    "definition": "~를 통해, ~때문에 (전치사, 속격/대격)",
+    "strongs": "G1223",
+    "frequency": "Used 667 times"
+  },
+  "ὑπό": {
+    "transliteration": "hupo",
+    "definition": "~아래, ~에 의해 (전치사, 속격/대격)",
+    "strongs": "G5259",
+    "frequency": "Used 220 times"
+  },
+  "εἰμί": {
+    "transliteration": "eimi",
+    "definition": "이다, 존재하다 (동사, 현재 능동태 직설법)",
+    "strongs": "G1510",
+    "frequency": "Most common verb"
+  },
+  "ἔχω": {
+    "transliteration": "echo",
+    "definition": "가지다, 갖다 (동사)",
+    "strongs": "G2192",
+    "frequency": "Used 708 times"
+  },
+  "λέγω": {
+    "transliteration": "lego",
+    "definition": "말하다, 이르다 (동사)",
+    "strongs": "G3004",
+    "frequency": "Used 2354 times"
+  },
+  "ποιέω": {
+    "transliteration": "poieo",
+    "definition": "하다, 만들다 (동사)",
+    "strongs": "G4160",
+    "frequency": "Used 579 times"
+  },
+  "δίδωμι": {
+    "transliteration": "didomi",
+    "definition": "주다 (동사)",
+    "strongs": "G1325",
+    "frequency": "Used 413 times"
+  },
+  "λαμβάνω": {
+    "transliteration": "lambano",
+    "definition": "받다, 취하다 (동사)",
+    "strongs": "G2983",
+    "frequency": "Used 258 times"
+  },
+  "ἀκούω": {
+    "transliteration": "akouo",
+    "definition": "듣다, 순종하다 (동사)",
+    "strongs": "G191",
+    "frequency": "Used 428 times"
+  },
+  "βλέπω": {
+    "transliteration": "blepo",
+    "definition": "보다, 주의하다 (동사)",
+    "strongs": "G991",
+    "frequency": "Used 132 times"
+  },
+  "οἶδα": {
+    "transliteration": "oida",
+    "definition": "알다, 알고 있다 (동사, 완료형으로 현재적 의미)",
+    "strongs": "G1492",
+    "frequency": "Used 318 times"
+  },
+  "ἀγαπάω": {
+    "transliteration": "agapao",
+    "definition": "사랑하다 (동사)",
+    "strongs": "G25",
+    "frequency": "Used 143 times"
+  },
+  "πιστεύω": {
+    "transliteration": "pisteuo",
+    "definition": "믿다, 신뢰하다 (동사)",
+    "strongs": "G4100",
+    "frequency": "Used 248 times"
+  },
+  "γινώσκω": {
+    "transliteration": "ginosko",
+    "definition": "알다, 인식하다 (동사)",
+    "strongs": "G1097",
+    "frequency": "Used 222 times"
+  },
+  "ἀποκρίνομαι": {
+    "transliteration": "apokrinomai",
+    "definition": "대답하다 (동사, 중간태)",
+    "strongs": "G611",
+    "frequency": "Used 231 times"
+  },
+  "ἔρχομαι": {
+    "transliteration": "erchomai",
+    "definition": "오다, 가다 (동사, 중간태)",
+    "strongs": "G2064",
+    "frequency": "Used 634 times"
+  },
+  "ἀποστέλλω": {
+    "transliteration": "apostello",
+    "definition": "보내다, 파견하다 (동사)",
+    "strongs": "G649",
+    "frequency": "Used 132 times"
+  },
+  "μαθητής": {
+    "transliteration": "mathetes",
+    "definition": "제자, 학생 (명사, 남성)",
+    "strongs": "G3101",
+    "frequency": "Used 261 times"
+  },
+  "ἀπόστολος": {
+    "transliteration": "apostolos",
+    "definition": "사도, 파송받은 자 (명사, 남성)",
+    "strongs": "G652",
+    "frequency": "Used 80 times"
+  },
+  "βασιλεία": {
+    "transliteration": "basileia",
+    "definition": "나라, 왕국, 통치 (명사, 여성)",
+    "strongs": "G932",
+    "frequency": "Used 162 times"
+  },
+  "σωτηρία": {
+    "transliteration": "soteria",
+    "definition": "구원 (명사, 여성)",
+    "strongs": "G4991",
+    "frequency": "Used 46 times"
+  },
+  "δικαιοσύνη": {
+    "transliteration": "dikaiosyne",
+    "definition": "의, 의로움 (명사, 여성)",
+    "strongs": "G1343",
+    "frequency": "Used 92 times"
+  },
+  "ἐκκλησία": {
+    "transliteration": "ekklesia",
+    "definition": "교회, 소집된 자들 (명사, 여성)",
+    "strongs": "G1577",
+    "frequency": "Used 114 times"
+  },
+  "εἰρήνη": {
+    "transliteration": "eirene",
+    "definition": "평화 (명사, 여성)",
+    "strongs": "G1515",
+    "frequency": "Used 92 times"
+  },
+  "χάρις": {
+    "transliteration": "charis",
+    "definition": "은혜 (명사, 여성)",
+    "strongs": "G5485",
+    "frequency": "Used 155 times"
+  },
+  "ἁμαρτία": {
+    "transliteration": "hamartia",
+    "definition": "죄 (명사, 여성)",
+    "strongs": "G266",
+    "frequency": "Used 173 times"
+  },
+  "θάνατος": {
+    "transliteration": "thanatos",
+    "definition": "죽음 (명사, 남성)",
+    "strongs": "G2288",
+    "frequency": "Used 120 times"
+  },
+  "ἀνάστασις": {
+    "transliteration": "anastasis",
+    "definition": "부활 (명사, 여성)",
+    "strongs": "G386",
+    "frequency": "Used 42 times"
+  },
+  "βαπτίζω": {
+    "transliteration": "baptizo",
+    "definition": "세례를 주다, 침례하다 (동사)",
+    "strongs": "G907",
+    "frequency": "Used 77 times"
+  },
+  "σταυρός": {
+    "transliteration": "stauros",
+    "definition": "십자가 (명사, 남성)",
+    "strongs": "G4716",
+    "frequency": "Used 27 times"
+  },
+  "ἱερόν": {
+    "transliteration": "hieron",
+    "definition": "성전, 예루살렘 성전 (명사, 중성)",
+    "strongs": "G2411",
+    "frequency": "Used 71 times"
+  },
+  "συναγωγή": {
+    "transliteration": "synagoge",
+    "definition": "회당, 모임 (명사, 여성)",
+    "strongs": "G4864",
+    "frequency": "Used 56 times"
+  },
+  "Ναζαρέτ": {
+    "transliteration": "Nazaret",
+    "definition": "나사렛 (고유명사, 도시)",
+    "strongs": "G3478",
+    "frequency": "Used 12 times"
+  },
+  "Ἱεροσόλυμα": {
+    "transliteration": "Hierosolyma",
+    "definition": "예루살렘 (고유명사, 도시)",
+    "strongs": "G2414/G2419",
+    "frequency": "Used 78 times"
+  },
+  "Γαλιλαία": {
+    "transliteration": "Galilaia",
+    "definition": "갈릴리 (고유명사, 지방)",
+    "strongs": "G1056",
+    "frequency": "Used 61 times"
+  },
+  "Ἰουδαία": {
+    "transliteration": "Ioudaia",
+    "definition": "유대 (고유명사, 지방)",
+    "strongs": "G2449",
+    "frequency": "Used 43 times"
+  },
+  "Σατανᾶς": {
+    "transliteration": "Satanas",
+    "definition": "사탄, 대적자 (고유명사)",
+    "strongs": "G4567",
+    "frequency": "Used 36 times"
+  },
+  "ἄγγελος": {
+    "transliteration": "aggelos",
+    "definition": "천사, 사자, 전하는 자 (명사, 남성)",
+    "strongs": "G32",
+    "frequency": "Used 175 times"
+  },
+  "δαιμόνιον": {
+    "transliteration": "daimonion",
+    "definition": "귀신, 악령 (명사, 중성)",
+    "strongs": "G1140",
+    "frequency": "Used 63 times"
+  },
+  "θαυμαστός": {
+    "transliteration": "thaumastos",
+    "definition": "놀라운, 기이한 (형용사)",
+    "strongs": "G2298",
+    "frequency": "Used 6 times"
+  }
+}
