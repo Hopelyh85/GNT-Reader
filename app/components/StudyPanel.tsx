@@ -299,11 +299,21 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
             <p className="text-xs font-semibold text-blue-700 mb-1">🇰🇷 개역한글 (KRV)</p>
             {translationLoading ? (
-              <p className="text-sm text-stone-500 animate-pulse">번역 데이터 로딩 중...</p>
+              <p className="text-sm text-stone-500 animate-pulse flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span>
+                Supabase에서 데이터 로딩 중...
+              </p>
             ) : koreanTranslation ? (
               <p className="text-sm text-stone-700 leading-relaxed">{koreanTranslation}</p>
             ) : (
-              <p className="text-sm text-stone-400 italic">(개역한글 데이터 준비 중 - API 연결 필요)</p>
+              <div className="text-sm text-stone-500 italic bg-stone-100 p-2 rounded">
+                <p>⚠️ 개역한글 데이터가 Supabase에 없습니다</p>
+                <p className="text-xs mt-1 text-stone-400">
+                  1. Supabase 콘솔에서 SQL Editor 열기<br/>
+                  2. supabase_schema.sql 실행<br/>
+                  3. CSV 데이터 Import
+                </p>
+              </div>
             )}
           </div>
           
@@ -311,11 +321,21 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           <div className="p-3 bg-green-50 rounded border-l-4 border-green-500">
             <p className="text-xs font-semibold text-green-700 mb-1">🌐 NET English (New English Translation)</p>
             {translationLoading ? (
-              <p className="text-sm text-stone-500 animate-pulse">Translation loading...</p>
+              <p className="text-sm text-stone-500 animate-pulse flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin"></span>
+                Supabase에서 데이터 로딩 중...
+              </p>
             ) : netTranslation ? (
               <p className="text-sm text-stone-700 leading-relaxed">{netTranslation}</p>
             ) : (
-              <p className="text-sm text-stone-400 italic">(NET 데이터 연결 준비 중)</p>
+              <div className="text-sm text-stone-500 italic bg-stone-100 p-2 rounded">
+                <p>⚠️ NET 영어 성경 데이터가 Supabase에 없습니다</p>
+                <p className="text-xs mt-1 text-stone-400">
+                  1. Supabase 콘솔 → Table Editor<br/>
+                  2. net_translations 테이블 선택<br/>
+                  3. CSV Import
+                </p>
+              </div>
             )}
           </div>
         </div>
