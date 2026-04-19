@@ -241,17 +241,27 @@ export function BiblePanel({
         </h2>
       </div>
 
-      {/* Bible Content - MOBILE HORIZONTAL SCROLL ENABLED */}
+      {/* Bible Content - MOBILE HORIZONTAL SCROLL FORCED */}
       <div 
         className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-2 w-full"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'auto',
+          scrollbarColor: '#d6d3d1 transparent',
+          touchAction: 'pan-x pan-y',
+          overscrollBehavior: 'contain'
+        }}
       >
+        {/* Mobile scroll hint */}
+        <div className="md:hidden sticky top-0 z-10 flex items-center justify-center gap-1 py-1 bg-stone-100 rounded-full mb-2 text-xs text-stone-400">
+          <span>← 옆으로 밀어서 보기 →</span>
+        </div>
         {books.map((book) => {
           const abbrev = getBookAbbrev(book.name);
           const isBookExpanded = expandedBook === book.name;
 
           return (
-            <div key={book.name} className="rounded-lg overflow-hidden">
+            <div key={book.name} className="rounded-lg overflow-visible">
               {/* Book Header */}
               <button
                 onClick={() => handleBookClick(book.name)}
@@ -273,7 +283,7 @@ export function BiblePanel({
 
               {/* Chapters */}
               {isBookExpanded && (
-                <div className="bg-stone-50 p-2 space-y-1">
+                <div className="bg-stone-50 p-2 space-y-1 overflow-visible">
                   {book.chapters.map((chapter) => {
                     const chapterKey = `${book.name}-${chapter.number}`;
                     const isChapterExpanded = expandedChapter === chapterKey;
@@ -303,9 +313,11 @@ export function BiblePanel({
                         {/* Verses - MOBILE SCROLL ENABLED */}
                         {isChapterExpanded && (
                           <div 
-                            className="mt-1 space-y-1 pl-2 bg-stone-50/30 rounded"
-                            style={{ minWidth: '700px' }}
+                            className="mt-1 space-y-1 pl-2 bg-stone-50/30 rounded overflow-x-auto"
+                            style={{ minWidth: '100%', display: 'block' }}
                           >
+                            {/* Visible scrollbar indicator */}
+                            <div className="md:hidden h-1 bg-gradient-to-r from-stone-300 via-amber-400 to-stone-300 rounded-full mb-2 opacity-60" />
                             {chapter.verses.map((verse, verseIdx) => {
                               const isSelected =
                                 selectedVerse?.book === abbrev &&
@@ -330,7 +342,10 @@ export function BiblePanel({
                                   }`}
                                   style={{ 
                                     whiteSpace: 'nowrap',
-                                    lineHeight: '1.8'
+                                    lineHeight: '1.8',
+                                    display: 'block',
+                                    width: 'max-content',
+                                    minWidth: '800px'
                                   }}
                                 >
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
