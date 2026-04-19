@@ -17,6 +17,7 @@ interface NoteData {
   verse: number;
   ministry_note: string;
   commentary: string;
+  created_at: string;
   updated_at: string;
 }
 
@@ -82,6 +83,18 @@ export async function POST(request: NextRequest) {
 
     const filePath = getNoteFilePath(book, chapter, verse);
 
+    // Check if note already exists to preserve created_at
+    let existingCreatedAt: string | null = null;
+    if (fs.existsSync(filePath)) {
+      try {
+        const existing = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        existingCreatedAt = existing.created_at || null;
+      } catch (e) {
+        // ignore parse errors
+      }
+    }
+
+    const now = new Date().toISOString();
     const noteData: NoteData = {
       user_nickname: user_nickname || 'guest',
       verse_ref: verse_ref || `${book} ${chapter}:${verse}`,
@@ -90,7 +103,8 @@ export async function POST(request: NextRequest) {
       verse,
       ministry_note: ministry_note || '',
       commentary: commentary || '',
-      updated_at: new Date().toISOString(),
+      created_at: existingCreatedAt || now,
+      updated_at: now,
     };
 
     fs.writeFileSync(filePath, JSON.stringify(noteData, null, 2), 'utf-8');

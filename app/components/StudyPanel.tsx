@@ -37,6 +37,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const [commentary, setCommentary] = useState('');
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [noteTimestamp, setNoteTimestamp] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   // Dictionary state
@@ -120,9 +121,11 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         if (!result.data) {
           setMinistryNote('');
           setCommentary('');
+          setNoteTimestamp(null);
         } else {
           setMinistryNote(result.data.ministry_note || '');
           setCommentary(result.data.commentary || '');
+          setNoteTimestamp(result.data.created_at || result.data.updated_at || null);
         }
         setError(null);
       } catch (err) {
@@ -165,7 +168,12 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         throw new Error('Failed to save note');
       }
 
+      const result = await response.json();
       setLastSaved(new Date());
+      // Update timestamp from saved data
+      if (result.data) {
+        setNoteTimestamp(result.data.created_at || result.data.updated_at || null);
+      }
     } catch (err) {
       console.error('Error saving note:', err);
       setError('저장 중 오류가 발생했습니다.');
@@ -256,6 +264,17 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                 저장됨 {lastSaved.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
               </span>
             ) : null}
+            {noteTimestamp && (
+              <span className="text-xs text-amber-600 font-medium">
+                📝 {new Date(noteTimestamp).toLocaleString('ko-KR', { 
+                  year: 'numeric', 
+                  month: '2-digit', 
+                  day: '2-digit',
+                  hour: '2-digit', 
+                  minute: '2-digit'
+                })}
+              </span>
+            )}
             <button
               onClick={handleSave}
               disabled={saving || !canWrite}

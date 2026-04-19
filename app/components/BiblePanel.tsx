@@ -106,23 +106,38 @@ export function BiblePanel({
     loadLexicon();
   }, []);
   
-  // Get definition for selected word - merges multiple field sources
+  // Get definition for selected word - merges ALL possible field sources
   const getWordDefinition = (lemma: string, surfaceForm?: string): LexiconEntry | null => {
     const entry = lexicon[lemma] || (surfaceForm && surfaceForm !== lemma ? lexicon[surfaceForm] : null);
     
     if (!entry) return null;
     
-    // Merge all possible meaning fields (definition, gloss, meaning, etc.)
+    // Merge all possible meaning fields from various data sources
     const meanings: string[] = [];
-    if (entry.definition && entry.definition.trim()) meanings.push(entry.definition);
-    if ((entry as any).gloss && (entry as any).gloss.trim()) meanings.push((entry as any).gloss);
-    if ((entry as any).meaning && (entry as any).meaning.trim()) meanings.push((entry as any).meaning);
-    if ((entry as any).translation && (entry as any).translation.trim()) meanings.push((entry as any).translation);
+    const e = entry as any;
+    
+    // Check all possible fields that might contain definition/meaning
+    const possibleFields = ['definition', 'gloss', 'meaning', 'translation', 'def', 'mean', 'trans', 'desc', 'description'];
+    
+    for (const field of possibleFields) {
+      const value = e[field];
+      if (value && typeof value === 'string' && value.trim()) {
+        meanings.push(value.trim());
+      }
+    }
+    
+    // Also check for array of definitions
+    if (e.definitions && Array.isArray(e.definitions)) {
+      meanings.push(...e.definitions.filter((d: string) => d && d.trim()));
+    }
+    
+    // Deduplicate meanings
+    const uniqueMeanings = [...new Set(meanings)];
     
     // Return enhanced entry with merged definition
     return {
       ...entry,
-      definition: meanings.length > 0 ? meanings.join(' | ') : '(정의 없음)'
+      definition: uniqueMeanings.length > 0 ? uniqueMeanings.join(' | ') : '(정의 없음 - DB 확인 필요)'
     };
   };
 
@@ -226,9 +241,10 @@ export function BiblePanel({
         </h2>
       </div>
 
-      {/* Bible Content - NATURAL TEXT WRAPPING */}
+      {/* Bible Content - MOBILE HORIZONTAL SCROLL ENABLED */}
       <div 
-        className="flex-1 overflow-y-auto p-4 space-y-2 w-full"
+        className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-2 w-full"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {books.map((book) => {
           const abbrev = getBookAbbrev(book.name);
@@ -284,10 +300,11 @@ export function BiblePanel({
                           )}
                         </button>
 
-                        {/* Verses - NATURAL WRAP LAYOUT */}
+                        {/* Verses - MOBILE SCROLL ENABLED */}
                         {isChapterExpanded && (
                           <div 
                             className="mt-1 space-y-1 pl-2 bg-stone-50/30 rounded"
+                            style={{ minWidth: '700px' }}
                           >
                             {chapter.verses.map((verse, verseIdx) => {
                               const isSelected =
@@ -306,22 +323,20 @@ export function BiblePanel({
                                       verse
                                     )
                                   }
-                                  className={`w-full text-left p-3 rounded transition-all text-sm cursor-pointer ${
+                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer flex-shrink-0 ${
                                     isSelected
                                       ? 'bg-amber-100 border-l-2 border-amber-500 text-stone-800'
                                       : 'bg-white hover:bg-stone-100 text-stone-600'
                                   }`}
                                   style={{ 
-                                    whiteSpace: 'normal', 
-                                    wordBreak: 'keep-all', 
-                                    lineHeight: '1.8',
-                                    overflowWrap: 'break-word'
+                                    whiteSpace: 'nowrap',
+                                    lineHeight: '1.8'
                                   }}
                                 >
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
                                     {verseIdx + 1}
                                   </span>
-                                  <span className="font-greek text-stone-700" style={{ whiteSpace: 'normal', wordBreak: 'keep-all', lineHeight: '1.8' }}>
+                                  <span className="font-greek text-stone-700 flex-shrink-0" style={{ whiteSpace: 'nowrap', lineHeight: '1.8' }}>
                                     {verse.map((word, wordIdx) => (
                                       <span
                                         key={wordIdx}
