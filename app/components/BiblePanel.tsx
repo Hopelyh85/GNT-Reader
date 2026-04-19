@@ -151,6 +151,16 @@ export function BiblePanel({
     verseNum: number,
     wordIndex: number
   ) => {
+    // DEBUG: Log raw word data and lexicon lookup
+    console.log('=== Word Click Debug ===');
+    console.log('Raw word data:', word);
+    console.log('Lemma (l):', word.l);
+    console.log('Text (t):', word.t);
+    console.log('Morph (m):', word.m);
+    console.log('Lexicon lookup result:', getWordDefinition(word.l, word.t));
+    console.log('Full lexicon keys sample:', Object.keys(lexicon).slice(0, 10));
+    console.log('========================');
+    
     const selectedWordData = {
       word,
       bookName: book.name,
@@ -207,8 +217,11 @@ export function BiblePanel({
         </h2>
       </div>
 
-      {/* Bible Content */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-1 w-full relative">
+      {/* Bible Content - FORCED HORIZONTAL SCROLL */}
+      <div 
+        className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-1 w-full relative"
+        style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+      >
         {/* Horizontal scroll hint for mobile */}
         <div className="md:hidden sticky left-0 right-0 top-0 z-10 h-1 bg-gradient-to-r from-transparent via-stone-300 to-transparent opacity-50 pointer-events-none" />
         {books.map((book) => {
@@ -265,9 +278,12 @@ export function BiblePanel({
                           )}
                         </button>
 
-                        {/* Verses */}
+                        {/* Verses - FORCED MIN WIDTH FOR SCROLL */}
                         {isChapterExpanded && (
-                          <div className="mt-1 space-y-0.5 pl-2 min-w-[800px] shadow-inner bg-stone-50/50 rounded border border-stone-200">
+                          <div 
+                            className="mt-1 space-y-0.5 pl-2 shadow-inner bg-stone-50/50 rounded border border-stone-200"
+                            style={{ minWidth: '800px' }}
+                          >
                             {chapter.verses.map((verse, verseIdx) => {
                               const isSelected =
                                 selectedVerse?.book === abbrev &&
@@ -380,12 +396,18 @@ export function BiblePanel({
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-4 p-4 bg-stone-50 border-2 border-stone-300 rounded-lg">
-                      <p className="text-sm font-semibold text-stone-700 mb-1">
-                        📖 사전 데이터 확인 필요
+                    <div className="mt-4 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                      <p className="text-sm font-bold text-red-700 mb-2">
+                        [뜻 없음 - 데이터 확인 필요]
                       </p>
-                      <p className="text-sm text-stone-500">
-                        원형: <span className="font-greek text-stone-600">{internalSelectedWord.word.l}</span>
+                      <p className="text-sm text-stone-600 mb-1">
+                        원형: <span className="font-greek text-stone-700 font-semibold">{internalSelectedWord.word.l}</span>
+                      </p>
+                      <p className="text-xs text-stone-400">
+                        표면형: {internalSelectedWord.word.t} | 문법: {internalSelectedWord.word.m}
+                      </p>
+                      <p className="text-xs text-red-500 mt-2">
+                        (콘솔에서 상세 로그 확인 - F12 &gt; Console)
                       </p>
                     </div>
                   );
