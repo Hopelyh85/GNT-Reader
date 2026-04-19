@@ -392,7 +392,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
             <Search className="w-3 h-3 text-amber-500" />
             사전 조회 (Dictionary)
-            {selectedWord && <span className="text-xs text-amber-600"> - {selectedWord.word.t}</span>}
+            {selectedWord && <span className="text-xs text-amber-600"> - {selectedWord.word.text}</span>}
           </label>
           
           {lexiconLoading ? (
@@ -402,12 +402,12 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           ) : selectedWord ? (
             <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg">
               {(() => {
-                const entry = getWordDefinition(selectedWord.word.l, selectedWord.word.t);
+                const entry = getWordDefinition(selectedWord.word.lemma, selectedWord.word.text);
                 return entry ? (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="font-greek text-lg font-semibold text-amber-700">
-                        {selectedWord.word.l}
+                        {selectedWord.word.lemma}
                       </span>
                       <span className="text-xs text-stone-500">[{entry.transliteration}]</span>
                     </div>
@@ -423,10 +423,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                 ) : (
                   <div className="text-center py-4">
                     <p className="text-sm text-stone-500 mb-2">
-                      &quot;{selectedWord.word.l}&quot;에 대한 사전 정보가 없습니다
+                      &quot;{selectedWord.word.lemma}&quot;에 대한 사전 정보가 없습니다
                     </p>
                     <p className="text-xs text-stone-400">
-                      원형: {selectedWord.word.l} | 문법: {selectedWord.word.m}
+                      원형: {selectedWord.word.lemma} | 문법: {selectedWord.word.morph}
                     </p>
                   </div>
                 );

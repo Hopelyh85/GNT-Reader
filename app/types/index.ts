@@ -1,9 +1,9 @@
 // MorphGNT Enhanced SBLGNT Data Types
-// Each verse is an array of word objects: {t: text, l: lemma, m: morph}
+// Each verse is an array of word objects: {text, lemma, morph}
 export interface GreekWord {
-  t: string;  // text (surface form)
-  l: string;  // lemma (lexical form)
-  m: string;  // morphology code (e.g., "N----NSF-")
+  text: string;   // surface form (e.g., Χριστοῦ)
+  lemma: string;  // lexical form (e.g., Χριστός)
+  morph: string;  // morphology code (e.g., "N----NSF-")
 }
 
 export interface BibleBook {
@@ -20,7 +20,7 @@ export interface SBLGNTData {
 // UI-facing interfaces (converted from BibleBook structure)
 export interface Verse {
   number: number;
-  words: GreekWord[];  // Array of word objects {t, l, m}
+  words: GreekWord[];  // Array of word objects {text, lemma, morph}
 }
 
 export interface Chapter {

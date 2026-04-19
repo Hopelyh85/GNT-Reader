@@ -178,10 +178,10 @@ export function BiblePanel({
     // DEBUG: Log raw word data and lexicon lookup
     console.log('=== Word Click Debug ===');
     console.log('Raw word data:', word);
-    console.log('Lemma (l):', word.l);
-    console.log('Text (t):', word.t);
-    console.log('Morph (m):', word.m);
-    console.log('Lexicon lookup result:', getWordDefinition(word.l, word.t));
+    console.log('Lemma:', word.lemma);
+    console.log('Text:', word.text);
+    console.log('Morph:', word.morph);
+    console.log('Lexicon lookup result:', getWordDefinition(word.lemma, word.text));
     console.log('Full lexicon keys sample:', Object.keys(lexicon).slice(0, 10));
     console.log('========================');
     
@@ -210,7 +210,7 @@ export function BiblePanel({
     verseWords: GreekWord[]
   ) => {
     const abbrev = getBookAbbrev(book.name);
-    const fullText = verseWords.map(w => w.t).join(' ');
+    const fullText = verseWords.map(w => w.text).join(' ');
     onSelectVerse({
       book: abbrev,
       bookName: book.name,
@@ -366,9 +366,9 @@ export function BiblePanel({
                                           );
                                         }}
                                         className="inline-block mr-[0.3em] cursor-pointer hover:bg-amber-200 hover:text-amber-900 rounded px-0.5 transition-colors"
-                                        title={`${word.l} (${word.m})`}
+                                        title={`${word.lemma} (${word.morph})`}
                                       >
-                                        {word.t}
+                                        {word.text}
                                       </span>
                                     ))}
                                   </span>
@@ -393,21 +393,21 @@ export function BiblePanel({
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <h3 className="text-sm font-serif font-semibold text-stone-800 mb-2">
-                단어 분석: {internalSelectedWord.word.t}
+                단어 분석: {internalSelectedWord.word.text}
               </h3>
               <div className="space-y-1 text-sm">
                 <p className="text-stone-600">
                   <span className="font-medium text-stone-700">원형 (Lemma):</span>{' '}
-                  <span className="font-greek text-amber-700">{internalSelectedWord.word.l}</span>
+                  <span className="font-greek text-amber-700">{internalSelectedWord.word.lemma}</span>
                 </p>
                 <p className="text-stone-600">
                   <span className="font-medium text-stone-700">문법 정보:</span>{' '}
-                  <span className="text-stone-500">[{internalSelectedWord.word.m}]</span>
+                  <span className="text-stone-500">[{internalSelectedWord.word.morph}]</span>
                 </p>
                 <p className="text-stone-600">
                   <span className="font-medium text-stone-700">문법:</span>{' '}
                   <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                    {parseMorphCode(internalSelectedWord.word.m)}
+                    {parseMorphCode(internalSelectedWord.word.morph)}
                   </span>
                 </p>
                 {/* Word Definition - Priority Display */}
@@ -421,7 +421,7 @@ export function BiblePanel({
                       </div>
                     );
                   }
-                  const entry = getWordDefinition(internalSelectedWord.word.l, internalSelectedWord.word.t);
+                  const entry = getWordDefinition(internalSelectedWord.word.lemma, internalSelectedWord.word.text);
                   return entry ? (
                     <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg shadow-sm">
                       <p className="text-base font-bold text-amber-900 mb-2 border-b border-amber-200 pb-1">
@@ -442,10 +442,10 @@ export function BiblePanel({
                         [뜻 없음 - 데이터 확인 필요]
                       </p>
                       <p className="text-sm text-stone-600 mb-1">
-                        원형: <span className="font-greek text-stone-700 font-semibold">{internalSelectedWord.word.l}</span>
+                        원형: <span className="font-greek text-stone-700 font-semibold">{internalSelectedWord.word.lemma}</span>
                       </p>
                       <p className="text-xs text-stone-400">
-                        표면형: {internalSelectedWord.word.t} | 문법: {internalSelectedWord.word.m}
+                        표면형: {internalSelectedWord.word.text} | 문법: {internalSelectedWord.word.morph}
                       </p>
                       <p className="text-xs text-red-500 mt-2">
                         (콘솔에서 상세 로그 확인 - F12 &gt; Console)

@@ -12,8 +12,8 @@ import json
 import csv
 import os
 
-# Load SBLGNT data from JSON
-SBLGNT_FILE = './public/data/sblgnt.json'
+# Load SBLGNT data from JSON (use fixed version with correct lemmas)
+SBLGNT_FILE = './public/data/sblgnt_fixed.json'
 OUTPUT_FILE = 'gnt_master_data.csv'
 
 def load_sblgnt_data():
@@ -25,8 +25,11 @@ def flatten_gnt_data(data):
     """
     Flatten the nested SBLGNT structure into a list of word records.
     
+    CRITICAL FIX: Uses corrected lemma extraction from MorphGNT parts[6]
+    (was incorrectly using parts[5] which is normalized form, not true lemma)
+    
     Structure: {books: [{abbrev, book, korean_name, chapters: [[[word]]]}]}
-    Where word = {t: text, l: lemma, m: morph}
+    Where word = {t: text, l: lemma (CORRECTED), m: morph}
     """
     records = []
     
@@ -39,16 +42,21 @@ def flatten_gnt_data(data):
             for verse_idx, verse_words in enumerate(chapter_verses, start=1):
                 # Iterate through words in verse
                 for word in verse_words:
+                    # CRITICAL: Check if we have corrected lemma from re-parse
+                    # If 'true_lemma' exists (from re-parsing MorphGNT), use it
+                    # Otherwise fall back to current 'l' field
+                    true_lemma = word.get('true_lemma', word['l'])
+                    
                     record = {
                         'book': book_abbrev,
                         'chapter': chapter_idx,
                         'verse': verse_idx,
-                        'text': word['t'],      # Surface form (e.g., Χριστοῦ)
-                        'lemma': word['l'],     # Lemma (e.g., Χριστός) ← May need correction
-                        'morph': word['m'],     # Morphology code
-                        'definition': '',       # Empty - to be filled later
-                        'krv': '',              # Empty - Korean translation to be added
-                        'net': ''               # Empty - NET translation to be added
+                        'text': word['t'],          # Surface form (e.g., Χριστοῦ)
+                        'lemma': true_lemma,        # TRUE Lemma (e.g., Χριστός) ← FIXED!
+                        'morph': word['m'],         # Morphology code
+                        'definition': '',           # Empty - to be filled later
+                        'krv': '',                  # Empty - Korean translation to be added
+                        'net': ''                   # Empty - NET translation to be added
                     }
                     records.append(record)
     

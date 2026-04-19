@@ -5,6 +5,24 @@ import { BibleBook, Book, Chapter, Verse, VerseRef, SBLGNTData, GreekWord } from
 
 const SBLGNT_URL = '/data/sblgnt.json';
 
+// Raw JSON data format (t/l/m) - before transformation
+interface RawGreekWord {
+  t: string;  // text
+  l: string;  // lemma
+  m: string;  // morph
+}
+
+interface RawBibleBook {
+  abbrev: string;
+  book: string;
+  korean_name: string;
+  chapters: RawGreekWord[][][];
+}
+
+interface RawSBLGNTData {
+  books: RawBibleBook[];
+}
+
 // Korean book names mapping (Protestant tradition)
 const BOOK_NAMES_KO: Record<string, string> = {
   'MAT': '마태복음',
@@ -48,8 +66,23 @@ export function useSBLGNT() {
         if (!response.ok) {
           throw new Error('Failed to fetch SBLGNT data');
         }
-        const jsonData: SBLGNTData = await response.json();
-        setBooks(jsonData.books || []);
+        const jsonData: RawSBLGNTData = await response.json();
+        
+        // Transform data: map t/l/m to text/lemma/morph for new schema
+        const transformedBooks = (jsonData.books || []).map(book => ({
+          ...book,
+          chapters: book.chapters.map(chapter =>
+            chapter.map(verse =>
+              verse.map(word => ({
+                text: word.t,
+                lemma: word.l,
+                morph: word.m
+              }))
+            )
+          )
+        }));
+        
+        setBooks(transformedBooks);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -128,7 +161,7 @@ export function useSBLGNT() {
   const getVerseText = useCallback(
     (bookAbbrev: string, chapterNum: number, verseNum: number): string => {
       const verse = getVerse(bookAbbrev, chapterNum, verseNum);
-      return verse?.words?.map(w => w.t).join(' ') || '';
+      return verse?.words?.map(w => w.text).join(' ') || '';
     },
     [getVerse]
   );
