@@ -226,13 +226,10 @@ export function BiblePanel({
         </h2>
       </div>
 
-      {/* Bible Content - FORCED HORIZONTAL SCROLL */}
+      {/* Bible Content - NATURAL TEXT WRAPPING */}
       <div 
-        className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-1 w-full relative"
-        style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+        className="flex-1 overflow-y-auto p-4 space-y-2 w-full"
       >
-        {/* Horizontal scroll hint for mobile */}
-        <div className="md:hidden sticky left-0 right-0 top-0 z-10 h-1 bg-gradient-to-r from-transparent via-stone-300 to-transparent opacity-50 pointer-events-none" />
         {books.map((book) => {
           const abbrev = getBookAbbrev(book.name);
           const isBookExpanded = expandedBook === book.name;
@@ -287,11 +284,10 @@ export function BiblePanel({
                           )}
                         </button>
 
-                        {/* Verses - FORCED MIN WIDTH FOR SCROLL */}
+                        {/* Verses - NATURAL WRAP LAYOUT */}
                         {isChapterExpanded && (
                           <div 
-                            className="mt-1 space-y-0.5 pl-2 shadow-inner bg-stone-50/50 rounded border border-stone-200"
-                            style={{ minWidth: '800px' }}
+                            className="mt-1 space-y-1 pl-2 bg-stone-50/30 rounded"
                           >
                             {chapter.verses.map((verse, verseIdx) => {
                               const isSelected =
@@ -310,16 +306,22 @@ export function BiblePanel({
                                       verse
                                     )
                                   }
-                                  className={`w-full text-left p-2 rounded transition-all text-sm leading-relaxed cursor-pointer whitespace-normal ${
+                                  className={`w-full text-left p-3 rounded transition-all text-sm cursor-pointer ${
                                     isSelected
                                       ? 'bg-amber-100 border-l-2 border-amber-500 text-stone-800'
                                       : 'bg-white hover:bg-stone-100 text-stone-600'
                                   }`}
+                                  style={{ 
+                                    whiteSpace: 'normal', 
+                                    wordBreak: 'keep-all', 
+                                    lineHeight: '1.8',
+                                    overflowWrap: 'break-word'
+                                  }}
                                 >
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
                                     {verseIdx + 1}
                                   </span>
-                                  <span className="font-greek text-stone-700 whitespace-normal">
+                                  <span className="font-greek text-stone-700" style={{ whiteSpace: 'normal', wordBreak: 'keep-all', lineHeight: '1.8' }}>
                                     {verse.map((word, wordIdx) => (
                                       <span
                                         key={wordIdx}

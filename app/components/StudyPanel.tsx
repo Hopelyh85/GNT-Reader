@@ -42,10 +42,59 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   // Dictionary state
   const [lexicon, setLexicon] = useState<Record<string, LexiconEntry>>({});
   const [lexiconLoading, setLexiconLoading] = useState(false);
+  
+  // Translation states
+  const [koreanTranslation, setKoreanTranslation] = useState<string>('');
+  const [netTranslation, setNetTranslation] = useState<string>('');
+  const [translationLoading, setTranslationLoading] = useState(false);
 
   const verseRef = selectedVerse
     ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`
     : '';
+  
+  // Load translations when verse changes
+  useEffect(() => {
+    if (!selectedVerse) {
+      setKoreanTranslation('');
+      setNetTranslation('');
+      return;
+    }
+    
+    async function loadTranslations() {
+      setTranslationLoading(true);
+      try {
+        // Fetch Korean translation (KRV/NKRV)
+        const koreanResponse = await fetch(
+          `/api/translations?version=krv&book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}`
+        );
+        if (koreanResponse.ok) {
+          const koreanData = await koreanResponse.json();
+          setKoreanTranslation(koreanData.text || koreanData.translation || '');
+        } else {
+          setKoreanTranslation('');
+        }
+        
+        // Fetch NET English translation
+        const netResponse = await fetch(
+          `/api/translations?version=net&book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}`
+        );
+        if (netResponse.ok) {
+          const netData = await netResponse.json();
+          setNetTranslation(netData.text || netData.translation || '');
+        } else {
+          setNetTranslation('');
+        }
+      } catch (err) {
+        console.error('Error loading translations:', err);
+        setKoreanTranslation('');
+        setNetTranslation('');
+      } finally {
+        setTranslationLoading(false);
+      }
+    }
+    
+    loadTranslations();
+  }, [selectedVerse]);
 
   // Load existing note when verse changes via API
   useEffect(() => {
@@ -217,22 +266,38 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </button>
           </div>
         </div>
-        <div className="mt-2 p-2 bg-amber-50 rounded border-l-2 border-amber-400">
-          <p className="font-serif text-sm text-stone-700">
-            <span className="font-semibold">{selectedVerse.bookName || selectedVerse.book}</span>
-            {' '}<span className="text-stone-500">{selectedVerse.chapter}:{selectedVerse.verse}</span>
-          </p>
-          {/* GNT Original Text */}
-          <p className="mt-1 text-sm text-stone-600 font-greek leading-relaxed">
-            <span className="text-xs text-stone-400 block mb-0.5">[GNT 원문]</span>
-            {selectedVerse.text}
-          </p>
-          {/* Korean Translation (KRV) */}
-          <div className="mt-2 pt-2 border-t border-amber-200">
-            <p className="text-xs text-stone-400 mb-0.5">[개역한글]</p>
-            <p className="text-sm text-stone-700 leading-relaxed">
-              {selectedVerse.translation || selectedVerse.krv || '(개역한글 번역 데이터 로딩 중...)'}
+        {/* Comparative Study: GNT - KRV - NET */}
+        <div className="mt-2 space-y-2">
+          {/* GNT Original */}
+          <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
+            <p className="text-xs font-semibold text-amber-700 mb-1">📜 GNT 원문 (Original)</p>
+            <p className="text-sm text-stone-700 font-greek leading-relaxed">
+              {selectedVerse.text}
             </p>
+          </div>
+          
+          {/* Korean Translation (KRV) */}
+          <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
+            <p className="text-xs font-semibold text-blue-700 mb-1">🇰🇷 개역한글 (KRV)</p>
+            {translationLoading ? (
+              <p className="text-sm text-stone-500 animate-pulse">번역 데이터 로딩 중...</p>
+            ) : koreanTranslation ? (
+              <p className="text-sm text-stone-700 leading-relaxed">{koreanTranslation}</p>
+            ) : (
+              <p className="text-sm text-stone-400 italic">(개역한글 데이터 준비 중 - API 연결 필요)</p>
+            )}
+          </div>
+          
+          {/* NET English Translation */}
+          <div className="p-3 bg-green-50 rounded border-l-4 border-green-500">
+            <p className="text-xs font-semibold text-green-700 mb-1">🌐 NET English (New English Translation)</p>
+            {translationLoading ? (
+              <p className="text-sm text-stone-500 animate-pulse">Translation loading...</p>
+            ) : netTranslation ? (
+              <p className="text-sm text-stone-700 leading-relaxed">{netTranslation}</p>
+            ) : (
+              <p className="text-sm text-stone-400 italic">(NET 데이터 연결 준비 중)</p>
+            )}
           </div>
         </div>
       </div>
