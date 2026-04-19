@@ -1,8 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Book, GreekWord } from '@/app/types';
 import { ChevronDown, ChevronRight, BookOpen, X } from 'lucide-react';
+
+interface LexiconEntry {
+  transliteration: string;
+  definition: string;
+  strongs: string;
+  frequency: string;
+}
 
 import { SelectedWord } from '@/app/types';
 
@@ -76,6 +83,35 @@ export function BiblePanel({
   const [expandedBook, setExpandedBook] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
   const [internalSelectedWord, setInternalSelectedWord] = useState<{word: GreekWord, bookName: string, chapter: number, verse: number, wordIndex: number} | null>(null);
+  
+  // Load lexicon data
+  const [lexicon, setLexicon] = useState<Record<string, LexiconEntry>>({});
+  
+  useEffect(() => {
+    async function loadLexicon() {
+      try {
+        const response = await fetch('/data/lexicon.json');
+        if (response.ok) {
+          const data = await response.json();
+          setLexicon(data);
+        }
+      } catch (err) {
+        console.error('Error loading lexicon:', err);
+      }
+    }
+    loadLexicon();
+  }, []);
+  
+  // Get definition for selected word
+  const getWordDefinition = (lemma: string, surfaceForm?: string): LexiconEntry | null => {
+    if (lexicon[lemma]) {
+      return lexicon[lemma];
+    }
+    if (surfaceForm && surfaceForm !== lemma && lexicon[surfaceForm]) {
+      return lexicon[surfaceForm];
+    }
+    return null;
+  };
 
   const bookAbbrevMap: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {
@@ -168,7 +204,7 @@ export function BiblePanel({
       </div>
 
       {/* Bible Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-1">
+      <div className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-1">
         {books.map((book) => {
           const abbrev = getBookAbbrev(book.name);
           const isBookExpanded = expandedBook === book.name;
@@ -306,11 +342,31 @@ export function BiblePanel({
                   <span className="text-stone-500">[{internalSelectedWord.word.m}]</span>
                 </p>
                 <p className="text-stone-600">
-                  <span className="font-medium text-stone-700">해석:</span>{' '}
+                  <span className="font-medium text-stone-700">문법:</span>{' '}
                   <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
                     {parseMorphCode(internalSelectedWord.word.m)}
                   </span>
                 </p>
+                {(() => {
+                  const entry = getWordDefinition(internalSelectedWord.word.l, internalSelectedWord.word.t);
+                  return entry ? (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm font-medium text-amber-800 mb-1">
+                        📖 사전 뜻 (Definition)
+                      </p>
+                      <p className="text-sm text-stone-700 leading-relaxed">
+                        {entry.definition}
+                      </p>
+                      <p className="text-xs text-stone-500 mt-1">
+                        Strong&apos;s: {entry.strongs} | [{entry.transliteration}]
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-stone-400 mt-2 italic">
+                      사전 정보가 없습니다 (원형: {internalSelectedWord.word.l})
+                    </p>
+                  );
+                })()}
                 <p className="text-xs text-stone-400 mt-2">
                   {internalSelectedWord.bookName} {internalSelectedWord.chapter}:{internalSelectedWord.verse}
                 </p>
