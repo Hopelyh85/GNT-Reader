@@ -86,9 +86,11 @@ export function BiblePanel({
   
   // Load lexicon data
   const [lexicon, setLexicon] = useState<Record<string, LexiconEntry>>({});
+  const [lexiconLoading, setLexiconLoading] = useState(true);
   
   useEffect(() => {
     async function loadLexicon() {
+      setLexiconLoading(true);
       try {
         const response = await fetch('/data/lexicon.json');
         if (response.ok) {
@@ -97,6 +99,8 @@ export function BiblePanel({
         }
       } catch (err) {
         console.error('Error loading lexicon:', err);
+      } finally {
+        setLexiconLoading(false);
       }
     }
     loadLexicon();
@@ -204,7 +208,9 @@ export function BiblePanel({
       </div>
 
       {/* Bible Content */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-1">
+      <div className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-1 w-full relative">
+        {/* Horizontal scroll hint for mobile */}
+        <div className="md:hidden sticky left-0 right-0 top-0 z-10 h-1 bg-gradient-to-r from-transparent via-stone-300 to-transparent opacity-50 pointer-events-none" />
         {books.map((book) => {
           const abbrev = getBookAbbrev(book.name);
           const isBookExpanded = expandedBook === book.name;
@@ -261,7 +267,7 @@ export function BiblePanel({
 
                         {/* Verses */}
                         {isChapterExpanded && (
-                          <div className="mt-1 space-y-0.5 pl-2">
+                          <div className="mt-1 space-y-0.5 pl-2 min-w-[800px] shadow-inner bg-stone-50/50 rounded border border-stone-200">
                             {chapter.verses.map((verse, verseIdx) => {
                               const isSelected =
                                 selectedVerse?.book === abbrev &&
@@ -279,7 +285,7 @@ export function BiblePanel({
                                       verse
                                     )
                                   }
-                                  className={`w-full text-left p-2 rounded transition-all text-sm leading-relaxed cursor-pointer ${
+                                  className={`w-full text-left p-2 rounded transition-all text-sm leading-relaxed cursor-pointer whitespace-nowrap ${
                                     isSelected
                                       ? 'bg-amber-100 border-l-2 border-amber-500 text-stone-800'
                                       : 'bg-white hover:bg-stone-100 text-stone-600'
@@ -288,7 +294,7 @@ export function BiblePanel({
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
                                     {verseIdx + 1}
                                   </span>
-                                  <span className="font-greek text-stone-700">
+                                  <span className="font-greek text-stone-700 whitespace-nowrap">
                                     {verse.map((word, wordIdx) => (
                                       <span
                                         key={wordIdx}
@@ -347,24 +353,41 @@ export function BiblePanel({
                     {parseMorphCode(internalSelectedWord.word.m)}
                   </span>
                 </p>
+                {/* Word Definition - Priority Display */}
                 {(() => {
+                  if (lexiconLoading) {
+                    return (
+                      <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                        <p className="text-sm font-semibold text-blue-700 animate-pulse">
+                          📖 사전 데이터 분석 중...
+                        </p>
+                      </div>
+                    );
+                  }
                   const entry = getWordDefinition(internalSelectedWord.word.l, internalSelectedWord.word.t);
                   return entry ? (
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <p className="text-sm font-medium text-amber-800 mb-1">
-                        📖 사전 뜻 (Definition)
+                    <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg shadow-sm">
+                      <p className="text-base font-bold text-amber-900 mb-2 border-b border-amber-200 pb-1">
+                        📖 사전 뜻
                       </p>
-                      <p className="text-sm text-stone-700 leading-relaxed">
+                      <p className="text-base text-stone-800 leading-relaxed font-medium">
                         {entry.definition}
                       </p>
-                      <p className="text-xs text-stone-500 mt-1">
-                        Strong&apos;s: {entry.strongs} | [{entry.transliteration}]
-                      </p>
+                      <div className="flex items-center gap-3 text-sm text-stone-600 mt-3 pt-2 border-t border-amber-200">
+                        <span className="font-semibold">Strong&apos;s: {entry.strongs}</span>
+                        <span className="text-stone-400">|</span>
+                        <span>[{entry.transliteration}]</span>
+                      </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-stone-400 mt-2 italic">
-                      사전 정보가 없습니다 (원형: {internalSelectedWord.word.l})
-                    </p>
+                    <div className="mt-4 p-4 bg-stone-50 border-2 border-stone-300 rounded-lg">
+                      <p className="text-sm font-semibold text-stone-700 mb-1">
+                        📖 사전 데이터 확인 필요
+                      </p>
+                      <p className="text-sm text-stone-500">
+                        원형: <span className="font-greek text-stone-600">{internalSelectedWord.word.l}</span>
+                      </p>
+                    </div>
                   );
                 })()}
                 <p className="text-xs text-stone-400 mt-2">
