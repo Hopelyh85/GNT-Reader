@@ -70,6 +70,8 @@ export interface Reflection {
 // UI State Types
 export interface SelectedVerse extends VerseRef {
   text: string;
+  translation?: string;  // Korean translation (KRV)
+  krv?: string;  // Alternative field name for Korean translation
 }
 
 // Selected word for dictionary lookup

@@ -222,9 +222,18 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             <span className="font-semibold">{selectedVerse.bookName || selectedVerse.book}</span>
             {' '}<span className="text-stone-500">{selectedVerse.chapter}:{selectedVerse.verse}</span>
           </p>
-          <p className="mt-1 text-sm text-stone-600 font-greek leading-relaxed line-clamp-2">
+          {/* GNT Original Text */}
+          <p className="mt-1 text-sm text-stone-600 font-greek leading-relaxed">
+            <span className="text-xs text-stone-400 block mb-0.5">[GNT 원문]</span>
             {selectedVerse.text}
           </p>
+          {/* Korean Translation (KRV) */}
+          <div className="mt-2 pt-2 border-t border-amber-200">
+            <p className="text-xs text-stone-400 mb-0.5">[개역한글]</p>
+            <p className="text-sm text-stone-700 leading-relaxed">
+              {selectedVerse.translation || selectedVerse.krv || '(개역한글 번역 데이터 로딩 중...)'}
+            </p>
+          </div>
         </div>
       </div>
 

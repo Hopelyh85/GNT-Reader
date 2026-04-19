@@ -106,15 +106,24 @@ export function BiblePanel({
     loadLexicon();
   }, []);
   
-  // Get definition for selected word
+  // Get definition for selected word - merges multiple field sources
   const getWordDefinition = (lemma: string, surfaceForm?: string): LexiconEntry | null => {
-    if (lexicon[lemma]) {
-      return lexicon[lemma];
-    }
-    if (surfaceForm && surfaceForm !== lemma && lexicon[surfaceForm]) {
-      return lexicon[surfaceForm];
-    }
-    return null;
+    const entry = lexicon[lemma] || (surfaceForm && surfaceForm !== lemma ? lexicon[surfaceForm] : null);
+    
+    if (!entry) return null;
+    
+    // Merge all possible meaning fields (definition, gloss, meaning, etc.)
+    const meanings: string[] = [];
+    if (entry.definition && entry.definition.trim()) meanings.push(entry.definition);
+    if ((entry as any).gloss && (entry as any).gloss.trim()) meanings.push((entry as any).gloss);
+    if ((entry as any).meaning && (entry as any).meaning.trim()) meanings.push((entry as any).meaning);
+    if ((entry as any).translation && (entry as any).translation.trim()) meanings.push((entry as any).translation);
+    
+    // Return enhanced entry with merged definition
+    return {
+      ...entry,
+      definition: meanings.length > 0 ? meanings.join(' | ') : '(정의 없음)'
+    };
   };
 
   const bookAbbrevMap: Record<string, string> = useMemo(() => {
@@ -301,7 +310,7 @@ export function BiblePanel({
                                       verse
                                     )
                                   }
-                                  className={`w-full text-left p-2 rounded transition-all text-sm leading-relaxed cursor-pointer whitespace-nowrap ${
+                                  className={`w-full text-left p-2 rounded transition-all text-sm leading-relaxed cursor-pointer whitespace-normal ${
                                     isSelected
                                       ? 'bg-amber-100 border-l-2 border-amber-500 text-stone-800'
                                       : 'bg-white hover:bg-stone-100 text-stone-600'
@@ -310,7 +319,7 @@ export function BiblePanel({
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
                                     {verseIdx + 1}
                                   </span>
-                                  <span className="font-greek text-stone-700 whitespace-nowrap">
+                                  <span className="font-greek text-stone-700 whitespace-normal">
                                     {verse.map((word, wordIdx) => (
                                       <span
                                         key={wordIdx}
