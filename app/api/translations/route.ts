@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/app/lib/supabase';
+import krvData from '@/krv_data.json';
+
+// Local KRV data loaded from krv_data.json
+// Format: { "BOOK_chapter_verse": "translation text", ... }
+const krvTranslations: Record<string, string> = krvData as Record<string, string>;
 
 // GET /api/translations?version=krv|net&book=MAT&chapter=1&verse=1
 export async function GET(request: NextRequest) {
@@ -17,24 +21,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabase();
+    // KRV: Use local JSON data (no external API call)
+    if (version === 'krv') {
+      const key = `${book}_${chapter}_${verse}`;
+      const text = krvTranslations[key] || null;
+      
+      return NextResponse.json({ 
+        data: text ? { text } : null,
+        text,
+        translation: text
+      });
+    }
     
-    // Determine which table to query based on version
-    const tableName = version === 'krv' ? 'krv_translations' : 
-                     version === 'net' ? 'net_translations' : 
-                     'translations';
-    
-    // Try to fetch from Supabase - select 'text' column only for new schema
-    const { data, error } = await supabase
-      .from(tableName)
-      .select('text')
-      .eq('book', book)
-      .eq('chapter', parseInt(chapter))
-      .eq('verse', parseInt(verse))
-      .maybeSingle();
-
-    if (error && error.code === 'PGRST116') {
-      // No data found
+    // NET: Currently not available (placeholder for future implementation)
+    if (version === 'net') {
       return NextResponse.json({ 
         data: null,
         text: null,
@@ -42,21 +42,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (error) {
-      console.error('Error fetching translation:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch translation' },
-        { status: 500 }
-      );
-    }
-
-    // Return the text field from new schema
-    const translationText = data?.text || null;
-    
+    // Unknown version
     return NextResponse.json({ 
-      data,
-      text: translationText,
-      translation: translationText
+      data: null,
+      text: null,
+      translation: null
     });
     
   } catch (error) {
