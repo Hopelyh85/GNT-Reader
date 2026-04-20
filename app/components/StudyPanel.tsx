@@ -219,17 +219,15 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     loadLexicon();
   }, []);
 
-  // Get definition for selected word - tries lemma first, then surface form
-  const getWordDefinition = (lemma: string, surfaceForm?: string): LexiconEntry | null => {
-    // Try lemma (root form) first
-    if (lexicon[lemma]) {
-      return lexicon[lemma];
-    }
-    // Fallback to surface form if provided and different from lemma
-    if (surfaceForm && surfaceForm !== lemma && lexicon[surfaceForm]) {
-      return lexicon[surfaceForm];
-    }
-    return null;
+  // Get definition for selected word - uses surface form as key (lexicon.json keys are surface forms)
+  const getWordDefinition = (surfaceForm: string): LexiconEntry | null => {
+    return lexicon[surfaceForm] || null;
+  };
+
+  // Extract true lemma from definition text (e.g., "낳았다 (γεννάω의 부정과거...)" -> "γεννάω")
+  const extractTrueLemma = (definition: string): string | null => {
+    const match = definition.match(/\(([\u0370-\u03FF]+)의/);  // Match Greek letters before '의'
+    return match ? match[1] : null;
   };
 
   if (!selectedVerse) {
@@ -402,14 +400,17 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           ) : selectedWord ? (
             <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg">
               {(() => {
-                const entry = getWordDefinition(selectedWord.word.lemma, selectedWord.word.text);
+                const entry = getWordDefinition(selectedWord.word.text);
+                const trueLemma = entry ? extractTrueLemma(entry.definition) : null;
                 return entry ? (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-greek text-lg font-semibold text-amber-700">
-                        {selectedWord.word.lemma}
+                        {trueLemma || selectedWord.word.text}
                       </span>
-                      <span className="text-xs text-stone-500">[{entry.transliteration}]</span>
+                      <span className="text-xs px-2 py-0.5 bg-stone-200 rounded text-stone-600">
+                        표면형: {selectedWord.word.text}
+                      </span>
                     </div>
                     <p className="text-sm text-stone-700 leading-relaxed">
                       {entry.definition}
@@ -417,16 +418,18 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                     <div className="flex items-center gap-2 text-xs text-stone-500">
                       <span>Strong&apos;s: {entry.strongs}</span>
                       <span>•</span>
+                      <span>[{entry.transliteration}]</span>
+                      <span>•</span>
                       <span>{entry.frequency}</span>
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-4">
                     <p className="text-sm text-stone-500 mb-2">
-                      &quot;{selectedWord.word.lemma}&quot;에 대한 사전 정보가 없습니다
+                      &quot;{selectedWord.word.text}&quot;에 대한 사전 정보가 없습니다
                     </p>
                     <p className="text-xs text-stone-400">
-                      원형: {selectedWord.word.lemma} | 문법: {selectedWord.word.morph}
+                      표면형: {selectedWord.word.text} | 문법: {selectedWord.word.morph}
                     </p>
                   </div>
                 );

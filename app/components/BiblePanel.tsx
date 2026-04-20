@@ -106,39 +106,15 @@ export function BiblePanel({
     loadLexicon();
   }, []);
   
-  // Get definition for selected word - merges ALL possible field sources
-  const getWordDefinition = (lemma: string, surfaceForm?: string): LexiconEntry | null => {
-    const entry = lexicon[lemma] || (surfaceForm && surfaceForm !== lemma ? lexicon[surfaceForm] : null);
-    
-    if (!entry) return null;
-    
-    // Merge all possible meaning fields from various data sources
-    const meanings: string[] = [];
-    const e = entry as any;
-    
-    // Check all possible fields that might contain definition/meaning
-    const possibleFields = ['definition', 'gloss', 'meaning', 'translation', 'def', 'mean', 'trans', 'desc', 'description'];
-    
-    for (const field of possibleFields) {
-      const value = e[field];
-      if (value && typeof value === 'string' && value.trim()) {
-        meanings.push(value.trim());
-      }
-    }
-    
-    // Also check for array of definitions
-    if (e.definitions && Array.isArray(e.definitions)) {
-      meanings.push(...e.definitions.filter((d: string) => d && d.trim()));
-    }
-    
-    // Deduplicate meanings
-    const uniqueMeanings = [...new Set(meanings)];
-    
-    // Return enhanced entry with merged definition
-    return {
-      ...entry,
-      definition: uniqueMeanings.length > 0 ? uniqueMeanings.join(' | ') : '(정의 없음 - DB 확인 필요)'
-    };
+  // Get definition for selected word - uses surface form as key (lexicon.json keys are surface forms)
+  const getWordDefinition = (surfaceForm: string): LexiconEntry | null => {
+    return lexicon[surfaceForm] || null;
+  };
+
+  // Extract true lemma from definition text (e.g., "낳았다 (γεννάω의 부정과거...)" -> "γεννάω")
+  const extractTrueLemma = (definition: string): string | null => {
+    const match = definition.match(/\(([\u0370-\u03FF]+)의/);  // Match Greek letters before '의'
+    return match ? match[1] : null;
   };
 
   const bookAbbrevMap: Record<string, string> = useMemo(() => {
@@ -181,7 +157,7 @@ export function BiblePanel({
     console.log('LEMMA (원형):', word.lemma, '| TEXT (표면형):', word.text);
     console.log('Are they SAME?:', word.lemma === word.text);
     console.log('Morph:', word.morph);
-    console.log('Lexicon lookup:', getWordDefinition(word.lemma, word.text));
+    console.log('Lexicon lookup:', getWordDefinition(word.text));
     console.log('========================');
     
     const selectedWordData = {
@@ -419,20 +395,40 @@ export function BiblePanel({
                       </div>
                     );
                   }
-                  const entry = getWordDefinition(internalSelectedWord.word.lemma, internalSelectedWord.word.text);
+                  const entry = getWordDefinition(internalSelectedWord.word.text);
+                  const trueLemma = entry ? extractTrueLemma(entry.definition) : null;
                   return entry ? (
                     <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg shadow-sm">
                       <p className="text-base font-bold text-amber-900 mb-2 border-b border-amber-200 pb-1">
                         📖 사전 뜻
                       </p>
-                      <p className="text-base text-stone-800 leading-relaxed font-medium">
+                      <p className="text-base font-bold text-amber-900 mb-2 border-b border-amber-200 pb-1">
+                        단어 분석: {trueLemma || internalSelectedWord.word.text}
+                      </p>
+                      <div className="flex items-center gap-3 mb-3 flex-wrap">
+                        <span className="font-greek text-2xl font-bold text-amber-700">
+                          {trueLemma || internalSelectedWord.word.text}
+                        </span>
+                        <span className="text-xs px-2 py-1 bg-amber-100 rounded text-amber-800">
+                          [{entry.transliteration}]
+                        </span>
+                        <span className="text-xs px-2 py-1 bg-stone-200 rounded text-stone-600">
+                          표면형: {internalSelectedWord.word.text}
+                        </span>
+                      </div>
+                      <p className="text-sm text-stone-700 mb-3 leading-relaxed">
                         {entry.definition}
                       </p>
-                      <div className="flex items-center gap-3 text-sm text-stone-600 mt-3 pt-2 border-t border-amber-200">
-                        <span className="font-semibold">Strong&apos;s: {entry.strongs}</span>
-                        <span className="text-stone-400">|</span>
-                        <span>[{entry.transliteration}]</span>
+                      <div className="flex items-center gap-2 text-xs text-stone-500">
+                        <span className="px-2 py-1 bg-stone-100 rounded">Strong&apos;s: {entry.strongs}</span>
+                        <span className="px-2 py-1 bg-stone-100 rounded">문법: {internalSelectedWord.word.morph}</span>
                       </div>
+                      <p className="text-xs text-stone-400">
+                        표면형: {internalSelectedWord.word.text} | 문법: {internalSelectedWord.word.morph}
+                      </p>
+                      <p className="text-xs text-red-500 mt-2">
+                        (콘솔에서 상세 로그 확인 - F12 &gt; Console)
+                      </p>
                     </div>
                   ) : (
                     <div className="mt-4 p-4 bg-red-50 border-2 border-red-300 rounded-lg">

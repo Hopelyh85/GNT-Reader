@@ -73,10 +73,10 @@ export default function Home() {
         </div>
       )}
 
-      {/* Main Content - 3 Column Layout */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Bible Text (MAXIMUM WIDTH) */}
-        <div className="w-1/2 min-w-[450px] border-r border-stone-200">
+      {/* Main Content - RESPONSIVE: Mobile=Stack, Desktop=Side by Side */}
+      <main className="flex-1 flex flex-col md:flex-row overflow-auto md:overflow-hidden">
+        {/* Left Panel - Bible Text */}
+        <div className="w-full md:w-1/2 md:min-w-[450px] md:border-r border-stone-200">
           <BiblePanel
             books={books}
             selectedVerse={selectedVerse}
@@ -87,7 +87,7 @@ export default function Home() {
         </div>
 
         {/* Center Panel - Study Notes */}
-        <div className="w-5/12 min-w-[400px] border-r border-stone-200">
+        <div className="w-full md:w-5/12 md:min-w-[400px] md:border-r border-stone-200 mt-4 md:mt-0">
           <StudyPanel
             selectedVerse={selectedVerse}
             selectedWord={selectedWord}
@@ -97,8 +97,8 @@ export default function Home() {
           />
         </div>
 
-        {/* Right Panel - Community */}
-        <div className="w-0 min-w-0 hidden lg:block lg:w-[280px]">
+        {/* Right Panel - Community (Desktop only) */}
+        <div className="hidden lg:block lg:w-[280px]">
           <CommunityPanel
             selectedVerse={selectedVerse}
             isLoggedIn={isLoggedIn}
