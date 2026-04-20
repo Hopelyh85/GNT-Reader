@@ -175,14 +175,13 @@ export function BiblePanel({
     verseNum: number,
     wordIndex: number
   ) => {
-    // DEBUG: Log raw word data and lexicon lookup
-    console.log('=== Word Click Debug ===');
-    console.log('Raw word data:', word);
-    console.log('Lemma:', word.lemma);
-    console.log('Text:', word.text);
+    // DEBUG: Log raw word data and lemma vs text
+    console.log('=== LEMMA vs TEXT DEBUG ===');
+    console.log('Raw word:', word);
+    console.log('LEMMA (원형):', word.lemma, '| TEXT (표면형):', word.text);
+    console.log('Are they SAME?:', word.lemma === word.text);
     console.log('Morph:', word.morph);
-    console.log('Lexicon lookup result:', getWordDefinition(word.lemma, word.text));
-    console.log('Full lexicon keys sample:', Object.keys(lexicon).slice(0, 10));
+    console.log('Lexicon lookup:', getWordDefinition(word.lemma, word.text));
     console.log('========================');
     
     const selectedWordData = {
@@ -241,9 +240,9 @@ export function BiblePanel({
         </h2>
       </div>
 
-      {/* Bible Content - MOBILE HORIZONTAL SCROLL FORCED */}
+      {/* Bible Content - FORCED HORIZONTAL SCROLL */}
       <div 
-        className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-2 w-full"
+        className="flex-1 overflow-y-auto overflow-x-auto p-4 space-y-2 [&::-webkit-scrollbar]:h-3"
         style={{ 
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'auto',
@@ -310,11 +309,11 @@ export function BiblePanel({
                           )}
                         </button>
 
-                        {/* Verses - MOBILE SCROLL ENABLED */}
+                        {/* Verses - FORCED WIDE SCROLL */}
                         {isChapterExpanded && (
                           <div 
-                            className="mt-1 space-y-1 pl-2 bg-stone-50/30 rounded overflow-x-auto"
-                            style={{ minWidth: '100%', display: 'block' }}
+                            className="mt-1 space-y-1 pl-2 bg-stone-50/30 rounded"
+                            style={{ minWidth: '1000px', display: 'block' }}
                           >
                             {/* Visible scrollbar indicator */}
                             <div className="md:hidden h-1 bg-gradient-to-r from-stone-300 via-amber-400 to-stone-300 rounded-full mb-2 opacity-60" />
