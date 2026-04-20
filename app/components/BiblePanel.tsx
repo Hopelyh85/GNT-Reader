@@ -527,6 +527,27 @@ export function BiblePanel({
           </div>
         </div>
       )}
+
+      {/* Mobile Reflection Input - at bottom of Bible text */}
+      <div className="md:hidden border-t border-stone-200 bg-white p-4 mt-4">
+        <h3 className="text-sm font-serif font-semibold text-stone-700 mb-2 flex items-center gap-2">
+          <BookOpen className="w-4 h-4" />
+          나의 묵상
+        </h3>
+        <textarea
+          className="w-full h-24 p-3 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400"
+          placeholder={selectedVerse ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}에 대한 묵상을 입력하세요...` : '먼저 성경 구절을 선택하세요...'}
+          disabled={!selectedVerse}
+        />
+        <div className="flex justify-end mt-2">
+          <button
+            className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg disabled:bg-stone-300 disabled:cursor-not-allowed"
+            disabled={!selectedVerse}
+          >
+            저장
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
