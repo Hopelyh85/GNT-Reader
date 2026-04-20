@@ -409,9 +409,8 @@ export function BiblePanel({
               {(() => {
                 const w = internalSelectedWord.word;
                 const def = lexicon[w.lemma]?.definition || lexicon[w.text]?.definition || null;
-                const isValidDef = def && def.trim() && def !== w.lemma && def !== w.text;
                 
-                if (isValidDef) {
+                if (def) {
                   return (
                     <div className="flex items-start gap-2">
                       <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
@@ -419,12 +418,7 @@ export function BiblePanel({
                     </div>
                   );
                 }
-                return (
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
-                    <p className="text-sm text-stone-400 italic">(상세 사전 데이터 업데이트 예정)</p>
-                  </div>
-                );
+                return null;
               })()}
             </div>
             <button
