@@ -5,7 +5,6 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { BiblePanel } from '@/app/components/BiblePanel';
 import { StudyPanel } from '@/app/components/StudyPanel';
 import { CommunityPanel } from '@/app/components/CommunityPanel';
-import { MobileWordSheet } from '@/app/components/MobileWordSheet';
 import { useSBLGNT } from '@/app/hooks/useSBLGNT';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { BookOpen, User, LogOut, LogIn } from 'lucide-react';
@@ -16,21 +15,6 @@ export default function Home() {
   const books = getBooks();
   const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
-  const [mobileWordOpen, setMobileWordOpen] = useState(false);
-
-  // Handle word selection - open mobile sheet on mobile devices
-  const handleSelectWord = (word: SelectedWord | null) => {
-    setSelectedWord(word);
-    if (word && typeof window !== 'undefined' && window.innerWidth < 768) {
-      setMobileWordOpen(true);
-    }
-  };
-
-  // Handle mobile sheet close
-  const handleCloseMobileWord = () => {
-    setMobileWordOpen(false);
-    setSelectedWord(null);
-  };
 
   const isLoggedIn = status === 'authenticated';
   const userRole = session?.user?.role || 'GUEST';
@@ -97,7 +81,7 @@ export default function Home() {
             books={books}
             selectedVerse={selectedVerse}
             onSelectVerse={setSelectedVerse}
-            onSelectWord={handleSelectWord}
+            onSelectWord={setSelectedWord}
             loading={loading}
           />
         </div>
@@ -123,12 +107,6 @@ export default function Home() {
           />
         </div>
       </main>
-
-      {/* Mobile Word Analysis Bottom Sheet */}
-      <MobileWordSheet 
-        selectedWord={mobileWordOpen ? selectedWord : null}
-        onClose={handleCloseMobileWord}
-      />
 
     </div>
   );
