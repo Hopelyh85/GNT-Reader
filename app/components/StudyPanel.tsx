@@ -410,13 +410,125 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
       )}
 
-      {/* Content */}
+      {/* Content - RESTRUCTURED LAYOUT */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Private Translation */}
+        
+        {/* 1. WORD ANALYSIS - Selected Word Info */}
+        {selectedWord && (
+          <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg">
+            <label className="flex items-center gap-2 text-sm font-serif font-medium text-amber-700 mb-3">
+              <Search className="w-3 h-3" />
+              단어 분석 (Word Analysis)
+            </label>
+            {(() => {
+              const w = selectedWord.word;
+              const entry = getWordDefinition(w.lemma, w.text);
+              const parsed = parseMorphCode(w.morph);
+              
+              console.log('=== STUDYPANEL WORD DEBUG ===');
+              console.log('word.morph:', w.morph);
+              console.log('parsed:', parsed);
+              console.log('============================');
+              
+              return (
+                <div className="space-y-2">
+                  {/* Line 1: Lemma */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-greek text-2xl font-bold text-amber-700">
+                      {w.lemma || w.text}
+                    </span>
+                  </div>
+                  
+                  {/* Line 2: Morph Code + Korean Grammar */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono bg-stone-200 px-1.5 py-0.5 rounded">
+                      [{w.morph}]
+                    </span>
+                    <span className="text-sm text-blue-700">
+                      [{parsed.type}{parsed.case ? ` • ${parsed.case}` : ''}{parsed.number ? ` • ${parsed.number}` : ''}{parsed.gender ? ` • ${parsed.gender}` : ''}{parsed.person ? ` • ${parsed.person}` : ''}{parsed.tense ? ` • ${parsed.tense}` : ''}{parsed.voice ? ` • ${parsed.voice}` : ''}{parsed.mood ? ` • ${parsed.mood}` : ''}]
+                    </span>
+                  </div>
+                  
+                  {/* Line 3: Definition */}
+                  {entry ? (
+                    <p className="text-sm text-stone-700 leading-relaxed">
+                      {entry.definition}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-stone-600">
+                      [성경 인물/지명]
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* 2. COMPARATIVE STUDY - GNT / KRV / NET */}
+        <div className="mt-2 space-y-2">
+          {/* GNT Original */}
+          <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
+            <p className="text-xs font-semibold text-amber-700 mb-1">📜 GNT 원문 (Original)</p>
+            <p className="text-sm text-stone-700 font-greek leading-relaxed">
+              {selectedVerse.text}
+            </p>
+          </div>
+          
+          {/* Korean Translation (KRV) */}
+          <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
+            <p className="text-xs font-semibold text-blue-700 mb-1">🇰🇷 개역한글 (KRV)</p>
+            {translationLoading ? (
+              <p className="text-sm text-stone-500 animate-pulse flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span>
+                로딩 중...
+              </p>
+            ) : koreanTranslation ? (
+              <p className="text-sm text-stone-700 leading-relaxed">{koreanTranslation}</p>
+            ) : (
+              <p className="text-sm text-stone-400 italic">개역한글 데이터 준비 중</p>
+            )}
+          </div>
+          
+          {/* NET English Translation */}
+          <div className="p-3 bg-green-50 rounded border-l-4 border-green-500">
+            <p className="text-xs font-semibold text-green-700 mb-1">🌐 NET English</p>
+            {translationLoading ? (
+              <p className="text-sm text-stone-500 animate-pulse flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin"></span>
+                로딩 중...
+              </p>
+            ) : netTranslation ? (
+              <p className="text-sm text-stone-700 leading-relaxed">{netTranslation}</p>
+            ) : (
+              <p className="text-sm text-stone-400 italic">NET 영어 데이터 준비 중</p>
+            )}
+          </div>
+        </div>
+
+        {/* 3. SAVED REFLECTIONS LIST */}
+        {ministryNote && (
+          <div className="p-3 bg-stone-50 border border-stone-200 rounded-lg">
+            <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
+              <BookOpen className="w-3 h-3" />
+              저장된 묵상
+            </label>
+            <div className="text-sm text-stone-700 bg-white p-3 rounded border border-stone-100">
+              {ministryNote.length > 100 ? ministryNote.substring(0, 100) + '...' : ministryNote}
+            </div>
+            {lastSaved && (
+              <p className="text-xs text-stone-400 mt-1">
+                저장됨: {lastSaved.toLocaleTimeString('ko-KR')}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* 4. REFLECTION INPUT */}
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
             <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-            나의 사역 (Private Translation)
+            나의 묵상 작성
             {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
           </label>
           <textarea
@@ -424,8 +536,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             onChange={(e) => canWrite && setMinistryNote(e.target.value)}
             disabled={!canWrite}
             placeholder={canWrite 
-              ? "이 말씀을 내 언어와 상황으로 옮긴다면... (개인적 번역)" 
-              : "로그인 후 나의 사역을 작성할 수 있습니다."}
+              ? "이 말씀에 대한 나의 묵상을 작성하세요..." 
+              : "로그인 후 묵상을 작성할 수 있습니다."}
             className="w-full h-32 p-3 text-sm leading-relaxed bg-stone-50 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
           />
         </div>
@@ -449,82 +561,6 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           />
         </div>
 
-        {/* Dictionary Lookup */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
-            <Search className="w-3 h-3 text-amber-500" />
-            사전 조회 (Dictionary)
-            {selectedWord && <span className="text-xs text-amber-600"> - {selectedWord.word.text}</span>}
-          </label>
-          
-          {lexiconLoading ? (
-            <div className="p-4 bg-stone-50 border border-stone-200 rounded-lg">
-              <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
-            </div>
-          ) : selectedWord ? (
-            <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg">
-              {(() => {
-                const entry = getWordDefinition(selectedWord.word.lemma, selectedWord.word.text);
-                const inferredType = inferWordType(selectedWord.word.morph, selectedWord.word.text);
-                const parsed = parseMorphCode(selectedWord.word.morph);
-                
-                return entry ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-greek text-lg font-semibold text-amber-700">
-                        {selectedWord.word.lemma}
-                      </span>
-                      {selectedWord.word.lemma !== selectedWord.word.text && (
-                        <span className="text-xs px-2 py-0.5 bg-stone-200 rounded text-stone-600">
-                          표면형: {selectedWord.word.text}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-stone-700 leading-relaxed">
-                      {entry.definition}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
-                      <span>Strong&apos;s: {entry.strongs}</span>
-                      <span>•</span>
-                      <span>[{entry.transliteration}]</span>
-                      <span>•</span>
-                      <span>{entry.frequency}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="font-greek text-xl font-semibold text-stone-700">
-                        {selectedWord.word.lemma}
-                      </span>
-                      {selectedWord.word.lemma !== selectedWord.word.text && (
-                        <span className="text-xs px-2 py-0.5 bg-stone-200 rounded text-stone-600">
-                          표면형: {selectedWord.word.text}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium text-amber-700 mb-2">
-                      📖 {inferredType}
-                    </p>
-                    <p className="text-xs text-stone-500 mb-1">
-                      문법정보: {parsed.type}{parsed.case ? ` • ${parsed.case}` : ''}{parsed.number ? ` • ${parsed.number}` : ''}{parsed.gender ? ` • ${parsed.gender}` : ''}{parsed.tense ? ` • ${parsed.tense}` : ''}{parsed.voice ? ` • ${parsed.voice}` : ''}{parsed.mood ? ` • ${parsed.mood}` : ''}
-                    </p>
-                    <p className="text-xs text-stone-400 mt-2 border-t border-stone-200 pt-2">
-                      (사전 데이터 준비 중)
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-          ) : (
-            <div className="p-4 bg-stone-50 border border-stone-200 rounded-lg text-center">
-              <BookOpen className="w-5 h-5 mx-auto mb-2 text-stone-300" />
-              <p className="text-xs text-stone-400">
-                왼쪽 패널에서 단어를 클릭하면<br />사전 정보가 표시됩니다
-              </p>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
