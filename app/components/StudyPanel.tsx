@@ -315,7 +315,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           <div className="flex items-center gap-2">
             <PenLine className="w-4 h-4 text-stone-600" />
             <h2 className="text-sm font-serif font-semibold text-stone-700">
-              나의 묵상 공간 {isAdmin && <span className="text-amber-600">👑</span>}
+              나의 사역 공간 (Private Translation) {isAdmin && <span className="text-amber-600">👑</span>}
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -345,60 +345,6 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               <Save className="w-3 h-3" />
               저장
             </button>
-          </div>
-        </div>
-        {/* Comparative Study: GNT - KRV - NET */}
-        <div className="mt-2 space-y-2">
-          {/* GNT Original */}
-          <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
-            <p className="text-xs font-semibold text-amber-700 mb-1">📜 GNT 원문 (Original)</p>
-            <p className="text-sm text-stone-700 font-greek leading-relaxed">
-              {selectedVerse.text}
-            </p>
-          </div>
-          
-          {/* Korean Translation (KRV) */}
-          <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
-            <p className="text-xs font-semibold text-blue-700 mb-1">🇰🇷 개역한글 (KRV)</p>
-            {translationLoading ? (
-              <p className="text-sm text-stone-500 animate-pulse flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span>
-                Supabase에서 데이터 로딩 중...
-              </p>
-            ) : koreanTranslation ? (
-              <p className="text-sm text-stone-700 leading-relaxed">{koreanTranslation}</p>
-            ) : (
-              <div className="text-sm text-stone-500 italic bg-stone-100 p-2 rounded">
-                <p>⚠️ 개역한글 데이터가 Supabase에 없습니다</p>
-                <p className="text-xs mt-1 text-stone-400">
-                  1. Supabase 콘솔에서 SQL Editor 열기<br/>
-                  2. supabase_schema.sql 실행<br/>
-                  3. CSV 데이터 Import
-                </p>
-              </div>
-            )}
-          </div>
-          
-          {/* NET English Translation */}
-          <div className="p-3 bg-green-50 rounded border-l-4 border-green-500">
-            <p className="text-xs font-semibold text-green-700 mb-1">🌐 NET English (New English Translation)</p>
-            {translationLoading ? (
-              <p className="text-sm text-stone-500 animate-pulse flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin"></span>
-                Supabase에서 데이터 로딩 중...
-              </p>
-            ) : netTranslation ? (
-              <p className="text-sm text-stone-700 leading-relaxed">{netTranslation}</p>
-            ) : (
-              <div className="text-sm text-stone-500 italic bg-stone-100 p-2 rounded">
-                <p>⚠️ NET 영어 성경 데이터가 Supabase에 없습니다</p>
-                <p className="text-xs mt-1 text-stone-400">
-                  1. Supabase 콘솔 → Table Editor<br/>
-                  2. net_translations 테이블 선택<br/>
-                  3. CSV Import
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -506,12 +452,12 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
         </div>
 
-        {/* 3. SAVED REFLECTIONS LIST */}
+        {/* 3. SAVED PRIVATE TRANSLATION LIST */}
         {ministryNote && (
           <div className="p-3 bg-stone-50 border border-stone-200 rounded-lg">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
               <BookOpen className="w-3 h-3" />
-              저장된 묵상
+              저장된 나의 사역
             </label>
             <div className="text-sm text-stone-700 bg-white p-3 rounded border border-stone-100">
               {ministryNote.length > 100 ? ministryNote.substring(0, 100) + '...' : ministryNote}
@@ -524,11 +470,11 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
         )}
 
-        {/* 4. REFLECTION INPUT */}
+        {/* 4. PRIVATE TRANSLATION INPUT */}
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
             <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-            나의 묵상 작성
+            나의 사역 작성 (Private Translation)
             {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
           </label>
           <textarea
@@ -536,8 +482,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             onChange={(e) => canWrite && setMinistryNote(e.target.value)}
             disabled={!canWrite}
             placeholder={canWrite 
-              ? "이 말씀에 대한 나의 묵상을 작성하세요..." 
-              : "로그인 후 묵상을 작성할 수 있습니다."}
+              ? "이 말씀을 내 언어와 상황으로 옮긴다면... (개인적 번역)" 
+              : "로그인 후 나의 사역을 작성할 수 있습니다."}
             className="w-full h-32 p-3 text-sm leading-relaxed bg-stone-50 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
           />
         </div>
