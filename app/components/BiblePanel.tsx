@@ -29,7 +29,7 @@ interface BiblePanelProps {
 const parseMorphCode = (morph: string): string => {
   if (!morph || morph.length < 8) return '미상의 품사';
   
-  const typeMap: Record<string, string> = {'N':'명사', 'V':'동사', 'A':'형용사', 'D':'부사', 'P':'대명사', 'R':'대명사', 'T':'관사', 'C':'접속사', 'X':'불변화사'};
+  const typeMap: Record<string, string> = {'N':'명사', 'V':'동사', 'A':'형용사', 'D':'부사', 'P':'전치사', 'R':'대명사', 'T':'관사', 'C':'접속사', 'X':'불변화사', 'I':'감탄사'};
   const caseMap: Record<string, string> = {'N':'주격', 'G':'속격', 'D':'여격', 'A':'대격', 'V':'호격'};
   const numberMap: Record<string, string> = {'S':'단수', 'P':'복수'};
   const genderMap: Record<string, string> = {'M':'남성', 'F':'여성', 'N':'중성'};
@@ -405,11 +405,13 @@ export function BiblePanel({
                 {parseMorphCode(internalSelectedWord.word.morph)}
               </div>
               
-              {/* Line 3: 사전 뜻 (있을 때만) */}
+              {/* Line 3: 사전 뜻 */}
               {(() => {
                 const w = internalSelectedWord.word;
                 const def = lexicon[w.lemma]?.definition || lexicon[w.text]?.definition || null;
-                if (def) {
+                const isValidDef = def && def.trim() && def !== w.lemma && def !== w.text;
+                
+                if (isValidDef) {
                   return (
                     <div className="flex items-start gap-2">
                       <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
@@ -417,7 +419,12 @@ export function BiblePanel({
                     </div>
                   );
                 }
-                return null;
+                return (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
+                    <p className="text-sm text-stone-400 italic">(상세 사전 데이터 업데이트 예정)</p>
+                  </div>
+                );
               })()}
             </div>
             <button

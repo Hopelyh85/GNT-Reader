@@ -236,7 +236,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const parseMorphCode = (morph: string): string => {
     if (!morph || morph.length < 8) return '미상의 품사';
     
-    const typeMap: Record<string, string> = {'N':'명사', 'V':'동사', 'A':'형용사', 'D':'부사', 'P':'대명사', 'R':'대명사', 'T':'관사', 'C':'접속사', 'X':'불변화사'};
+    const typeMap: Record<string, string> = {'N':'명사', 'V':'동사', 'A':'형용사', 'D':'부사', 'P':'전치사', 'R':'대명사', 'T':'관사', 'C':'접속사', 'X':'불변화사', 'I':'감탄사'};
     const caseMap: Record<string, string> = {'N':'주격', 'G':'속격', 'D':'여격', 'A':'대격', 'V':'호격'};
     const numberMap: Record<string, string> = {'S':'단수', 'P':'복수'};
     const genderMap: Record<string, string> = {'M':'남성', 'F':'여성', 'N':'중성'};
@@ -329,29 +329,34 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             {(() => {
               const w = selectedWord.word;
               const entry = getWordDefinition(w.lemma, w.text);
-              const grammar = parseMorphCode(w.morph);
+              const def = entry?.definition || null;
+              const isValidDef = def && def.trim() && def !== w.lemma && def !== w.text;
               
               return (
-                <div className="space-y-2">
-                  <div className="font-greek text-2xl font-bold text-amber-700">
-                    {w.lemma || w.text}
-                  </div>
-                  <div className="text-sm text-blue-700 font-medium">
-                    {grammar}
-                  </div>
-                  {entry?.definition && (
-                    <p className="text-sm text-stone-700 leading-relaxed">
-                      {entry.definition}
-                    </p>
-                  )}
+              <div className="space-y-2">
+                <div className="font-greek text-2xl font-bold text-amber-700">
+                  {w.lemma || w.text}
                 </div>
-              );
-            })()}
+                <div className="text-sm text-blue-700 font-medium">
+                  {parseMorphCode(w.morph)}
+                </div>
+                {isValidDef ? (
+                  <p className="text-sm text-stone-700 leading-relaxed">{def}</p>
+                ) : (
+                  <p className="text-sm text-stone-400 italic">(상세 사전 데이터 업데이트 예정)</p>
+                )}
+              </div>
+            );
+          })()}
           </div>
         )}
 
         {/* 2. 본문 대조 (GNT / KRV / NET) */}
-        <div className="space-y-2">
+        <div className="border-t border-stone-200 pt-4 space-y-2">
+          <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
+            <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
+            본문 대조 (Comparative Study)
+          </label>
           <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
             <p className="text-xs font-semibold text-amber-700 mb-1">📜 GNT 원문</p>
             <p className="text-sm text-stone-700 font-greek leading-relaxed">{selectedVerse.text}</p>
@@ -381,10 +386,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
 
         {/* 3. 나의 사역 (Private Translation) */}
-        <div className="space-y-2">
+        <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
             <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-            나의 사역 (Private Translation)
+            나의 사역 - 번역 및 주석 (Private Translation)
             {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
           </label>
           <textarea
@@ -399,10 +404,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
 
         {/* 4. 나의 묵상 (Reflection) */}
-        <div className="space-y-2">
+        <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
             <BookOpen className="w-3 h-3 text-amber-500" />
-            나의 묵상 (Reflection)
+            나의 묵상 - 삶의 적용 (Reflection)
             {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
           </label>
           <textarea
