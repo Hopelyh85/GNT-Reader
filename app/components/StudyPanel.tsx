@@ -232,22 +232,21 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     return null;
   };
 
-  // Parse morph code to extract grammatical info (e.g., "N----NSM-" -> Noun, Nominative, Singular, Masculine)
+  // Parse morph code to extract grammatical info - COMPLETE RESTORED VERSION
   const parseMorphCode = (code: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
-    if (!code || code.length < 10) return { type: 'unknown' };
+    if (!code || code.length < 10) return { type: '' };
     
-    const type = code[0]; // N=Noun, V=Verb, A=Adjective, etc.
+    const type = code[0];
     const typeMap: Record<string, string> = {
       'N': '명사', 'V': '동사', 'A': '형용사', 'D': '부사', 
       'C': '접속사', 'P': '전치사', 'R': '관계사', 'M': '수사',
-      'I': '감탄사', 'X': '부정사'
+      'I': '감탄사', 'X': '부정사', 'T': '관사'
     };
     
     const result: any = { type: typeMap[type] || type };
     
-    if (type === 'N' || type === 'A' || type === 'R') {
-      // Noun/Adj: N----NSM-
-      // positions: 0=type, 1-3=unused, 4=case, 5=number, 6=gender
+    // Nouns, Adjectives, Articles: N----NSM-, A----NSM-, T----NSM-
+    if (type === 'N' || type === 'A' || type === 'R' || type === 'T') {
       const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
       const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
       const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
@@ -256,8 +255,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
       if (code[8]) result.number = numberMap[code[8]] || code[8];
       if (code[9]) result.gender = genderMap[code[9]] || code[9];
     } else if (type === 'V') {
-      // Verb: V3AAI-S--
-      // positions: 1=person, 2=number, 3=tense, 4=voice, 5=mood
+      // Verbs: V3AAI-S--
       const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
       const tenseMap: Record<string, string> = { 'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료' };
       const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };

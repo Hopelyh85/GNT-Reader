@@ -25,7 +25,7 @@ interface BiblePanelProps {
   loading: boolean;
 }
 
-// Parse morphology code and return structured data
+// Parse morphology code and return structured data - COMPLETE RESTORED VERSION
 const parseMorphCode = (morph: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
   if (!morph || morph.length < 10) return { type: '' };
   
@@ -33,12 +33,13 @@ const parseMorphCode = (morph: string): { type: string; case?: string; number?: 
   const typeMap: Record<string, string> = {
     'N': '명사', 'V': '동사', 'A': '형용사', 'D': '부사', 
     'C': '접속사', 'P': '전치사', 'R': '관계사', 'M': '수사',
-    'I': '감탄사', 'X': '부정사'
+    'I': '감탄사', 'X': '부정사', 'T': '관사'
   };
   
-  const result: any = { type: typeMap[type] || '' };
+  const result: any = { type: typeMap[type] || type };
   
-  if (type === 'N' || type === 'A' || type === 'R') {
+  // Nouns, Adjectives, Articles, Pronouns: N----NSM-, A----NSM-, T----NSM-
+  if (type === 'N' || type === 'A' || type === 'R' || type === 'T') {
     const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
     const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
     const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
@@ -47,6 +48,7 @@ const parseMorphCode = (morph: string): { type: string; case?: string; number?: 
     if (morph[8]) result.number = numberMap[morph[8]] || morph[8];
     if (morph[9]) result.gender = genderMap[morph[9]] || morph[9];
   } else if (type === 'V') {
+    // Verbs: V3AAI-S--
     const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
     const tenseMap: Record<string, string> = { 'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료' };
     const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };
