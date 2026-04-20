@@ -232,76 +232,37 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     return null;
   };
 
-  // Parse morphology code - COMPLETE REWRITE v2.0 (Sync with BiblePanel)
-  const parseMorphCode = (morph: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
-    if (!morph || morph.length < 10) return { type: '' };
+  // Parse morphology code - USER PROVIDED VERSION (returns string)
+  const parseMorphCode = (morph: string): string => {
+    if (!morph || morph.length < 8) return '미상의 품사';
     
-    const pos = morph[0];
-    const sub = morph[1];
-    
-    // Part of speech with subtypes
-    let type = '';
-    if (pos === 'R') {
-      const pronounMap: Record<string, string> = {
-        'D': '지시 대명사', 'P': '인칭 대명사', 'I': '의문 대명사',
-        'R': '관계 대명사', 'F': '재귀 대명사', 'X': '부정 대명사',
-        'S': '소유 대명사', '-': '대명사', 'C': '상관 대명사',
-        'K': '상관 대명사', 'Q': '의문 대명사'
-      };
-      type = pronounMap[sub] || '대명사';
-    } else if (pos === 'D') {
-      const adverbMap: Record<string, string> = {
-        '-': '부사', 'S': '지시 부사', 'X': '부정 부사',
-        'I': '의문 부사', 'Q': '의문 부사', 'R': '상관 부사',
-        'K': '상관 부사', 'C': '접속 부사', 'P': '전치사적 부사'
-      };
-      type = adverbMap[sub] || '부사';
-    } else if (pos === 'C') {
-      type = '접속사';
-    } else if (pos === 'P') {
-      type = '전치사';
+    const typeMap: Record<string, string> = {'N':'명사', 'V':'동사', 'A':'형용사', 'D':'부사', 'P':'대명사', 'R':'대명사', 'T':'관사', 'C':'접속사', 'X':'불변화사'};
+    const caseMap: Record<string, string> = {'N':'주격', 'G':'속격', 'D':'여격', 'A':'대격', 'V':'호격'};
+    const numberMap: Record<string, string> = {'S':'단수', 'P':'복수'};
+    const genderMap: Record<string, string> = {'M':'남성', 'F':'여성', 'N':'중성'};
+    const personMap: Record<string, string> = {'1':'1인칭', '2':'2인칭', '3':'3인칭'};
+    const tenseMap: Record<string, string> = {'P':'현재', 'I':'미완료', 'F':'미래', 'A':'부정과거', 'R':'완료', 'V':'과거완료'};
+    const voiceMap: Record<string, string> = {'A':'능동태', 'M':'중간태', 'P':'수동태', 'D':'디포넌트'};
+    const moodMap: Record<string, string> = {'I':'직설법', 'S':'가정법', 'O':'희구법', 'M':'명령법', 'N':'부정사', 'P':'분사'};
+
+    const type = typeMap[morph[0]] || '기타';
+    let details: string[] = [];
+
+    if (type === '동사') {
+      if (morph[1] !== '-') details.push(personMap[morph[1]]);
+      if (morph[2] !== '-') details.push(tenseMap[morph[2]]);
+      if (morph[3] !== '-') details.push(voiceMap[morph[3]]);
+      if (morph[4] !== '-') details.push(moodMap[morph[4]]);
+      if (morph[6] !== '-') details.push(numberMap[morph[6]]);
+      if (morph[7] !== '-') details.push(genderMap[morph[7]]);
     } else {
-      const posMap: Record<string, string> = {
-        'N': '명사', 'V': '동사', 'A': '형용사', 'T': '관사',
-        'M': '수사', 'I': '감탄사', 'X': '부정사'
-      };
-      type = posMap[pos] || pos;
+      if (morph[5] !== '-') details.push(caseMap[morph[5]]);
+      if (morph[6] !== '-') details.push(numberMap[morph[6]]);
+      if (morph[7] !== '-') details.push(genderMap[morph[7]]);
     }
-    
-    const result: any = { type };
-    const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
-    const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
-    const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
-    const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
-    const tenseMap: Record<string, string> = { 
-      'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료'
-    };
-    const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };
-    const moodMap: Record<string, string> = { 
-      'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 'P': '분사'
-    };
-    
-    // Nouns, Adjectives, Articles, Pronouns
-    if (pos === 'N' || pos === 'A' || pos === 'T' || pos === 'R') {
-      if (morph[6] && morph[6] !== '-') result.case = caseMap[morph[6]] || morph[6];
-      if (morph[7] && morph[7] !== '-') result.number = numberMap[morph[7]] || morph[7];
-      if (morph[8] && morph[8] !== '-') result.gender = genderMap[morph[8]] || morph[8];
-    }
-    // Verbs
-    else if (pos === 'V') {
-      if (morph[1] && morph[1] !== '-') result.person = personMap[morph[1]] || morph[1];
-      if (morph[2] && morph[2] !== '-') result.number = numberMap[morph[2]] || morph[2];
-      if (morph[3] && morph[3] !== '-') result.tense = tenseMap[morph[3]] || morph[3];
-      if (morph[4] && morph[4] !== '-') result.voice = voiceMap[morph[4]] || morph[4];
-      if (morph[5] && morph[5] !== '-') result.mood = moodMap[morph[5]] || morph[5];
-      if (morph[5] === 'P') {
-        if (morph[6] && morph[6] !== '-') result.case = caseMap[morph[6]] || morph[6];
-        if (morph[7] && morph[7] !== '-') result.number = numberMap[morph[7]] || morph[7];
-        if (morph[8] && morph[8] !== '-') result.gender = genderMap[morph[8]] || morph[8];
-      }
-    }
-    
-    return result;
+
+    const detailStr = details.filter(Boolean).join(' • ');
+    return detailStr ? `[${type} • ${detailStr}]` : `[${type}]`;
   };
 
   if (!selectedVerse) {
@@ -325,7 +286,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           <div className="flex items-center gap-2">
             <PenLine className="w-4 h-4 text-stone-600" />
             <h2 className="text-sm font-serif font-semibold text-stone-700">
-              나의 사역 공간 (Private Translation) {isAdmin && <span className="text-amber-600">👑</span>}
+              Study Panel {isAdmin && <span className="text-amber-600">👑</span>}
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -336,17 +297,6 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                 저장됨 {lastSaved.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
               </span>
             ) : null}
-            {noteTimestamp && (
-              <span className="text-xs text-amber-600 font-medium">
-                📝 {new Date(noteTimestamp).toLocaleString('ko-KR', { 
-                  year: 'numeric', 
-                  month: '2-digit', 
-                  day: '2-digit',
-                  hour: '2-digit', 
-                  minute: '2-digit'
-                })}
-              </span>
-            )}
             <button
               onClick={handleSave}
               disabled={saving || !canWrite}
@@ -366,47 +316,30 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
       )}
 
-      {/* Content - RESTRUCTURED LAYOUT */}
+      {/* Content - CLEAN 4 SECTIONS */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         
-        {/* 1. WORD ANALYSIS - Selected Word Info */}
+        {/* 1. 단어 분석 (Word Analysis) */}
         {selectedWord && (
           <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-amber-700 mb-3">
               <Search className="w-3 h-3" />
-              단어 분석 (Word Analysis)
+              단어 분석
             </label>
             {(() => {
               const w = selectedWord.word;
               const entry = getWordDefinition(w.lemma, w.text);
-              const parsed = parseMorphCode(w.morph);
-              
-              console.log('=== STUDYPANEL WORD DEBUG ===');
-              console.log('word.morph:', w.morph);
-              console.log('parsed:', parsed);
-              console.log('============================');
+              const grammar = parseMorphCode(w.morph);
               
               return (
                 <div className="space-y-2">
-                  {/* Line 1: Lemma */}
-                  <div className="flex items-center gap-2">
-                    <span className="font-greek text-2xl font-bold text-amber-700">
-                      {w.lemma || w.text}
-                    </span>
+                  <div className="font-greek text-2xl font-bold text-amber-700">
+                    {w.lemma || w.text}
                   </div>
-                  
-                  {/* Line 2: Morph Code + Korean Grammar */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono bg-stone-200 px-1.5 py-0.5 rounded">
-                      [{w.morph}]
-                    </span>
-                    <span className="text-sm text-blue-700">
-                      [{parsed.type}{parsed.case ? ` • ${parsed.case}` : ''}{parsed.number ? ` • ${parsed.number}` : ''}{parsed.gender ? ` • ${parsed.gender}` : ''}{parsed.person ? ` • ${parsed.person}` : ''}{parsed.tense ? ` • ${parsed.tense}` : ''}{parsed.voice ? ` • ${parsed.voice}` : ''}{parsed.mood ? ` • ${parsed.mood}` : ''}]
-                    </span>
+                  <div className="text-sm text-blue-700 font-medium">
+                    {grammar}
                   </div>
-                  
-                  {/* Line 3: Definition - NO HARDCODING */}
-                  {entry && entry.definition && (
+                  {entry?.definition && (
                     <p className="text-sm text-stone-700 leading-relaxed">
                       {entry.definition}
                     </p>
@@ -417,70 +350,41 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
         )}
 
-        {/* 2. COMPARATIVE STUDY - GNT / KRV / NET */}
-        <div className="mt-2 space-y-2">
-          {/* GNT Original */}
+        {/* 2. 본문 대조 (GNT / KRV / NET) */}
+        <div className="space-y-2">
           <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
-            <p className="text-xs font-semibold text-amber-700 mb-1">📜 GNT 원문 (Original)</p>
-            <p className="text-sm text-stone-700 font-greek leading-relaxed">
-              {selectedVerse.text}
-            </p>
+            <p className="text-xs font-semibold text-amber-700 mb-1">📜 GNT 원문</p>
+            <p className="text-sm text-stone-700 font-greek leading-relaxed">{selectedVerse.text}</p>
           </div>
           
-          {/* Korean Translation (KRV) */}
           <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
             <p className="text-xs font-semibold text-blue-700 mb-1">🇰🇷 개역한글 (KRV)</p>
             {translationLoading ? (
-              <p className="text-sm text-stone-500 animate-pulse flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span>
-                로딩 중...
-              </p>
+              <p className="text-sm text-stone-500">로딩 중...</p>
             ) : koreanTranslation ? (
               <p className="text-sm text-stone-700 leading-relaxed">{koreanTranslation}</p>
             ) : (
-              <p className="text-sm text-stone-400 italic">개역한글 데이터 준비 중</p>
+              <p className="text-sm text-stone-400 italic">데이터 준비 중</p>
             )}
           </div>
           
-          {/* NET English Translation */}
           <div className="p-3 bg-green-50 rounded border-l-4 border-green-500">
             <p className="text-xs font-semibold text-green-700 mb-1">🌐 NET English</p>
             {translationLoading ? (
-              <p className="text-sm text-stone-500 animate-pulse flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin"></span>
-                로딩 중...
-              </p>
+              <p className="text-sm text-stone-500">로딩 중...</p>
             ) : netTranslation ? (
               <p className="text-sm text-stone-700 leading-relaxed">{netTranslation}</p>
             ) : (
-              <p className="text-sm text-stone-400 italic">NET 영어 데이터 준비 중</p>
+              <p className="text-sm text-stone-400 italic">데이터 준비 중</p>
             )}
           </div>
         </div>
 
-        {/* 3. SAVED PRIVATE TRANSLATION LIST */}
-        {ministryNote && (
-          <div className="p-3 bg-stone-50 border border-stone-200 rounded-lg">
-            <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
-              <BookOpen className="w-3 h-3" />
-              저장된 나의 사역
-            </label>
-            <div className="text-sm text-stone-700 bg-white p-3 rounded border border-stone-100">
-              {ministryNote.length > 100 ? ministryNote.substring(0, 100) + '...' : ministryNote}
-            </div>
-            {lastSaved && (
-              <p className="text-xs text-stone-400 mt-1">
-                저장됨: {lastSaved.toLocaleTimeString('ko-KR')}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* 4. PRIVATE TRANSLATION INPUT */}
+        {/* 3. 나의 사역 (Private Translation) */}
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
             <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-            나의 사역 작성 (Private Translation)
+            나의 사역 (Private Translation)
             {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
           </label>
           <textarea
@@ -488,14 +392,14 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             onChange={(e) => canWrite && setMinistryNote(e.target.value)}
             disabled={!canWrite}
             placeholder={canWrite 
-              ? "이 말씀을 내 언어와 상황으로 옮긴다면... (개인적 번역)" 
-              : "로그인 후 나의 사역을 작성할 수 있습니다."}
-            className="w-full h-32 p-3 text-sm leading-relaxed bg-stone-50 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
+              ? "이 말씀을 내 언어와 상황으로 옮긴다면..." 
+              : "로그인 후 작성할 수 있습니다."}
+            className="w-full h-32 p-3 text-sm leading-relaxed bg-stone-50 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 placeholder:text-stone-400 disabled:bg-stone-100"
           />
         </div>
 
-        {/* 4. REFLECTION - 나의 묵상 */}
-        <div className="space-y-2 border-t border-stone-200 pt-4">
+        {/* 4. 나의 묵상 (Reflection) */}
+        <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
             <BookOpen className="w-3 h-3 text-amber-500" />
             나의 묵상 (Reflection)
@@ -506,28 +410,9 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             onChange={(e) => canWrite && setMinistryNote(e.target.value)}
             disabled={!canWrite}
             placeholder={canWrite 
-              ? "이 말씀에 대한 나의 묵상, 적용, 기도 제목을 작성하세요..." 
-              : "로그인 후 묵상을 작성할 수 있습니다."}
-            className="w-full h-32 p-3 text-sm leading-relaxed bg-amber-50/30 border border-amber-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
-          />
-        </div>
-
-        {/* Commentary - ADMIN ONLY */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
-            <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
-            주석 (Commentary)
-            {isAdmin && <span className="text-xs text-amber-600">👑 관리자</span>}
-            {!isAdmin && <span className="text-xs text-stone-400">(관리자 전용)</span>}
-          </label>
-          <textarea
-            value={commentary}
-            onChange={(e) => isAdmin && setCommentary(e.target.value)}
-            disabled={!isAdmin}
-            placeholder={isAdmin 
-              ? "헬라어 원문의 뉘앙스, 역사적 배경, 신학적 의미 등을 기록하세요..." 
-              : "주석 작성은 관리자(지혜 소장님)만 가능합니다."}
-            className="w-full h-32 p-3 text-sm leading-relaxed bg-stone-50 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
+              ? "이 말씀에 대한 묵상과 적용을 작성하세요..." 
+              : "로그인 후 작성할 수 있습니다."}
+            className="w-full h-32 p-3 text-sm leading-relaxed bg-amber-50/30 border border-amber-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 placeholder:text-stone-400 disabled:bg-stone-100"
           />
         </div>
 

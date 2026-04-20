@@ -25,129 +25,37 @@ interface BiblePanelProps {
   loading: boolean;
 }
 
-// Parse morphology code - COMPLETE REWRITE v2.0
-// Format: [POS][SUBTYPE]...[CASE][NUMBER][GENDER] for nouns/pronouns/adjectives
-// Format: [POS][PERSON][NUMBER][TENSE][VOICE][MOOD][CASE][NUMBER][GENDER] for verbs/participles
-const parseMorphCode = (morph: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
-  if (!morph || morph.length < 10) return { type: '' };
+// Parse morphology code - USER PROVIDED VERSION (returns string)
+const parseMorphCode = (morph: string): string => {
+  if (!morph || morph.length < 8) return '미상의 품사';
   
-  const pos = morph[0]; // Part of speech
-  const sub = morph[1]; // Subtype (for pronouns, etc.)
-  
-  // === PART OF SPEECH MAPPING ===
-  // Handle pronoun subtypes first
-  let type = '';
-  if (pos === 'R') {
-    // Pronoun subtypes
-    const pronounMap: Record<string, string> = {
-      'D': '지시 대명사',
-      'P': '인칭 대명사', 
-      'I': '의문 대명사',
-      'R': '관계 대명사',
-      'F': '재귀 대명사',
-      'X': '부정 대명사',
-      'S': '소유 대명사',
-      '-': '대명사',
-      'C': '상관 대명사',
-      'K': '상관 대명사',
-      'Q': '의문 대명사'
-    };
-    type = pronounMap[sub] || '대명사';
-  } else if (pos === 'D') {
-    // Adverb/Determiner subtypes
-    const adverbMap: Record<string, string> = {
-      '-': '부사',
-      'S': '지시 부사',
-      'X': '부정 부사',
-      'I': '의문 부사',
-      'Q': '의문 부사',
-      'R': '상관 부사',
-      'K': '상관 부사',
-      'C': '접속 부사',
-      'P': '전치사적 부사'
-    };
-    type = adverbMap[sub] || '부사';
-  } else if (pos === 'C') {
-    // Conjunction subtypes
-    const conjMap: Record<string, string> = {
-      '-': '접속사',
-      'C': '등위 접속사',
-      'S': '종속 접속사',
-      'D': '구별 접속사',
-      'X': '부정 접속사',
-      'L': '반의 접속사',
-      'I': '추가 접속사',
-      'T': '전환 접속사'
-    };
-    type = conjMap[sub] || '접속사';
-  } else if (pos === 'P') {
-    // Preposition subtypes
-    const prepMap: Record<string, string> = {
-      '-': '전치사',
-      'I': '지시적 전치사'
-    };
-    type = prepMap[sub] || '전치사';
+  const typeMap: Record<string, string> = {'N':'명사', 'V':'동사', 'A':'형용사', 'D':'부사', 'P':'대명사', 'R':'대명사', 'T':'관사', 'C':'접속사', 'X':'불변화사'};
+  const caseMap: Record<string, string> = {'N':'주격', 'G':'속격', 'D':'여격', 'A':'대격', 'V':'호격'};
+  const numberMap: Record<string, string> = {'S':'단수', 'P':'복수'};
+  const genderMap: Record<string, string> = {'M':'남성', 'F':'여성', 'N':'중성'};
+  const personMap: Record<string, string> = {'1':'1인칭', '2':'2인칭', '3':'3인칭'};
+  const tenseMap: Record<string, string> = {'P':'현재', 'I':'미완료', 'F':'미래', 'A':'부정과거', 'R':'완료', 'V':'과거완료'};
+  const voiceMap: Record<string, string> = {'A':'능동태', 'M':'중간태', 'P':'수동태', 'D':'디포넌트'};
+  const moodMap: Record<string, string> = {'I':'직설법', 'S':'가정법', 'O':'희구법', 'M':'명령법', 'N':'부정사', 'P':'분사'};
+
+  const type = typeMap[morph[0]] || '기타';
+  let details: string[] = [];
+
+  if (type === '동사') {
+    if (morph[1] !== '-') details.push(personMap[morph[1]]);
+    if (morph[2] !== '-') details.push(tenseMap[morph[2]]);
+    if (morph[3] !== '-') details.push(voiceMap[morph[3]]);
+    if (morph[4] !== '-') details.push(moodMap[morph[4]]);
+    if (morph[6] !== '-') details.push(numberMap[morph[6]]);
+    if (morph[7] !== '-') details.push(genderMap[morph[7]]);
   } else {
-    // Standard parts of speech
-    const posMap: Record<string, string> = {
-      'N': '명사',
-      'V': '동사',
-      'A': '형용사',
-      'T': '관사',
-      'M': '수사',
-      'I': '감탄사',
-      'X': '부정사',
-      'L': '수사',
-      'B': '부사',
-      'Q': '의문사',
-      'O': '호격'
-    };
-    type = posMap[pos] || pos;
+    if (morph[5] !== '-') details.push(caseMap[morph[5]]);
+    if (morph[6] !== '-') details.push(numberMap[morph[6]]);
+    if (morph[7] !== '-') details.push(genderMap[morph[7]]);
   }
-  
-  const result: any = { type };
-  
-  // === GRAMMATICAL CATEGORIES ===
-  const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
-  const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
-  const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성', 'C': '공통' };
-  const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
-  const tenseMap: Record<string, string> = { 
-    'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 
-    'R': '완료', 'L': '과거완료', 'X': '미정', 'U': '미정'
-  };
-  const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태', 'E': '중간태', 'D': '중간태' };
-  const moodMap: Record<string, string> = { 
-    'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 
-    'P': '분사', 'M': '명령법', 'D': '가정법', 'T': '명령법'
-  };
-  
-  // === NOUNS, ADJECTIVES, ARTICLES, PRONOUNS ===
-  // Format: [POS][SUB]----[CASE][NUM][GEN] (positions 6,7,8)
-  if (pos === 'N' || pos === 'A' || pos === 'T' || pos === 'R') {
-    if (morph[6] && morph[6] !== '-') result.case = caseMap[morph[6]] || morph[6];
-    if (morph[7] && morph[7] !== '-') result.number = numberMap[morph[7]] || morph[7];
-    if (morph[8] && morph[8] !== '-') result.gender = genderMap[morph[8]] || morph[8];
-  }
-  
-  // === VERBS ===
-  // Format: V[PERSON][NUMBER][TENSE][VOICE][MOOD][CASE][NUMBER][GENDER]
-  else if (pos === 'V') {
-    if (morph[1] && morph[1] !== '-') result.person = personMap[morph[1]] || morph[1];
-    if (morph[2] && morph[2] !== '-') result.number = numberMap[morph[2]] || morph[2];
-    if (morph[3] && morph[3] !== '-') result.tense = tenseMap[morph[3]] || morph[3];
-    if (morph[4] && morph[4] !== '-') result.voice = voiceMap[morph[4]] || morph[4];
-    if (morph[5] && morph[5] !== '-') result.mood = moodMap[morph[5]] || morph[5];
-    
-    // Participles have case/number/gender at end
-    if (morph[5] === 'P') {
-      if (morph[6] && morph[6] !== '-') result.case = caseMap[morph[6]] || morph[6];
-      if (morph[7] && morph[7] !== '-') result.number = numberMap[morph[7]] || morph[7];
-      if (morph[8] && morph[8] !== '-') result.gender = genderMap[morph[8]] || morph[8];
-    }
-  }
-  
-  return result;
+
+  const detailStr = details.filter(Boolean).join(' • ');
+  return detailStr ? `[${type} • ${detailStr}]` : `[${type}]`;
 };
 
 export function BiblePanel({
@@ -218,63 +126,6 @@ export function BiblePanel({
     return null;
   };
 
-  // Parse morph code to extract grammatical info
-  const parseMorphCode = (code: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
-    if (!code || code.length < 10) return { type: 'unknown' };
-    
-    const type = code[0];
-    const typeMap: Record<string, string> = {
-      'N': '명사', 'V': '동사', 'A': '형용사', 'D': '부사', 
-      'C': '접속사', 'P': '전치사', 'R': '관계사', 'M': '수사',
-      'I': '감탄사', 'X': '부정사'
-    };
-    
-    const result: any = { type: typeMap[type] || type };
-    
-    if (type === 'N' || type === 'A' || type === 'R') {
-      const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
-      const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
-      const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
-      
-      if (code[7]) result.case = caseMap[code[7]] || code[7];
-      if (code[8]) result.number = numberMap[code[8]] || code[8];
-      if (code[9]) result.gender = genderMap[code[9]] || code[9];
-    } else if (type === 'V') {
-      const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
-      const tenseMap: Record<string, string> = { 'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료' };
-      const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };
-      const moodMap: Record<string, string> = { 'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 'P': '분사' };
-      
-      if (code[1]) result.person = personMap[code[1]] || code[1];
-      if (code[3]) result.tense = tenseMap[code[3]] || code[3];
-      if (code[4]) result.voice = voiceMap[code[4]] || code[4];
-      if (code[5]) result.mood = moodMap[code[5]] || code[5];
-      if (code[2]) result.number = code[2] === 'S' ? '단수' : code[2] === 'P' ? '복수' : code[2];
-    }
-    
-    return result;
-  };
-
-  // Infer word type from morph code
-  const inferWordType = (morph: string, word: string): string => {
-    const parsed = parseMorphCode(morph);
-    
-    if (parsed.type === '명사' && word[0] === word[0]?.toUpperCase()) {
-      return '고유명사 (인명/지명)';
-    }
-    
-    if (parsed.type === '명사') return `명사${parsed.case ? ` (${parsed.case})` : ''}${parsed.number ? ` ${parsed.number}` : ''}${parsed.gender ? ` ${parsed.gender}` : ''}`;
-    if (parsed.type === '동사') return `동사${parsed.tense ? ` (${parsed.tense})` : ''}${parsed.voice ? ` ${parsed.voice}` : ''}${parsed.mood ? ` ${parsed.mood}` : ''}`;
-    if (parsed.type === '형용사') return `형용사${parsed.case ? ` (${parsed.case})` : ''}`;
-    if (parsed.type === '관계사') return '관계대명사';
-    if (parsed.type === '수사') return '수사';
-    if (parsed.type === '부사') return '부사';
-    if (parsed.type === '접속사') return '접속사';
-    if (parsed.type === '전치사') return '전치사';
-    if (parsed.type === '감탄사') return '감탄사';
-    
-    return parsed.type || '미상의 품사';
-  };
 
   const bookAbbrevMap: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {
@@ -549,29 +400,12 @@ export function BiblePanel({
                 </span>
               </div>
               
-              {/* Line 2: 문법 코드 + 한글 문법 풀이 */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-medium text-stone-500 w-14 shrink-0">문법:</span>
-                <span className="text-sm font-mono text-stone-600 bg-stone-200 px-2 py-1 rounded">
-                  [{internalSelectedWord.word.morph}]
-                </span>
-                {(() => {
-                  const p = parseMorphCode(internalSelectedWord.word.morph);
-                  const parts = [];
-                  if (p.type) parts.push(p.type);
-                  if (p.case) parts.push(p.case);
-                  if (p.number) parts.push(p.number);
-                  if (p.gender) parts.push(p.gender);
-                  if (p.person) parts.push(p.person);
-                  if (p.tense) parts.push(p.tense);
-                  if (p.voice) parts.push(p.voice);
-                  if (p.mood) parts.push(p.mood);
-                  if (parts.length === 0) return <span className="text-sm text-blue-600">[고유명사]</span>;
-                  return <span className="text-sm text-blue-600">[{parts.join(' • ')}]</span>;
-                })()}
+              {/* Line 2: 한글 문법 풀이 */}
+              <div className="text-sm text-blue-700 font-medium">
+                {parseMorphCode(internalSelectedWord.word.morph)}
               </div>
               
-              {/* Line 3: 사전적 의미 */}
+              {/* Line 3: 사전 뜻 (있을 때만) */}
               {(() => {
                 const w = internalSelectedWord.word;
                 const def = lexicon[w.lemma]?.definition || lexicon[w.text]?.definition || null;
@@ -579,29 +413,11 @@ export function BiblePanel({
                   return (
                     <div className="flex items-start gap-2">
                       <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
-                      <p className="text-sm text-stone-700 leading-relaxed">
-                        {def}
-                      </p>
+                      <p className="text-sm text-stone-700 leading-relaxed">{def}</p>
                     </div>
                   );
                 }
-                // 고유명사 등 추론
-                if (w.lemma && w.lemma[0] === w.lemma[0].toUpperCase()) {
-                  return (
-                    <div className="flex items-start gap-2">
-                      <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
-                      <p className="text-sm text-stone-700 leading-relaxed">[고유명사/인명]</p>
-                    </div>
-                  );
-                }
-                return (
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
-                    <p className="text-sm text-stone-600 leading-relaxed">
-                      [성경 인물/지명]
-                    </p>
-                  </div>
-                );
+                return null;
               })()}
             </div>
             <button
