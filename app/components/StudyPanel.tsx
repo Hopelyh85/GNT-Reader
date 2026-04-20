@@ -232,66 +232,76 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     return null;
   };
 
-  // Parse morph code to extract grammatical info - COMPLETE RESTORED VERSION
-  const parseMorphCode = (code: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
-    if (!code || code.length < 10) return { type: '' };
+  // Parse morphology code - COMPLETE REWRITE v2.0 (Sync with BiblePanel)
+  const parseMorphCode = (morph: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
+    if (!morph || morph.length < 10) return { type: '' };
     
-    const type = code[0];
-    const typeMap: Record<string, string> = {
-      'N': '명사', 'V': '동사', 'A': '형용사', 'D': '부사', 
-      'C': '접속사', 'P': '전치사', 'R': '관계사', 'M': '수사',
-      'I': '감탄사', 'X': '부정사', 'T': '관사'
+    const pos = morph[0];
+    const sub = morph[1];
+    
+    // Part of speech with subtypes
+    let type = '';
+    if (pos === 'R') {
+      const pronounMap: Record<string, string> = {
+        'D': '지시 대명사', 'P': '인칭 대명사', 'I': '의문 대명사',
+        'R': '관계 대명사', 'F': '재귀 대명사', 'X': '부정 대명사',
+        'S': '소유 대명사', '-': '대명사', 'C': '상관 대명사',
+        'K': '상관 대명사', 'Q': '의문 대명사'
+      };
+      type = pronounMap[sub] || '대명사';
+    } else if (pos === 'D') {
+      const adverbMap: Record<string, string> = {
+        '-': '부사', 'S': '지시 부사', 'X': '부정 부사',
+        'I': '의문 부사', 'Q': '의문 부사', 'R': '상관 부사',
+        'K': '상관 부사', 'C': '접속 부사', 'P': '전치사적 부사'
+      };
+      type = adverbMap[sub] || '부사';
+    } else if (pos === 'C') {
+      type = '접속사';
+    } else if (pos === 'P') {
+      type = '전치사';
+    } else {
+      const posMap: Record<string, string> = {
+        'N': '명사', 'V': '동사', 'A': '형용사', 'T': '관사',
+        'M': '수사', 'I': '감탄사', 'X': '부정사'
+      };
+      type = posMap[pos] || pos;
+    }
+    
+    const result: any = { type };
+    const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
+    const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
+    const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
+    const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
+    const tenseMap: Record<string, string> = { 
+      'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료'
+    };
+    const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };
+    const moodMap: Record<string, string> = { 
+      'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 'P': '분사'
     };
     
-    const result: any = { type: typeMap[type] || type };
-    
-    // Nouns, Adjectives, Articles: N----NSM-, A----NSM-, T----NSM-
-    if (type === 'N' || type === 'A' || type === 'R' || type === 'T') {
-      const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
-      const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
-      const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
-      
-      if (code[7]) result.case = caseMap[code[7]] || code[7];
-      if (code[8]) result.number = numberMap[code[8]] || code[8];
-      if (code[9]) result.gender = genderMap[code[9]] || code[9];
-    } else if (type === 'V') {
-      // Verbs: V3AAI-S--
-      const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
-      const tenseMap: Record<string, string> = { 'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료' };
-      const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };
-      const moodMap: Record<string, string> = { 'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 'P': '분사' };
-      
-      if (code[1]) result.person = personMap[code[1]] || code[1];
-      if (code[3]) result.tense = tenseMap[code[3]] || code[3];
-      if (code[4]) result.voice = voiceMap[code[4]] || code[4];
-      if (code[5]) result.mood = moodMap[code[5]] || code[5];
-      if (code[2]) result.number = code[2] === 'S' ? '단수' : code[2] === 'P' ? '복수' : code[2];
+    // Nouns, Adjectives, Articles, Pronouns
+    if (pos === 'N' || pos === 'A' || pos === 'T' || pos === 'R') {
+      if (morph[6] && morph[6] !== '-') result.case = caseMap[morph[6]] || morph[6];
+      if (morph[7] && morph[7] !== '-') result.number = numberMap[morph[7]] || morph[7];
+      if (morph[8] && morph[8] !== '-') result.gender = genderMap[morph[8]] || morph[8];
+    }
+    // Verbs
+    else if (pos === 'V') {
+      if (morph[1] && morph[1] !== '-') result.person = personMap[morph[1]] || morph[1];
+      if (morph[2] && morph[2] !== '-') result.number = numberMap[morph[2]] || morph[2];
+      if (morph[3] && morph[3] !== '-') result.tense = tenseMap[morph[3]] || morph[3];
+      if (morph[4] && morph[4] !== '-') result.voice = voiceMap[morph[4]] || morph[4];
+      if (morph[5] && morph[5] !== '-') result.mood = moodMap[morph[5]] || morph[5];
+      if (morph[5] === 'P') {
+        if (morph[6] && morph[6] !== '-') result.case = caseMap[morph[6]] || morph[6];
+        if (morph[7] && morph[7] !== '-') result.number = numberMap[morph[7]] || morph[7];
+        if (morph[8] && morph[8] !== '-') result.gender = genderMap[morph[8]] || morph[8];
+      }
     }
     
     return result;
-  };
-
-  // Infer word type from morph code for "no definition" display
-  const inferWordType = (morph: string, word: string): string => {
-    const parsed = parseMorphCode(morph);
-    
-    // Check for proper nouns (typically personal/place names)
-    if (parsed.type === '명사' && word[0] === word[0]?.toUpperCase()) {
-      return '고유명사 (인명/지명)';
-    }
-    
-    // Common patterns
-    if (parsed.type === '명사') return `명사${parsed.case ? ` (${parsed.case})` : ''}${parsed.number ? ` ${parsed.number}` : ''}${parsed.gender ? ` ${parsed.gender}` : ''}`;
-    if (parsed.type === '동사') return `동사${parsed.tense ? ` (${parsed.tense})` : ''}${parsed.voice ? ` ${parsed.voice}` : ''}${parsed.mood ? ` ${parsed.mood}` : ''}`;
-    if (parsed.type === '형용사') return `형용사${parsed.case ? ` (${parsed.case})` : ''}`;
-    if (parsed.type === '관계사') return '관계대명사';
-    if (parsed.type === '수사') return '수사';
-    if (parsed.type === '부사') return '부사';
-    if (parsed.type === '접속사') return '접속사';
-    if (parsed.type === '전치사') return '전치사';
-    if (parsed.type === '감탄사') return '감탄사';
-    
-    return parsed.type || '미상의 품사';
   };
 
   if (!selectedVerse) {
@@ -395,14 +405,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                     </span>
                   </div>
                   
-                  {/* Line 3: Definition */}
-                  {entry ? (
+                  {/* Line 3: Definition - NO HARDCODING */}
+                  {entry && entry.definition && (
                     <p className="text-sm text-stone-700 leading-relaxed">
                       {entry.definition}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-stone-600">
-                      [성경 인물/지명]
                     </p>
                   )}
                 </div>
@@ -485,6 +491,24 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               ? "이 말씀을 내 언어와 상황으로 옮긴다면... (개인적 번역)" 
               : "로그인 후 나의 사역을 작성할 수 있습니다."}
             className="w-full h-32 p-3 text-sm leading-relaxed bg-stone-50 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
+          />
+        </div>
+
+        {/* 4. REFLECTION - 나의 묵상 */}
+        <div className="space-y-2 border-t border-stone-200 pt-4">
+          <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
+            <BookOpen className="w-3 h-3 text-amber-500" />
+            나의 묵상 (Reflection)
+            {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
+          </label>
+          <textarea
+            value={ministryNote}
+            onChange={(e) => canWrite && setMinistryNote(e.target.value)}
+            disabled={!canWrite}
+            placeholder={canWrite 
+              ? "이 말씀에 대한 나의 묵상, 적용, 기도 제목을 작성하세요..." 
+              : "로그인 후 묵상을 작성할 수 있습니다."}
+            className="w-full h-32 p-3 text-sm leading-relaxed bg-amber-50/30 border border-amber-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
           />
         </div>
 

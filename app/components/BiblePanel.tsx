@@ -25,40 +25,126 @@ interface BiblePanelProps {
   loading: boolean;
 }
 
-// Parse morphology code and return structured data - COMPLETE RESTORED VERSION
+// Parse morphology code - COMPLETE REWRITE v2.0
+// Format: [POS][SUBTYPE]...[CASE][NUMBER][GENDER] for nouns/pronouns/adjectives
+// Format: [POS][PERSON][NUMBER][TENSE][VOICE][MOOD][CASE][NUMBER][GENDER] for verbs/participles
 const parseMorphCode = (morph: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
   if (!morph || morph.length < 10) return { type: '' };
   
-  const type = morph[0];
-  const typeMap: Record<string, string> = {
-    'N': '명사', 'V': '동사', 'A': '형용사', 'D': '부사', 
-    'C': '접속사', 'P': '전치사', 'R': '관계사', 'M': '수사',
-    'I': '감탄사', 'X': '부정사', 'T': '관사'
+  const pos = morph[0]; // Part of speech
+  const sub = morph[1]; // Subtype (for pronouns, etc.)
+  
+  // === PART OF SPEECH MAPPING ===
+  // Handle pronoun subtypes first
+  let type = '';
+  if (pos === 'R') {
+    // Pronoun subtypes
+    const pronounMap: Record<string, string> = {
+      'D': '지시 대명사',
+      'P': '인칭 대명사', 
+      'I': '의문 대명사',
+      'R': '관계 대명사',
+      'F': '재귀 대명사',
+      'X': '부정 대명사',
+      'S': '소유 대명사',
+      '-': '대명사',
+      'C': '상관 대명사',
+      'K': '상관 대명사',
+      'Q': '의문 대명사'
+    };
+    type = pronounMap[sub] || '대명사';
+  } else if (pos === 'D') {
+    // Adverb/Determiner subtypes
+    const adverbMap: Record<string, string> = {
+      '-': '부사',
+      'S': '지시 부사',
+      'X': '부정 부사',
+      'I': '의문 부사',
+      'Q': '의문 부사',
+      'R': '상관 부사',
+      'K': '상관 부사',
+      'C': '접속 부사',
+      'P': '전치사적 부사'
+    };
+    type = adverbMap[sub] || '부사';
+  } else if (pos === 'C') {
+    // Conjunction subtypes
+    const conjMap: Record<string, string> = {
+      '-': '접속사',
+      'C': '등위 접속사',
+      'S': '종속 접속사',
+      'D': '구별 접속사',
+      'X': '부정 접속사',
+      'L': '반의 접속사',
+      'I': '추가 접속사',
+      'T': '전환 접속사'
+    };
+    type = conjMap[sub] || '접속사';
+  } else if (pos === 'P') {
+    // Preposition subtypes
+    const prepMap: Record<string, string> = {
+      '-': '전치사',
+      'I': '지시적 전치사'
+    };
+    type = prepMap[sub] || '전치사';
+  } else {
+    // Standard parts of speech
+    const posMap: Record<string, string> = {
+      'N': '명사',
+      'V': '동사',
+      'A': '형용사',
+      'T': '관사',
+      'M': '수사',
+      'I': '감탄사',
+      'X': '부정사',
+      'L': '수사',
+      'B': '부사',
+      'Q': '의문사',
+      'O': '호격'
+    };
+    type = posMap[pos] || pos;
+  }
+  
+  const result: any = { type };
+  
+  // === GRAMMATICAL CATEGORIES ===
+  const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
+  const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
+  const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성', 'C': '공통' };
+  const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
+  const tenseMap: Record<string, string> = { 
+    'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 
+    'R': '완료', 'L': '과거완료', 'X': '미정', 'U': '미정'
+  };
+  const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태', 'E': '중간태', 'D': '중간태' };
+  const moodMap: Record<string, string> = { 
+    'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 
+    'P': '분사', 'M': '명령법', 'D': '가정법', 'T': '명령법'
   };
   
-  const result: any = { type: typeMap[type] || type };
+  // === NOUNS, ADJECTIVES, ARTICLES, PRONOUNS ===
+  // Format: [POS][SUB]----[CASE][NUM][GEN] (positions 6,7,8)
+  if (pos === 'N' || pos === 'A' || pos === 'T' || pos === 'R') {
+    if (morph[6] && morph[6] !== '-') result.case = caseMap[morph[6]] || morph[6];
+    if (morph[7] && morph[7] !== '-') result.number = numberMap[morph[7]] || morph[7];
+    if (morph[8] && morph[8] !== '-') result.gender = genderMap[morph[8]] || morph[8];
+  }
   
-  // Nouns, Adjectives, Articles, Pronouns: N----NSM-, A----NSM-, T----NSM-
-  if (type === 'N' || type === 'A' || type === 'R' || type === 'T') {
-    const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
-    const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
-    const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
+  // === VERBS ===
+  // Format: V[PERSON][NUMBER][TENSE][VOICE][MOOD][CASE][NUMBER][GENDER]
+  else if (pos === 'V') {
+    if (morph[1] && morph[1] !== '-') result.person = personMap[morph[1]] || morph[1];
+    if (morph[2] && morph[2] !== '-') result.number = numberMap[morph[2]] || morph[2];
+    if (morph[3] && morph[3] !== '-') result.tense = tenseMap[morph[3]] || morph[3];
+    if (morph[4] && morph[4] !== '-') result.voice = voiceMap[morph[4]] || morph[4];
+    if (morph[5] && morph[5] !== '-') result.mood = moodMap[morph[5]] || morph[5];
     
-    if (morph[7]) result.case = caseMap[morph[7]] || morph[7];
-    if (morph[8]) result.number = numberMap[morph[8]] || morph[8];
-    if (morph[9]) result.gender = genderMap[morph[9]] || morph[9];
-  } else if (type === 'V') {
-    // Verbs: V3AAI-S--
-    const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
-    const tenseMap: Record<string, string> = { 'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료' };
-    const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };
-    const moodMap: Record<string, string> = { 'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 'P': '분사' };
-    
-    if (morph[1]) result.person = personMap[morph[1]] || morph[1];
-    if (morph[3]) result.tense = tenseMap[morph[3]] || morph[3];
-    if (morph[4]) result.voice = voiceMap[morph[4]] || morph[4];
-    if (morph[5]) result.mood = moodMap[morph[5]] || morph[5];
-    if (morph[2]) result.number = morph[2] === 'S' ? '단수' : morph[2] === 'P' ? '복수' : morph[2];
+    // Participles have case/number/gender at end
+    if (morph[5] === 'P') {
+      if (morph[6] && morph[6] !== '-') result.case = caseMap[morph[6]] || morph[6];
+      if (morph[7] && morph[7] !== '-') result.number = numberMap[morph[7]] || morph[7];
+      if (morph[8] && morph[8] !== '-') result.gender = genderMap[morph[8]] || morph[8];
+    }
   }
   
   return result;
