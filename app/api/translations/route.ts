@@ -24,14 +24,14 @@ export async function GET(request: NextRequest) {
                      version === 'net' ? 'net_translations' : 
                      'translations';
     
-    // Try to fetch from Supabase
+    // Try to fetch from Supabase - select 'text' column only for new schema
     const { data, error } = await supabase
       .from(tableName)
-      .select('text, translation, content')
+      .select('text')
       .eq('book', book)
       .eq('chapter', parseInt(chapter))
       .eq('verse', parseInt(verse))
-      .single();
+      .maybeSingle();
 
     if (error && error.code === 'PGRST116') {
       // No data found
@@ -50,8 +50,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Return the first available field
-    const translationText = data?.text || data?.translation || data?.content || null;
+    // Return the text field from new schema
+    const translationText = data?.text || null;
     
     return NextResponse.json({ 
       data,

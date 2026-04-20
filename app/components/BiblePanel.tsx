@@ -341,17 +341,16 @@ export function BiblePanel({
                                       : 'bg-white hover:bg-stone-100 text-stone-600'
                                   }`}
                                   style={{ 
-                                    whiteSpace: 'nowrap',
+                                    whiteSpace: 'normal',
                                     lineHeight: '1.8',
                                     display: 'block',
-                                    width: 'max-content',
-                                    minWidth: '800px'
+                                    width: '100%'
                                   }}
                                 >
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
                                     {verseIdx + 1}
                                   </span>
-                                  <span className="font-greek text-stone-700 flex-shrink-0" style={{ whiteSpace: 'nowrap', lineHeight: '1.8' }}>
+                                  <span className="font-greek text-stone-700 flex-wrap break-words" style={{ whiteSpace: 'normal', lineHeight: '1.8' }}>
                                     {verse.map((word, wordIdx) => (
                                       <span
                                         key={wordIdx}
