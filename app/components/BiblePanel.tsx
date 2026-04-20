@@ -233,6 +233,8 @@ export function BiblePanel({
     
     const entry = getWordDefinition(word.lemma, word.text);
     console.log('lexicon entry:', entry);
+    console.log('lexicon[word.lemma]:', lexicon[word.lemma]);
+    console.log('lexicon[word.text]:', lexicon[word.text]);
     console.log('=======================');
     
     const selectedWordData = {
@@ -444,60 +446,70 @@ export function BiblePanel({
         })}
       </div>
 
-      {/* Word Analysis Card - Full Data Display */}
+      {/* Word Analysis Card - Perfect Data Display */}
       {internalSelectedWord && (
         <div className="border-t border-stone-200 bg-amber-50 p-4">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex-1 min-w-0 space-y-3">
               {/* Line 1: 원형 (Lemma) */}
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-stone-500 w-16">원형:</span>
-                <span className="font-greek text-xl font-bold text-amber-700">
+                <span className="text-xs font-medium text-stone-500 w-14 shrink-0">원형:</span>
+                <span className="font-greek text-2xl font-bold text-amber-700">
                   {internalSelectedWord.word.lemma || internalSelectedWord.word.text}
                 </span>
               </div>
               
-              {/* Line 2: 문법 코드 + 한국어 문법 */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-stone-500 w-16">문법:</span>
-                <span className="text-sm font-mono text-stone-600 bg-stone-200 px-1.5 py-0.5 rounded">
-                  {internalSelectedWord.word.morph}
+              {/* Line 2: 문법 코드 + 한글 문법 풀이 */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-medium text-stone-500 w-14 shrink-0">문법:</span>
+                <span className="text-sm font-mono text-stone-600 bg-stone-200 px-2 py-1 rounded">
+                  [{internalSelectedWord.word.morph}]
                 </span>
                 {(() => {
                   const p = parseMorphCode(internalSelectedWord.word.morph);
-                  if (!p.type) return null;
-                  const parts = [p.type];
+                  const parts = [];
+                  if (p.type) parts.push(p.type);
                   if (p.case) parts.push(p.case);
                   if (p.number) parts.push(p.number);
                   if (p.gender) parts.push(p.gender);
+                  if (p.person) parts.push(p.person);
                   if (p.tense) parts.push(p.tense);
                   if (p.voice) parts.push(p.voice);
                   if (p.mood) parts.push(p.mood);
-                  return (
-                    <span className="text-sm text-blue-700">
-                      [{parts.join(' • ')}]
-                    </span>
-                  );
+                  if (parts.length === 0) return <span className="text-sm text-blue-600">[고유명사]</span>;
+                  return <span className="text-sm text-blue-600">[{parts.join(' • ')}]</span>;
                 })()}
               </div>
               
-              {/* Line 3: 한글 뜻 */}
+              {/* Line 3: 사전적 의미 */}
               {(() => {
-                const entry = getWordDefinition(internalSelectedWord.word.lemma, internalSelectedWord.word.text);
-                if (entry) {
+                const w = internalSelectedWord.word;
+                const def = lexicon[w.lemma]?.definition || lexicon[w.text]?.definition || null;
+                if (def) {
                   return (
                     <div className="flex items-start gap-2">
-                      <span className="text-xs font-medium text-stone-500 w-16">뜻:</span>
+                      <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
                       <p className="text-sm text-stone-700 leading-relaxed">
-                        {entry.definition}
+                        {def}
                       </p>
                     </div>
                   );
                 }
+                // 고유명사 등 추론
+                if (w.lemma && w.lemma[0] === w.lemma[0].toUpperCase()) {
+                  return (
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
+                      <p className="text-sm text-stone-700 leading-relaxed">[고유명사/인명]</p>
+                    </div>
+                  );
+                }
                 return (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-stone-500 w-16">뜻:</span>
-                    <span className="text-sm text-stone-400">(사전 데이터 준비 중)</span>
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
+                    <p className="text-sm text-stone-600 leading-relaxed italic">
+                      [성경 본문용어: {w.text} - 자세한 정의 준비 중]
+                    </p>
                   </div>
                 );
               })()}
