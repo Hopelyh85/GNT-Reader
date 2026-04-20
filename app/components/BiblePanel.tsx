@@ -222,6 +222,19 @@ export function BiblePanel({
     verseNum: number,
     wordIndex: number
   ) => {
+    // DEBUG: Log all word data
+    console.log('=== WORD CLICK DEBUG ===');
+    console.log('word.text (표면형):', word.text);
+    console.log('word.lemma (원형):', word.lemma);
+    console.log('word.morph (문법코드):', word.morph);
+    
+    const parsed = parseMorphCode(word.morph);
+    console.log('parsed (한국어 문법):', parsed);
+    
+    const entry = getWordDefinition(word.lemma, word.text);
+    console.log('lexicon entry:', entry);
+    console.log('=======================');
+    
     const selectedWordData = {
       word,
       bookName: book.name,
@@ -431,41 +444,62 @@ export function BiblePanel({
         })}
       </div>
 
-      {/* Minimal Word Analysis Card - Non-blocking */}
+      {/* Word Analysis Card - Full Data Display */}
       {internalSelectedWord && (
-        <div className="border-t border-stone-200 bg-amber-50/50 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              {/* Minimal Single Line Display */}
-              <div className="flex items-center gap-2 flex-wrap text-sm">
-                <span className="font-greek text-lg font-semibold text-amber-700">
-                  {internalSelectedWord.word.lemma}
-                </span>
-                <span className="text-stone-500 text-xs">
-                  {(() => {
-                    const p = parseMorphCode(internalSelectedWord.word.morph);
-                    if (!p.type) return '';
-                    const parts = [p.type];
-                    if (p.case) parts.push(p.case);
-                    if (p.number) parts.push(p.number);
-                    if (p.tense) parts.push(p.tense);
-                    if (p.voice) parts.push(p.voice);
-                    if (p.mood) parts.push(p.mood);
-                    return `[${parts.join(' • ')}]`;
-                  })()}
+        <div className="border-t border-stone-200 bg-amber-50 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0 space-y-2">
+              {/* Line 1: 원형 (Lemma) */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-stone-500 w-16">원형:</span>
+                <span className="font-greek text-xl font-bold text-amber-700">
+                  {internalSelectedWord.word.lemma || internalSelectedWord.word.text}
                 </span>
               </div>
-              {/* Definition - Single Line */}
+              
+              {/* Line 2: 문법 코드 + 한국어 문법 */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-stone-500 w-16">문법:</span>
+                <span className="text-sm font-mono text-stone-600 bg-stone-200 px-1.5 py-0.5 rounded">
+                  {internalSelectedWord.word.morph}
+                </span>
+                {(() => {
+                  const p = parseMorphCode(internalSelectedWord.word.morph);
+                  if (!p.type) return null;
+                  const parts = [p.type];
+                  if (p.case) parts.push(p.case);
+                  if (p.number) parts.push(p.number);
+                  if (p.gender) parts.push(p.gender);
+                  if (p.tense) parts.push(p.tense);
+                  if (p.voice) parts.push(p.voice);
+                  if (p.mood) parts.push(p.mood);
+                  return (
+                    <span className="text-sm text-blue-700">
+                      [{parts.join(' • ')}]
+                    </span>
+                  );
+                })()}
+              </div>
+              
+              {/* Line 3: 한글 뜻 */}
               {(() => {
                 const entry = getWordDefinition(internalSelectedWord.word.lemma, internalSelectedWord.word.text);
                 if (entry) {
                   return (
-                    <p className="text-sm text-stone-700 mt-1 truncate">
-                      {entry.definition.split('(')[0].trim()}
-                    </p>
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-medium text-stone-500 w-16">뜻:</span>
+                      <p className="text-sm text-stone-700 leading-relaxed">
+                        {entry.definition}
+                      </p>
+                    </div>
                   );
                 }
-                return null;
+                return (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-stone-500 w-16">뜻:</span>
+                    <span className="text-sm text-stone-400">(사전 데이터 준비 중)</span>
+                  </div>
+                );
               })()}
             </div>
             <button
@@ -473,9 +507,9 @@ export function BiblePanel({
                 setInternalSelectedWord(null);
                 onSelectWord(null);
               }}
-              className="ml-2 p-1 hover:bg-stone-200 rounded transition-colors flex-shrink-0"
+              className="p-1.5 hover:bg-stone-200 rounded transition-colors flex-shrink-0"
             >
-              <span className="text-xs text-stone-400">✕</span>
+              <span className="text-sm text-stone-400">✕</span>
             </button>
           </div>
         </div>
