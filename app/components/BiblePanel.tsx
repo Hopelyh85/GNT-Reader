@@ -409,21 +409,23 @@ export function BiblePanel({
                                   </span>
                                   <span className="font-greek text-stone-700 flex-wrap break-words" style={{ whiteSpace: 'normal', lineHeight: '1.8' }}>
                                     {verse.map((word, wordIdx) => (
-                                      <span
-                                        key={wordIdx}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleWordClick(
-                                            word,
-                                            book,
-                                            chapter.number,
-                                            verseIdx + 1,
-                                            wordIdx
-                                          );
-                                        }}
-                                        className="inline-block mr-[0.3em] cursor-pointer hover:bg-amber-200 hover:text-amber-900 rounded px-0.5 transition-colors"
-                                      >
-                                        {word.text}
+                                      <span key={`word-${wordIdx}`} className="inline-block">
+                                        <span
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleWordClick(
+                                              word,
+                                              book,
+                                              chapter.number,
+                                              verseIdx + 1,
+                                              wordIdx
+                                            );
+                                          }}
+                                          className="inline-block cursor-pointer hover:bg-amber-200 hover:text-amber-900 rounded px-0.5 transition-colors"
+                                        >
+                                          {word.text}
+                                        </span>
+                                        {' '}
                                       </span>
                                     ))}
                                   </span>
@@ -448,9 +450,9 @@ export function BiblePanel({
         })}
       </div>
 
-      {/* Word Analysis Card - Perfect Data Display */}
+      {/* Word Analysis Card - Fixed at Bottom */}
       {internalSelectedWord && (
-        <div className="border-t border-stone-200 bg-amber-50 p-4">
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-stone-200 bg-amber-50 p-4 shadow-lg">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0 space-y-3">
               {/* Line 1: 원형 (Lemma) */}
@@ -509,8 +511,8 @@ export function BiblePanel({
                 return (
                   <div className="flex items-start gap-2">
                     <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
-                    <p className="text-sm text-stone-600 leading-relaxed italic">
-                      [성경 본문용어: {w.text} - 자세한 정의 준비 중]
+                    <p className="text-sm text-stone-600 leading-relaxed">
+                      [성경 인물/지명]
                     </p>
                   </div>
                 );
