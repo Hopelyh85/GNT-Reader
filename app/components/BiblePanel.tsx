@@ -106,15 +106,75 @@ export function BiblePanel({
     loadLexicon();
   }, []);
   
-  // Get definition for selected word - uses surface form as key (lexicon.json keys are surface forms)
-  const getWordDefinition = (surfaceForm: string): LexiconEntry | null => {
-    return lexicon[surfaceForm] || null;
+  // Get definition for selected word - DUAL LOOKUP: try lemma first, then surface form
+  const getWordDefinition = (lemma: string, surfaceForm: string): LexiconEntry | null => {
+    // 1. Try lemma (root form) first - for proper nouns and base forms
+    if (lexicon[lemma]) {
+      return lexicon[lemma];
+    }
+    // 2. Fallback to surface form - for inflected forms
+    if (lexicon[surfaceForm]) {
+      return lexicon[surfaceForm];
+    }
+    return null;
   };
 
-  // Extract true lemma from definition text (e.g., "낳았다 (γεννάω의 부정과거...)" -> "γεννάω")
-  const extractTrueLemma = (definition: string): string | null => {
-    const match = definition.match(/\(([\u0370-\u03FF]+)의/);  // Match Greek letters before '의'
-    return match ? match[1] : null;
+  // Parse morph code to extract grammatical info
+  const parseMorphCode = (code: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
+    if (!code || code.length < 10) return { type: 'unknown' };
+    
+    const type = code[0];
+    const typeMap: Record<string, string> = {
+      'N': '명사', 'V': '동사', 'A': '형용사', 'D': '부사', 
+      'C': '접속사', 'P': '전치사', 'R': '관계사', 'M': '수사',
+      'I': '감탄사', 'X': '부정사'
+    };
+    
+    const result: any = { type: typeMap[type] || type };
+    
+    if (type === 'N' || type === 'A' || type === 'R') {
+      const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
+      const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
+      const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
+      
+      if (code[7]) result.case = caseMap[code[7]] || code[7];
+      if (code[8]) result.number = numberMap[code[8]] || code[8];
+      if (code[9]) result.gender = genderMap[code[9]] || code[9];
+    } else if (type === 'V') {
+      const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
+      const tenseMap: Record<string, string> = { 'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료' };
+      const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };
+      const moodMap: Record<string, string> = { 'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 'P': '분사' };
+      
+      if (code[1]) result.person = personMap[code[1]] || code[1];
+      if (code[3]) result.tense = tenseMap[code[3]] || code[3];
+      if (code[4]) result.voice = voiceMap[code[4]] || code[4];
+      if (code[5]) result.mood = moodMap[code[5]] || code[5];
+      if (code[2]) result.number = code[2] === 'S' ? '단수' : code[2] === 'P' ? '복수' : code[2];
+    }
+    
+    return result;
+  };
+
+  // Infer word type from morph code
+  const inferWordType = (morph: string, word: string): string => {
+    const parsed = parseMorphCode(morph);
+    
+    if (parsed.type === '명사' && word[0] === word[0]?.toUpperCase()) {
+      return '고유명사 (인명/지명)';
+    }
+    
+    if (parsed.type === '명사') return `명사${parsed.case ? ` (${parsed.case})` : ''}${parsed.number ? ` ${parsed.number}` : ''}${parsed.gender ? ` ${parsed.gender}` : ''}`;
+    if (parsed.type === '동사') return `동사${parsed.tense ? ` (${parsed.tense})` : ''}${parsed.voice ? ` ${parsed.voice}` : ''}${parsed.mood ? ` ${parsed.mood}` : ''}`;
+    if (parsed.type === '형용사') return `형용사${parsed.case ? ` (${parsed.case})` : ''}`;
+    if (parsed.type === '관계사') return '관계대명사';
+    if (parsed.type === '수사') return '수사';
+    if (parsed.type === '부사') return '부사';
+    if (parsed.type === '접속사') return '접속사';
+    if (parsed.type === '전치사') return '전치사';
+    if (parsed.type === '감탄사') return '감탄사';
+    
+    return parsed.type || '미상의 품사';
   };
 
   const bookAbbrevMap: Record<string, string> = useMemo(() => {
@@ -157,7 +217,7 @@ export function BiblePanel({
     console.log('LEMMA (원형):', word.lemma, '| TEXT (표면형):', word.text);
     console.log('Are they SAME?:', word.lemma === word.text);
     console.log('Morph:', word.morph);
-    console.log('Lexicon lookup:', getWordDefinition(word.text));
+    console.log('Lexicon lookup (dual):', getWordDefinition(word.lemma, word.text));
     console.log('========================');
     
     const selectedWordData = {
@@ -381,7 +441,10 @@ export function BiblePanel({
                 <p className="text-stone-600">
                   <span className="font-medium text-stone-700">문법:</span>{' '}
                   <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                    {parseMorphCode(internalSelectedWord.word.morph)}
+                    {(() => {
+                      const p = parseMorphCode(internalSelectedWord.word.morph);
+                      return `${p.type}${p.case ? ` • ${p.case}` : ''}${p.number ? ` • ${p.number}` : ''}${p.gender ? ` • ${p.gender}` : ''}${p.tense ? ` • ${p.tense}` : ''}${p.voice ? ` • ${p.voice}` : ''}${p.mood ? ` • ${p.mood}` : ''}`;
+                    })()}
                   </span>
                 </p>
                 {/* Word Definition - Priority Display */}
@@ -395,59 +458,59 @@ export function BiblePanel({
                       </div>
                     );
                   }
-                  const entry = getWordDefinition(internalSelectedWord.word.text);
-                  const trueLemma = entry ? extractTrueLemma(entry.definition) : null;
+                  const entry = getWordDefinition(internalSelectedWord.word.lemma, internalSelectedWord.word.text);
+                  const inferredType = entry ? '' : inferWordType(internalSelectedWord.word.morph, internalSelectedWord.word.text);
+                  const parsed = parseMorphCode(internalSelectedWord.word.morph);
                   return entry ? (
                     <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg shadow-sm">
                       <p className="text-base font-bold text-amber-900 mb-2 border-b border-amber-200 pb-1">
-                        📖 사전 뜻
-                      </p>
-                      <p className="text-base font-bold text-amber-900 mb-2 border-b border-amber-200 pb-1">
-                        단어 분석: {trueLemma || internalSelectedWord.word.text}
+                        📖 단어 분석
                       </p>
                       <div className="flex items-center gap-3 mb-3 flex-wrap">
                         <span className="font-greek text-2xl font-bold text-amber-700">
-                          {trueLemma || internalSelectedWord.word.text}
+                          {internalSelectedWord.word.lemma}
                         </span>
-                        <span className="text-xs px-2 py-1 bg-amber-100 rounded text-amber-800">
-                          [{entry.transliteration}]
-                        </span>
-                        <span className="text-xs px-2 py-1 bg-stone-200 rounded text-stone-600">
-                          표면형: {internalSelectedWord.word.text}
-                        </span>
+                        {internalSelectedWord.word.lemma !== internalSelectedWord.word.text && (
+                          <span className="text-xs px-2 py-1 bg-stone-200 rounded text-stone-600">
+                            표면형: {internalSelectedWord.word.text}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-stone-700 mb-3 leading-relaxed">
                         {entry.definition}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-stone-500">
+                      <div className="flex items-center gap-2 text-xs text-stone-500 flex-wrap">
                         <span className="px-2 py-1 bg-stone-100 rounded">Strong&apos;s: {entry.strongs}</span>
-                        <span className="px-2 py-1 bg-stone-100 rounded">문법: {internalSelectedWord.word.morph}</span>
+                        <span className="px-2 py-1 bg-stone-100 rounded">[{entry.transliteration}]</span>
+                        <span className="px-2 py-1 bg-stone-100 rounded">{entry.frequency}</span>
                       </div>
-                      <p className="text-xs text-stone-400">
-                        표면형: {internalSelectedWord.word.text} | 문법: {internalSelectedWord.word.morph}
-                      </p>
-                      <p className="text-xs text-red-500 mt-2">
-                        (콘솔에서 상세 로그 확인 - F12 &gt; Console)
-                      </p>
                     </div>
                   ) : (
-                    <div className="mt-4 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
-                      <p className="text-sm font-bold text-red-700 mb-2">
-                        [뜻 없음 - 데이터 확인 필요]
+                    <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="font-greek text-xl font-semibold text-stone-700">
+                          {internalSelectedWord.word.lemma}
+                        </span>
+                        {internalSelectedWord.word.lemma !== internalSelectedWord.word.text && (
+                          <span className="text-xs px-2 py-0.5 bg-stone-200 rounded text-stone-600">
+                            표면형: {internalSelectedWord.word.text}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium text-amber-700 mb-2">
+                        📖 {inferredType}
                       </p>
-                      <p className="text-sm text-stone-600 mb-1">
-                        원형: <span className="font-greek text-stone-700 font-semibold">{internalSelectedWord.word.lemma}</span>
+                      <p className="text-xs text-stone-500 mb-1">
+                        문법: {parsed.type}{parsed.case ? ` • ${parsed.case}` : ''}{parsed.number ? ` • ${parsed.number}` : ''}{parsed.gender ? ` • ${parsed.gender}` : ''}{parsed.tense ? ` • ${parsed.tense}` : ''}{parsed.voice ? ` • ${parsed.voice}` : ''}{parsed.mood ? ` • ${parsed.mood}` : ''}
                       </p>
-                      <p className="text-xs text-stone-400">
-                        표면형: {internalSelectedWord.word.text} | 문법: {internalSelectedWord.word.morph}
-                      </p>
-                      <p className="text-xs text-red-500 mt-2">
-                        (콘솔에서 상세 로그 확인 - F12 &gt; Console)
+                      <p className="text-xs text-stone-400 mt-2 border-t border-stone-200 pt-2">
+                        (사전 데이터 준비 중)
                       </p>
                     </div>
                   );
                 })()}
-                <p className="text-xs text-stone-400 mt-2">
+                <p className="text-xs text-red-500 mt-2">
+                  (콘솔에서 상세 로그 확인 - F12 &gt; Console)
                   {internalSelectedWord.bookName} {internalSelectedWord.chapter}:{internalSelectedWord.verse}
                 </p>
               </div>

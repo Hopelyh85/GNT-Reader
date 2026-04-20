@@ -219,15 +219,81 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     loadLexicon();
   }, []);
 
-  // Get definition for selected word - uses surface form as key (lexicon.json keys are surface forms)
-  const getWordDefinition = (surfaceForm: string): LexiconEntry | null => {
-    return lexicon[surfaceForm] || null;
+  // Get definition for selected word - DUAL LOOKUP: try lemma first, then surface form
+  const getWordDefinition = (lemma: string, surfaceForm: string): LexiconEntry | null => {
+    // 1. Try lemma (root form) first - for proper nouns and base forms
+    if (lexicon[lemma]) {
+      return lexicon[lemma];
+    }
+    // 2. Fallback to surface form - for inflected forms
+    if (lexicon[surfaceForm]) {
+      return lexicon[surfaceForm];
+    }
+    return null;
   };
 
-  // Extract true lemma from definition text (e.g., "낳았다 (γεννάω의 부정과거...)" -> "γεννάω")
-  const extractTrueLemma = (definition: string): string | null => {
-    const match = definition.match(/\(([\u0370-\u03FF]+)의/);  // Match Greek letters before '의'
-    return match ? match[1] : null;
+  // Parse morph code to extract grammatical info (e.g., "N----NSM-" -> Noun, Nominative, Singular, Masculine)
+  const parseMorphCode = (code: string): { type: string; case?: string; number?: string; gender?: string; person?: string; tense?: string; voice?: string; mood?: string } => {
+    if (!code || code.length < 10) return { type: 'unknown' };
+    
+    const type = code[0]; // N=Noun, V=Verb, A=Adjective, etc.
+    const typeMap: Record<string, string> = {
+      'N': '명사', 'V': '동사', 'A': '형용사', 'D': '부사', 
+      'C': '접속사', 'P': '전치사', 'R': '관계사', 'M': '수사',
+      'I': '감탄사', 'X': '부정사'
+    };
+    
+    const result: any = { type: typeMap[type] || type };
+    
+    if (type === 'N' || type === 'A' || type === 'R') {
+      // Noun/Adj: N----NSM-
+      // positions: 0=type, 1-3=unused, 4=case, 5=number, 6=gender
+      const caseMap: Record<string, string> = { 'N': '주격', 'G': '속격', 'D': '여격', 'A': '대격', 'V': '호격' };
+      const numberMap: Record<string, string> = { 'S': '단수', 'P': '복수' };
+      const genderMap: Record<string, string> = { 'M': '남성', 'F': '여성', 'N': '중성' };
+      
+      if (code[7]) result.case = caseMap[code[7]] || code[7];
+      if (code[8]) result.number = numberMap[code[8]] || code[8];
+      if (code[9]) result.gender = genderMap[code[9]] || code[9];
+    } else if (type === 'V') {
+      // Verb: V3AAI-S--
+      // positions: 1=person, 2=number, 3=tense, 4=voice, 5=mood
+      const personMap: Record<string, string> = { '1': '1인칭', '2': '2인칭', '3': '3인칭' };
+      const tenseMap: Record<string, string> = { 'P': '현재', 'I': '미완료', 'F': '미래', 'A': '부정과거', 'R': '완료', 'L': '과거완료' };
+      const voiceMap: Record<string, string> = { 'A': '능동태', 'M': '중간태', 'P': '수동태' };
+      const moodMap: Record<string, string> = { 'I': '직설법', 'S': '가정법', 'O': '명령법', 'N': '부정사', 'P': '분사' };
+      
+      if (code[1]) result.person = personMap[code[1]] || code[1];
+      if (code[3]) result.tense = tenseMap[code[3]] || code[3];
+      if (code[4]) result.voice = voiceMap[code[4]] || code[4];
+      if (code[5]) result.mood = moodMap[code[5]] || code[5];
+      if (code[2]) result.number = code[2] === 'S' ? '단수' : code[2] === 'P' ? '복수' : code[2];
+    }
+    
+    return result;
+  };
+
+  // Infer word type from morph code for "no definition" display
+  const inferWordType = (morph: string, word: string): string => {
+    const parsed = parseMorphCode(morph);
+    
+    // Check for proper nouns (typically personal/place names)
+    if (parsed.type === '명사' && word[0] === word[0]?.toUpperCase()) {
+      return '고유명사 (인명/지명)';
+    }
+    
+    // Common patterns
+    if (parsed.type === '명사') return `명사${parsed.case ? ` (${parsed.case})` : ''}${parsed.number ? ` ${parsed.number}` : ''}${parsed.gender ? ` ${parsed.gender}` : ''}`;
+    if (parsed.type === '동사') return `동사${parsed.tense ? ` (${parsed.tense})` : ''}${parsed.voice ? ` ${parsed.voice}` : ''}${parsed.mood ? ` ${parsed.mood}` : ''}`;
+    if (parsed.type === '형용사') return `형용사${parsed.case ? ` (${parsed.case})` : ''}`;
+    if (parsed.type === '관계사') return '관계대명사';
+    if (parsed.type === '수사') return '수사';
+    if (parsed.type === '부사') return '부사';
+    if (parsed.type === '접속사') return '접속사';
+    if (parsed.type === '전치사') return '전치사';
+    if (parsed.type === '감탄사') return '감탄사';
+    
+    return parsed.type || '미상의 품사';
   };
 
   if (!selectedVerse) {
@@ -400,17 +466,21 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           ) : selectedWord ? (
             <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg">
               {(() => {
-                const entry = getWordDefinition(selectedWord.word.text);
-                const trueLemma = entry ? extractTrueLemma(entry.definition) : null;
+                const entry = getWordDefinition(selectedWord.word.lemma, selectedWord.word.text);
+                const inferredType = inferWordType(selectedWord.word.morph, selectedWord.word.text);
+                const parsed = parseMorphCode(selectedWord.word.morph);
+                
                 return entry ? (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-greek text-lg font-semibold text-amber-700">
-                        {trueLemma || selectedWord.word.text}
+                        {selectedWord.word.lemma}
                       </span>
-                      <span className="text-xs px-2 py-0.5 bg-stone-200 rounded text-stone-600">
-                        표면형: {selectedWord.word.text}
-                      </span>
+                      {selectedWord.word.lemma !== selectedWord.word.text && (
+                        <span className="text-xs px-2 py-0.5 bg-stone-200 rounded text-stone-600">
+                          표면형: {selectedWord.word.text}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-stone-700 leading-relaxed">
                       {entry.definition}
@@ -425,11 +495,24 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-sm text-stone-500 mb-2">
-                      &quot;{selectedWord.word.text}&quot;에 대한 사전 정보가 없습니다
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="font-greek text-xl font-semibold text-stone-700">
+                        {selectedWord.word.lemma}
+                      </span>
+                      {selectedWord.word.lemma !== selectedWord.word.text && (
+                        <span className="text-xs px-2 py-0.5 bg-stone-200 rounded text-stone-600">
+                          표면형: {selectedWord.word.text}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-amber-700 mb-2">
+                      📖 {inferredType}
                     </p>
-                    <p className="text-xs text-stone-400">
-                      표면형: {selectedWord.word.text} | 문법: {selectedWord.word.morph}
+                    <p className="text-xs text-stone-500 mb-1">
+                      문법정보: {parsed.type}{parsed.case ? ` • ${parsed.case}` : ''}{parsed.number ? ` • ${parsed.number}` : ''}{parsed.gender ? ` • ${parsed.gender}` : ''}{parsed.tense ? ` • ${parsed.tense}` : ''}{parsed.voice ? ` • ${parsed.voice}` : ''}{parsed.mood ? ` • ${parsed.mood}` : ''}
+                    </p>
+                    <p className="text-xs text-stone-400 mt-2 border-t border-stone-200 pt-2">
+                      (사전 데이터 준비 중)
                     </p>
                   </div>
                 );
