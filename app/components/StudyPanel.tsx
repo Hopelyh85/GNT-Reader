@@ -315,21 +315,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     return validDetails ? `[${type} • ${validDetails}]` : `[${type}]`;
   };
 
-  if (!selectedVerse) {
-    return (
-      <div className="h-full flex items-center justify-center p-8">
-        <div className="text-center text-stone-400">
-          <BookText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p className="font-serif text-sm">
-            좌측 패널에서 성경 구절을 선택하여<br />묵상을 시작하세요
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Mobile: show as bottom sheet when verse or word selected
-  // Desktop: show as sidebar
+  // Show panel when verse OR word is selected
   const showPanel = selectedVerse || selectedWord;
 
   if (!showPanel) {
@@ -497,7 +483,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
         )}
 
-        {/* 3. 본문 대조 (GNT / KRV / NET) */}
+        {/* 3. 본문 대조 (GNT / KRV / NET) - Only show when verse selected */}
+        {selectedVerse && (
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
             <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
@@ -533,6 +520,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             )}
           </div>
         </div>
+        )}
 
         {/* 3. 나의 사역 (Private Translation) */}
         <div className="border-t border-stone-200 pt-4 space-y-2">
