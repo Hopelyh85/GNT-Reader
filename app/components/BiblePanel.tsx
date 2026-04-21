@@ -10,6 +10,7 @@ interface LexiconEntry {
   definition: string;
   strongs: string;
   frequency: string;
+  korean_def?: string;
 }
 
 interface KRVData {

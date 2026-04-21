@@ -18,6 +18,7 @@ interface LexiconEntry {
   lemma?: string;
   transliteration: string;
   definition: string;
+  korean_def?: string;
   strongs: string;
   frequency: string;
 }
@@ -535,22 +536,30 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                         </span>
                       </div>
                       
-                      {/* Korean meaning (placeholder for future DB) */}
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold text-stone-800">[한글 뜻 업데이트 예정]</p>
-                      </div>
+                      {/* 1. Korean meaning (TOP priority) */}
+                      {entry?.korean_def ? (
+                        <div className="space-y-1">
+                          <p className="text-base font-bold text-blue-700 leading-relaxed">
+                            {String(entry.korean_def)}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-stone-400">[한글 뜻 준비중]</p>
+                        </div>
+                      )}
                       
-                      {/* English definition - split Strongs and KJV */}
-                      <div className="space-y-1 border-l-2 border-stone-300 pl-2">
+                      {/* 2. English definition - split Strongs and KJV */}
+                      <div className="space-y-1 border-l-2 border-stone-300 pl-2 mt-2">
                         {entry?.definition?.includes('[Strongs]') ? (
                           <>
                             <p className="text-xs text-stone-600">
-                              <span className="font-semibold">Strongs:</span>{' '}
+                              <span className="font-semibold text-stone-700">Strongs:</span>{' '}
                               {String(entry?.definition?.split('[KJV]')?.[0]?.replace('[Strongs]', '')?.trim() || '')}
                             </p>
                             {entry?.definition?.includes('[KJV]') && (
                               <p className="text-xs text-stone-600">
-                                <span className="font-semibold">KJV:</span>{' '}
+                                <span className="font-semibold text-stone-700">KJV:</span>{' '}
                                 {String(entry?.definition?.split('[KJV]')?.[1]?.trim() || '')}
                               </p>
                             )}
