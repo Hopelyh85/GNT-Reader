@@ -61,97 +61,73 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const [netTranslation, setNetTranslation] = useState<string>('');
   const [kjvTranslation, setKjvTranslation] = useState<string>('');
   const [translationLoading, setTranslationLoading] = useState(false);
+  
+  // Local translation data cache
+  const [krvData, setKrvData] = useState<Record<string, string>>({});
+  const [netData, setNetData] = useState<Record<string, string>>({});
+  const [kjvData, setKjvData] = useState<Record<string, string>>({});
+  const [translationsLoaded, setTranslationsLoaded] = useState(false);
 
   const verseRef = selectedVerse
     ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`
     : '';
   
-  // Load translations when verse changes
+  // Load local translation JSON files on mount
   useEffect(() => {
-    if (!selectedVerse) {
+    async function loadLocalTranslations() {
+      try {
+        // Load KRV data
+        const krvResponse = await fetch('/data/kjv_data.json');
+        if (krvResponse.ok) {
+          const krvJson = await krvResponse.json();
+          setKrvData(krvJson);
+        }
+        
+        // Load NET data
+        const netResponse = await fetch('/data/net_bible.json');
+        if (netResponse.ok) {
+          const netJson = await netResponse.json();
+          setNetData(netJson);
+        }
+        
+        // Load KJV data
+        const kjvResponse = await fetch('/data/kjv_bible.json');
+        if (kjvResponse.ok) {
+          const kjvJson = await kjvResponse.json();
+          setKjvData(kjvJson);
+        }
+        
+        setTranslationsLoaded(true);
+        console.log('✅ Local translations loaded');
+      } catch (err) {
+        console.error('❌ Failed to load local translations:', err);
+      }
+    }
+    
+    loadLocalTranslations();
+  }, []);
+
+  // Load translations when verse changes (from local cache)
+  useEffect(() => {
+    if (!selectedVerse || !translationsLoaded) {
       setKoreanTranslation('');
       setNetTranslation('');
       setKjvTranslation('');
       return;
     }
     
-    async function loadTranslations() {
-      setTranslationLoading(true);
-      try {
-        // Fetch Korean translation (KRV/NKRV)
-        const koreanResponse = await fetch(
-          `/api/translations?version=krv&book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}`
-        );
-        if (koreanResponse.ok) {
-          const koreanData = await koreanResponse.json();
-          setKoreanTranslation(koreanData.text || koreanData.translation || '');
-        } else {
-          setKoreanTranslation('');
-        }
-        
-        // Fetch NET English translation via API first
-        let netText = '';
-        try {
-          const netResponse = await fetch(
-            `/api/translations?version=net&book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}`
-          );
-          if (netResponse.ok) {
-            const netData = await netResponse.json();
-            netText = netData.text || netData.translation || '';
-          }
-        } catch (apiErr) {
-          console.log('API fetch failed, trying Supabase directly...');
-        }
-        
-        // Fallback: Direct Supabase fetch for NET translation
-        if (!netText) {
-          try {
-            const supabase = getSupabase();
-            const { data: netData, error: netError } = await supabase
-              .from('net_translations')
-              .select('text')
-              .eq('book', selectedVerse!.book)
-              .eq('chapter', selectedVerse!.chapter)
-              .eq('verse', selectedVerse!.verse)
-              .single();
-            
-            if (!netError && netData) {
-              netText = netData.text || '';
-            }
-          } catch (supabaseErr) {
-            console.error('Supabase NET fetch error:', supabaseErr);
-          }
-        }
-        
-        setNetTranslation(netText);
-        
-        // Fetch KJV translation via API
-        let kjvText = '';
-        try {
-          const kjvResponse = await fetch(
-            `/api/translations?version=kjv&book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}`
-          );
-          if (kjvResponse.ok) {
-            const kjvData = await kjvResponse.json();
-            kjvText = kjvData.text || kjvData.translation || '';
-          }
-        } catch (kjvErr) {
-          console.log('KJV API fetch failed:', kjvErr);
-        }
-        setKjvTranslation(kjvText);
-        
-      } catch (err) {
-        console.error('Error loading translations:', err);
-        setKoreanTranslation('');
-        setNetTranslation('');
-        setKjvTranslation('');
-      } finally {
-        setTranslationLoading(false);
-      }
-    }
+    const key = `${selectedVerse.book}_${selectedVerse.chapter}_${selectedVerse.verse}`;
     
-    loadTranslations();
-  }, [selectedVerse]);
+    // Get KRV translation
+    setKoreanTranslation(krvData[key] || '');
+    
+    // Get NET translation
+    setNetTranslation(netData[key] || '');
+    
+    // Get KJV translation
+    setKjvTranslation(kjvData[key] || '');
+    
+  }, [selectedVerse, translationsLoaded, krvData, netData, kjvData]);
 
   // Load existing note when verse changes via API
   useEffect(() => {
@@ -607,40 +583,34 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           
           <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
             <p className="text-xs font-semibold text-blue-700 mb-1">🇰🇷 개역한글 (KRV)</p>
-            {translationLoading ? (
-              <p className="text-sm text-stone-500">로딩 중...</p>
+            {!translationsLoaded ? (
+              <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
             ) : koreanTranslation ? (
-              <p className="text-sm text-stone-700 leading-relaxed">{koreanTranslation}</p>
+              <p className="text-sm text-stone-700 leading-relaxed">{String(koreanTranslation)}</p>
             ) : (
-              <p className="text-sm text-stone-400 italic">데이터 준비 중</p>
+              <p className="text-sm text-amber-600">⚠️ 해당 절의 개역한글 번역 데이터가 없습니다</p>
             )}
           </div>
           
           <div className="p-3 bg-green-50 rounded border-l-4 border-green-500">
             <p className="text-xs font-semibold text-green-700 mb-1">🌐 NET English</p>
-            {translationLoading ? (
-              <p className="text-sm text-stone-500">로딩 중...</p>
+            {!translationsLoaded ? (
+              <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
             ) : netTranslation ? (
-              <p className="text-sm text-stone-700 leading-relaxed">{netTranslation}</p>
+              <p className="text-sm text-stone-700 leading-relaxed">{String(netTranslation)}</p>
             ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-amber-600 font-medium">⚠️ NET 영어 성경 데이터가 Supabase에 없습니다</p>
-                <p className="text-xs text-stone-500">Table Editor에서 net_translations 테이블을 확인하거나 CSV Import 하세요.</p>
-              </div>
+              <p className="text-sm text-amber-600">⚠️ 해당 절의 NET 영어 번역 데이터가 없습니다</p>
             )}
           </div>
           
           <div className="p-3 bg-red-50 rounded border-l-4 border-red-500">
             <p className="text-xs font-semibold text-red-700 mb-1">📖 KJV (King James Version)</p>
-            {translationLoading ? (
-              <p className="text-sm text-stone-500">로딩 중...</p>
+            {!translationsLoaded ? (
+              <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
             ) : kjvTranslation ? (
-              <p className="text-sm text-stone-700 leading-relaxed">{kjvTranslation}</p>
+              <p className="text-sm text-stone-700 leading-relaxed">{String(kjvTranslation)}</p>
             ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-amber-600 font-medium">⚠️ KJV 데이터가 없습니다</p>
-                <p className="text-xs text-stone-500">KJV 번역 데이터를 준비 중입니다.</p>
-              </div>
+              <p className="text-sm text-amber-600">⚠️ 해당 절의 KJV 영어 번역 데이터가 없습니다</p>
             )}
           </div>
         </div>
