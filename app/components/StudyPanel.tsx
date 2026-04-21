@@ -279,7 +279,12 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const fallbackFixer: Record<string, string> = {
     // Articles
     'τοῦ': 'ὁ', 'τόν': 'ὁ', 'τήν': 'ὁ', 'τῆς': 'ὁ', 'τῷ': 'ὁ', 'τούς': 'ὁ',
-    // Common nouns
+    // αὐτός pronoun forms - FORCE to G846 (he/him/his), avoid G847 (adverb) trap!
+    'αὐτός': 'αὐτός', 'αὐτοῦ': 'αὐτός', 'αὐτῷ': 'αὐτός', 'αὐτόν': 'αὐτός',
+    'αὐτή': 'αὐτός', 'αὐτῆς': 'αὐτός', 'αὐτῇ': 'αὐτός', 'αὐτήν': 'αὐτός',
+    'αὐτό': 'αὐτός', 'αὐτοί': 'αὐτός', 'αὐτῶν': 'αὐτός', 'αὐτοῖς': 'αὐτός', 'αὐτούς': 'αὐτός',
+    'αὐταί': 'αὐτός', 'αὐταῖς': 'αὐτός', 'αὐτάς': 'αὐτός',
+    // Common nouns - SBLGNT bad lemma data corrections
     'προφήτου': 'προφήτης', 'προφήτην': 'προφήτης',
     'ἄγγελος': 'ἄγγελος', 'ἀγγέλου': 'ἄγγελος',
     'υἱόν': 'υἱός', 'υἱοῦ': 'υἱός',
@@ -288,6 +293,9 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     'χριστόν': 'χριστός', 'χριστοῦ': 'χριστός',
     'κύριον': 'κύριος', 'κυρίου': 'κύριος',
     'ἀδελφόν': 'ἀδελφός', 'ἀδελφοῦ': 'ἀδελφός',
+    // λαός (people) - SBLGNT incorrect lemma fix
+    'λαός': 'λαός', 'λαὸς': 'λαός', 'λαόν': 'λαός', 'λαὸν': 'λαός',
+    'λαοῦ': 'λαός', 'λαῷ': 'λαός', 'λαοί': 'λαός', 'λαῶν': 'λαός', 'λαούς': 'λαός',
     // Participles (SBLGNT often lists these as lemmas incorrectly)
     'λέγων': 'λέγω', 'λέγοντος': 'λέγω', 'λέγοντα': 'λέγω',
     'λέγουσα': 'λέγω', 'λέγουσαν': 'λέγω',
@@ -481,20 +489,22 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
               {(() => {
                 const w = selectedWord.word;
+                // Calculate searchKey with fallbackFixer as 1st priority
+                const searchKey = fallbackFixer[w.text] || fallbackFixer[w.lemma] || w.lemma || w.text;
                 // Use getWordDefinition with fallbackFixer
                 const entry = getWordDefinition(w.lemma, w.text);
-                const cleanedLemma = entry?.lemma || w.lemma || w.text;
+                const cleanedLemma = entry?.lemma || searchKey;
                 
                 return (
                 <div className="space-y-3">
-                  {/* Header: Surface Form + Lemma */}
+                  {/* Header: Surface Form + Lemma (showing fallback-corrected searchKey) */}
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-greek text-3xl font-bold text-amber-700">
                       {w.text}
                     </span>
-                    {cleanedLemma && cleanedLemma !== w.text && (
+                    {searchKey && searchKey !== w.text && (
                       <span className="text-sm text-stone-500">
-                        (원형: <span className="font-greek text-amber-600">{cleanedLemma}</span>)
+                        (원형: <span className="font-greek text-amber-600">{searchKey}</span>)
                       </span>
                     )}
                   </div>
