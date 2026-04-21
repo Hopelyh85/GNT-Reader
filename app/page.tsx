@@ -97,6 +97,23 @@ export default function Home() {
           />
         </div>
 
+        {/* Mobile Bottom Sheet - StudyPanel */}
+        {(selectedVerse || selectedWord) && (
+          <div className="md:hidden">
+            <StudyPanel
+              selectedVerse={selectedVerse}
+              selectedWord={selectedWord}
+              isLoggedIn={isLoggedIn}
+              userRole={userRole}
+              userName={userName}
+              onClose={() => {
+                setSelectedWord(null);
+                // Keep verse selected, just close the panel
+              }}
+            />
+          </div>
+        )}
+
         {/* Right Panel - Community (Desktop only) */}
         <div className="hidden lg:block lg:w-[280px]">
           <CommunityPanel

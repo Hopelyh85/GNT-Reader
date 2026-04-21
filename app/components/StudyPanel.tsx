@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
-import { PenLine, BookText, Save, Loader2, BookOpen, Search } from 'lucide-react';
+import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
 
 interface StudyPanelProps {
@@ -11,6 +11,7 @@ interface StudyPanelProps {
   isLoggedIn: boolean;
   userRole: string;
   userName: string;
+  onClose?: () => void;
 }
 
 interface LexiconEntry {
@@ -39,7 +40,7 @@ interface Reflection {
   created_at: string;
 }
 
-export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, userName }: StudyPanelProps) {
+export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, userName, onClose }: StudyPanelProps) {
   const isAdmin = userRole === 'ADMIN';
   const canWrite = isLoggedIn;
   const [ministryNote, setMinistryNote] = useState('');
@@ -327,36 +328,82 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     );
   }
 
-  return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header */}
-      <div className="px-4 py-3 bg-stone-100 border-b border-stone-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PenLine className="w-4 h-4 text-stone-600" />
-            <h2 className="text-sm font-serif font-semibold text-stone-700">
-              Study Panel {isAdmin && <span className="text-amber-600">👑</span>}
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
-            ) : lastSaved ? (
-              <span className="text-xs text-stone-400">
-                저장됨 {lastSaved.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            ) : null}
-            <button
-              onClick={handleSave}
-              disabled={saving || !canWrite}
-              className="flex items-center gap-1 px-3 py-1.5 bg-stone-700 text-white text-xs rounded hover:bg-stone-600 disabled:opacity-50 transition-colors"
-            >
-              <Save className="w-3 h-3" />
-              저장
-            </button>
-          </div>
+  // Mobile: show as bottom sheet when verse or word selected
+  // Desktop: show as sidebar
+  const showPanel = selectedVerse || selectedWord;
+
+  if (!showPanel) {
+    return (
+      <div className="hidden md:flex h-full items-center justify-center p-8">
+        <div className="text-center text-stone-400">
+          <BookText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+          <p className="font-serif text-sm">
+            좌측 패널에서 성경 구절을 선택하여<br />묵상을 시작하세요
+          </p>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Mobile Backdrop */}
+      <div 
+        className="md:hidden fixed inset-0 bg-black/50 z-40"
+        onClick={onClose}
+      />
+      
+      {/* Main Panel - Mobile: Bottom Sheet, Desktop: Sidebar */}
+      <div className="
+        md:relative md:w-96 md:h-full
+        fixed bottom-0 left-0 w-full max-h-[85vh] md:max-h-full
+        overflow-y-auto md:overflow-hidden
+        bg-white md:bg-white
+        rounded-t-2xl md:rounded-none
+        shadow-2xl md:shadow-none
+        z-50 md:z-auto
+        flex flex-col
+        animate-slide-up md:animate-none
+      ">
+        {/* Header */}
+        <div className="px-4 py-3 bg-stone-100 border-b border-stone-200 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PenLine className="w-4 h-4 text-stone-600" />
+              <h2 className="text-sm font-serif font-semibold text-stone-700">
+                Study Panel {isAdmin && <span className="text-amber-600">👑</span>}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
+              ) : lastSaved ? (
+                <span className="text-xs text-stone-400 hidden sm:inline">
+                  저장됨 {lastSaved.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              ) : null}
+              
+              {/* Mobile Close Button */}
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  className="md:hidden p-1.5 hover:bg-stone-200 rounded transition-colors"
+                >
+                  <X className="w-4 h-4 text-stone-600" />
+                </button>
+              )}
+              
+              <button
+                onClick={handleSave}
+                disabled={saving || !canWrite}
+                className="flex items-center gap-1 px-3 py-1.5 bg-stone-700 text-white text-xs rounded hover:bg-stone-600 disabled:opacity-50 transition-colors"
+              >
+                <Save className="w-3 h-3" />
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
 
       {/* Error Message */}
       {error && (
@@ -377,7 +424,6 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
               {(() => {
                 const w = selectedWord.word;
-                const entry = getWordDefinition(w.lemma, w.text);
                 // Lemma Fixer: hardcoded corrections for common lemmas + articles
                 const lemmaFixer: Record<string, string> = {
                   'ἐστί(ν)': 'εἰμί',
@@ -405,8 +451,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                   'τούς': 'ὁ',
                   'ταῖς': 'ὁ'
                 };
-                const rawLemma = entry?.lemma || w.lemma || w.text || '';
+                const rawLemma = w.lemma || w.text || '';
                 const cleanedLemma = lemmaFixer[rawLemma] || rawLemma.replace(/\(.*\)/g, '');
+                // Use cleanedLemma as primary key for lexicon lookup
+                const entry = lexicon[cleanedLemma] || lexicon[w.lemma] || lexicon[w.text];
                 
                 return (
                 <div className="space-y-3">
@@ -435,13 +483,24 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
             {(() => {
               const w = selectedWord.word;
-              const entry = getWordDefinition(w.lemma, w.text);
+              // Lemma Fixer: same as Word Analysis section
+              const lemmaFixer: Record<string, string> = {
+                'ἐστί(ν)': 'εἰμί', 'εἰσίν': 'εἰμί',
+                'αὐτῆς': 'αὐτός', 'αὐτοῦ': 'αὐτός', 'αὐτῷ': 'αὐτός', 'αὐτόν': 'αὐτός',
+                'τόν': 'ὁ', 'τὴν': 'ὁ', 'τῆς': 'ὁ', 'τοὺς': 'ὁ', 'τῷ': 'ὁ', 'τῶν': 'ὁ',
+                'τῇ': 'ὁ', 'τὰ': 'ὁ', 'τὸ': 'ὁ', 'τοῦ': 'ὁ', 'οἱ': 'ὁ', 'αἱ': 'ὁ',
+                'ὁ': 'ὁ', 'ἡ': 'ὁ', 'τό': 'ὁ', 'τούς': 'ὁ', 'ταῖς': 'ὁ'
+              };
+              const rawLemma = w.lemma || w.text || '';
+              const cleanedLemma = lemmaFixer[rawLemma] || rawLemma.replace(/\(.*\)/g, '');
+              // Use cleanedLemma as primary key for lexicon lookup
+              const entry = lexicon[cleanedLemma] || lexicon[w.lemma] || lexicon[w.text];
               
               return (
                 <div className="space-y-2 p-3 bg-blue-50/50 border border-blue-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="font-greek text-xl font-bold text-blue-700">
-                      {w.lemma || w.text}
+                      {cleanedLemma || w.lemma || w.text}
                     </span>
                     {entry?.strongs && (
                       <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded text-blue-700">
@@ -564,5 +623,6 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
 
       </div>
     </div>
+    </>
   );
 }
