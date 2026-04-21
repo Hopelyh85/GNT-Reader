@@ -5,6 +5,7 @@ import { Book, GreekWord } from '@/app/types';
 import { ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
 
 interface LexiconEntry {
+  lemma?: string;
   transliteration: string;
   definition: string;
   strongs: string;
@@ -392,18 +393,19 @@ export function BiblePanel({
         <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-stone-200 bg-amber-50 p-4 shadow-lg max-h-[50vh] overflow-y-auto">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0 space-y-3">
-              {/* Line 1: 원형 (Lemma) - FORCE RENDER */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-stone-500 w-14 shrink-0">원형:</span>
-                <span className="font-greek text-3xl font-bold text-amber-700 leading-tight">
-                  {internalSelectedWord.word.lemma || internalSelectedWord.word.text || '⚠️ 원형 없음'}
-                </span>
-              </div>
-              
-              {/* Debug info - show what's available */}
-              <div className="text-xs text-stone-400 font-mono">
-                lemma: {internalSelectedWord.word.lemma || 'N/A'} | text: {internalSelectedWord.word.text || 'N/A'} | morph: {internalSelectedWord.word.morph || 'N/A'}
-              </div>
+              {/* Line 1: 원형 (Lemma) - CLEAN */}
+              {(() => {
+                const w = internalSelectedWord.word;
+                const entry = lexicon[w.lemma] || lexicon[w.text];
+                const cleanedLemma = entry?.lemma 
+                  ? entry.lemma 
+                  : (w.lemma || w.text || '').replace(/\(.*\)/g, '');
+                return (
+                  <div className="font-greek text-3xl font-bold text-amber-700 leading-tight">
+                    {cleanedLemma || '⚠️ 원형 없음'}
+                  </div>
+                );
+              })()}
               
               {/* Line 2: 한글 문법 풀이 */}
               <div className="text-sm text-blue-700 font-medium">

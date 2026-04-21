@@ -14,6 +14,7 @@ interface StudyPanelProps {
 }
 
 interface LexiconEntry {
+  lemma?: string;
   transliteration: string;
   definition: string;
   strongs: string;
@@ -364,19 +365,16 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               {(() => {
                 const w = selectedWord.word;
                 const entry = getWordDefinition(w.lemma, w.text);
+                // 원형 정제: lexicon의 lemma가 있으면 사용, 없으면 현재 lemma에서 괄호 제거
+                const cleanedLemma = entry?.lemma 
+                  ? entry.lemma 
+                  : (w.lemma || w.text || '').replace(/\(.*\)/g, '');
                 
                 return (
                 <div className="space-y-3">
-                  {/* 원형 - FORCE RENDER */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-stone-500">원형:</span>
-                    <span className="font-greek text-3xl font-bold text-amber-700">
-                      {w.lemma || w.text || '⚠️ 원형 없음'}
-                    </span>
-                  </div>
-                  {/* Debug info */}
-                  <div className="text-xs text-stone-400 font-mono">
-                    lemma: {w.lemma || 'N/A'} | text: {w.text || 'N/A'}
+                  {/* 원형 - 클린 출력 */}
+                  <div className="font-greek text-3xl font-bold text-amber-700">
+                    {cleanedLemma || '⚠️ 원형 없음'}
                   </div>
                   <div className="text-sm text-blue-700 font-medium">
                     {parseMorphCode(w.morph)}
