@@ -356,8 +356,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
       {/* Main Panel - Mobile: Bottom Sheet, Desktop: Sidebar */}
       <div className="
         md:relative md:w-96 md:h-full
-        fixed bottom-0 left-0 w-full max-h-[85vh] md:max-h-full
-        overflow-y-auto md:overflow-hidden
+        fixed bottom-0 left-0 w-full h-[50vh] md:h-full
+        overflow-hidden
         bg-white md:bg-white
         rounded-t-2xl md:rounded-none
         shadow-2xl md:shadow-none
@@ -365,6 +365,11 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         flex flex-col
         animate-slide-up md:animate-none
       ">
+        {/* iOS-style Drag Handle - Mobile only */}
+        <div className="md:hidden pt-2 pb-1 flex-shrink-0">
+          <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto" />
+        </div>
+        
         {/* Header */}
         <div className="px-4 py-3 bg-stone-100 border-b border-stone-200 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -424,7 +429,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
               {(() => {
                 const w = selectedWord.word;
-                // Lemma Fixer: hardcoded corrections for common lemmas + articles
+                // Lemma Fixer: hardcoded corrections for common lemmas + articles + demonstratives
                 const lemmaFixer: Record<string, string> = {
                   'ἐστί(ν)': 'εἰμί',
                   'εἰσίν': 'εἰμί',
@@ -449,7 +454,18 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                   'ἡ': 'ὁ',
                   'τό': 'ὁ',
                   'τούς': 'ὁ',
-                  'ταῖς': 'ὁ'
+                  'ταῖς': 'ὁ',
+                  // Demonstrative Pronouns
+                  'ταῦτα': 'οὗτος',
+                  'τοῦτο': 'οὗτος',
+                  'τούτῳ': 'οὗτος',
+                  'τούτου': 'οὗτος',
+                  'ταύτην': 'οὗτος',
+                  'ταύτης': 'οὗτος',
+                  'αὕτη': 'οὗτος',
+                  'οὗτοι': 'οὗτος',
+                  'ἐκείναις': 'ἐκεῖνος',
+                  'ἐκείνῃ': 'ἐκεῖνος'
                 };
                 const rawLemma = w.lemma || w.text || '';
                 const cleanedLemma = lemmaFixer[rawLemma] || rawLemma.replace(/\(.*\)/g, '');
@@ -483,13 +499,17 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
             {(() => {
               const w = selectedWord.word;
-              // Lemma Fixer: same as Word Analysis section
+              // Lemma Fixer: same as Word Analysis section + demonstratives
               const lemmaFixer: Record<string, string> = {
                 'ἐστί(ν)': 'εἰμί', 'εἰσίν': 'εἰμί',
                 'αὐτῆς': 'αὐτός', 'αὐτοῦ': 'αὐτός', 'αὐτῷ': 'αὐτός', 'αὐτόν': 'αὐτός',
                 'τόν': 'ὁ', 'τὴν': 'ὁ', 'τῆς': 'ὁ', 'τοὺς': 'ὁ', 'τῷ': 'ὁ', 'τῶν': 'ὁ',
                 'τῇ': 'ὁ', 'τὰ': 'ὁ', 'τὸ': 'ὁ', 'τοῦ': 'ὁ', 'οἱ': 'ὁ', 'αἱ': 'ὁ',
-                'ὁ': 'ὁ', 'ἡ': 'ὁ', 'τό': 'ὁ', 'τούς': 'ὁ', 'ταῖς': 'ὁ'
+                'ὁ': 'ὁ', 'ἡ': 'ὁ', 'τό': 'ὁ', 'τούς': 'ὁ', 'ταῖς': 'ὁ',
+                // Demonstrative Pronouns
+                'ταῦτα': 'οὗτος', 'τοῦτο': 'οὗτος', 'τούτῳ': 'οὗτος', 'τούτου': 'οὗτος',
+                'ταύτην': 'οὗτος', 'ταύτης': 'οὗτος', 'αὕτη': 'οὗτος', 'οὗτοι': 'οὗτος',
+                'ἐκείναις': 'ἐκεῖνος', 'ἐκείνῃ': 'ἐκεῖνος'
               };
               const rawLemma = w.lemma || w.text || '';
               const cleanedLemma = lemmaFixer[rawLemma] || rawLemma.replace(/\(.*\)/g, '');
@@ -502,26 +522,23 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                     <span className="font-greek text-xl font-bold text-blue-700">
                       {cleanedLemma || w.lemma || w.text}
                     </span>
-                    {entry?.strongs && (
-                      <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded text-blue-700">
-                        {entry.strongs}
-                      </span>
-                    )}
                   </div>
-                  {entry?.transliteration && (
-                    <p className="text-xs text-stone-500">
-                      [{entry.transliteration}]
-                    </p>
-                  )}
-                  {entry?.definition && (
-                    <p className="text-sm text-stone-700 leading-relaxed">
-                      {entry.definition}
-                    </p>
-                  )}
-                  {entry?.frequency && (
-                    <p className="text-xs text-stone-400">
-                      빈도: {entry.frequency}
-                    </p>
+                  {entry ? (
+                    <>
+                      {entry.strongs && (
+                        <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded text-blue-700">
+                          {entry.strongs}
+                        </span>
+                      )}
+                      <p className="text-xs text-stone-500">
+                        [{entry.transliteration || '발음 없음'}]
+                      </p>
+                      <p className="text-sm text-stone-700">
+                        {entry.definition || '(사전 데이터가 비어 있습니다)'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-red-500 italic">⚠️ '{cleanedLemma}'에 대한 영문 사전 데이터가 없습니다.</p>
                   )}
                 </div>
               );
