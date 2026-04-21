@@ -127,17 +127,54 @@ export function BiblePanel({
     loadKRV();
   }, []);
   
-  // Get definition for selected word - DUAL LOOKUP: try lemma first, then surface form
-  const getWordDefinition = (lemma: string, surfaceForm: string): LexiconEntry | null => {
-    // 1. Try lemma (root form) first - for proper nouns and base forms
-    if (lexicon[lemma]) {
-      return lexicon[lemma];
+  // ===== AUTOMATIC LEMMA TRACKING with 3-Level Fallback =====
+  const getWordDefinition = (lemma: string, surfaceForm: string): { entry: LexiconEntry | null; cleanedLemma: string } => {
+    const stripAccents = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    
+    // Emergency lemmaFixer
+    const lemmaFixer: Record<string, string> = {
+      'ἐστί(ν)': 'εἰμί', 'εἰσίν': 'εἰμί',
+      'αὐτῆς': 'αὐτός', 'αὐτοῦ': 'αὐτός', 'αὐτῷ': 'αὐτός', 'αὐτόν': 'αὐτός',
+      'τόν': 'ὁ', 'τὴν': 'ὁ', 'τῆς': 'ὁ', 'τοὺς': 'ὁ', 'τῷ': 'ὁ', 'τῶν': 'ὁ',
+      'τῇ': 'ὁ', 'τὰ': 'ὁ', 'τὸ': 'ὁ', 'τοῦ': 'ὁ', 'οἱ': 'ὁ', 'αἱ': 'ὁ',
+      'ὁ': 'ὁ', 'ἡ': 'ὁ', 'τό': 'ὁ', 'τούς': 'ὁ', 'ταῖς': 'ὁ',
+      'ταῦτα': 'οὗτος', 'τοῦτο': 'οὗτος', 'τούτῳ': 'οὗτος', 'τούτου': 'οὗτος',
+      'ταύτην': 'οὗτος', 'ταύτης': 'οὗτος', 'αὕτη': 'οὗτος', 'οὗτοι': 'οὗτος',
+      'ἐκείναις': 'ἐκεῖνος', 'ἐκείνῃ': 'ἐκεῖνος',
+      'δέ': 'δέ', 'Ἰησοῦν': 'Ἰησοῦς', 'Ἰησοῦ': 'Ἰησοῦς', 'Ἰησοῦς': 'Ἰησοῦς',
+      'χριστοῦ': 'χριστός', 'χριστόν': 'χριστός', 'χριστός': 'χριστός',
+      'θεοῦ': 'θεός', 'θεόν': 'θεός', 'θεός': 'θεός'
+    };
+    
+    // Level 1: Direct lookup
+    let entry = lexicon[lemma] || lexicon[surfaceForm];
+    let cleanedLemma = lemma || surfaceForm;
+    
+    // Apply lemmaFixer if direct lookup failed
+    if (!entry && lemmaFixer[lemma || surfaceForm]) {
+      const fixed = lemmaFixer[lemma || surfaceForm];
+      entry = lexicon[fixed];
+      if (entry) cleanedLemma = fixed;
     }
-    // 2. Fallback to surface form - for inflected forms
-    if (lexicon[surfaceForm]) {
-      return lexicon[surfaceForm];
+    
+    // Level 2: Strip parentheses and retry
+    if (!entry) {
+      const basicLemma = (lemma || surfaceForm).replace(/\(.*\)/g, '').trim();
+      entry = lexicon[basicLemma];
+      if (entry) cleanedLemma = basicLemma;
     }
-    return null;
+    
+    // Level 3: Strip accents and search all keys
+    if (!entry) {
+      const targetNoAccent = stripAccents((lemma || surfaceForm).replace(/\(.*\)/g, '').trim());
+      const foundKey = Object.keys(lexicon).find(key => stripAccents(key) === targetNoAccent);
+      if (foundKey) {
+        entry = lexicon[foundKey];
+        cleanedLemma = foundKey;
+      }
+    }
+    
+    return { entry, cleanedLemma };
   };
 
 
@@ -184,8 +221,9 @@ export function BiblePanel({
     const parsed = parseMorphCode(word.morph);
     console.log('parsed (한국어 문법):', parsed);
     
-    const entry = getWordDefinition(word.lemma, word.text);
+    const { entry, cleanedLemma } = getWordDefinition(word.lemma, word.text);
     console.log('lexicon entry:', entry);
+    console.log('cleanedLemma:', cleanedLemma);
     console.log('lexicon[word.lemma]:', lexicon[word.lemma]);
     console.log('lexicon[word.text]:', lexicon[word.text]);
     console.log('=======================');
