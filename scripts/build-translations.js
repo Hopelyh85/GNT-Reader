@@ -216,17 +216,97 @@ async function parseNET() {
   return netData;
 }
 
+// Parse KRV (Korean) markdown files from folder structure
+function parseKRV() {
+  const krvBaseDir = path.join(__dirname, '../data/krv_source');
+  const outputDir = path.join(__dirname, '../public/data');
+  
+  const krvData = {};
+  
+  // Book folder mapping: folder name -> abbrev
+  const bookFolderMap = {
+    '40마태복음': 'MAT', '41마가복음': 'MRK', '42누가복음': 'LUK', '43요한복음': 'JHN',
+    '44사도행전': 'ACT', '45로마서': 'ROM', '46고린도전서': '1CO', '47고린도후서': '2CO',
+    '48갈라디아서': 'GAL', '49에베소서': 'EPH', '50빌립보서': 'PHP', '51골로새서': 'COL',
+    '52데살로니가전서': '1TH', '53데살로니가후서': '2TH', '54디모데전서': '1TI', '55디모데후서': '2TI',
+    '56디도서': 'TIT', '57빌레몬서': 'PHM', '58히브리서': 'HEB', '59야고보서': 'JAS',
+    '60베드로전서': '1PE', '61베드로후서': '2PE', '62요한1서': '1JN', '63요한2서': '2JN',
+    '64요한3서': '3JN', '65유다서': 'JUD', '66요한계시록': 'REV'
+  };
+  
+  console.log('📖 Parsing KRV (개역한글) files...');
+  
+  for (const [folderName, abbrev] of Object.entries(bookFolderMap)) {
+    const bookDir = path.join(krvBaseDir, folderName);
+    if (!fs.existsSync(bookDir)) {
+      console.warn(`⚠️ Folder not found: ${folderName}`);
+      continue;
+    }
+    
+    // Get all .md files in the folder
+    const files = fs.readdirSync(bookDir).filter(f => f.endsWith('.md') && f !== `${folderName}.md`);
+    
+    let bookVerseCount = 0;
+    
+    for (const filename of files) {
+      const filepath = path.join(bookDir, filename);
+      const content = fs.readFileSync(filepath, 'utf-8');
+      
+      // Extract chapter number from filename (e.g., "마1.md" -> 1)
+      const chapterMatch = filename.match(/(\d+)/);
+      const chapterNum = chapterMatch ? parseInt(chapterMatch[1]) : 0;
+      
+      if (chapterNum === 0) continue;
+      
+      // Parse verses: format is "###### N" followed by verse text
+      const lines = content.split('\n');
+      let currentVerse = 0;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Match verse header: "###### N"
+        const verseMatch = line.match(/^######\s+(\d+)/);
+        if (verseMatch) {
+          currentVerse = parseInt(verseMatch[1]);
+          
+          // Get verse text from next line
+          if (i + 1 < lines.length) {
+            const verseText = lines[i + 1].trim();
+            if (verseText && currentVerse > 0) {
+              const key = `${abbrev}_${chapterNum}_${currentVerse}`;
+              krvData[key] = verseText;
+              bookVerseCount++;
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`  ✅ ${abbrev}: ${bookVerseCount} verses`);
+  }
+  
+  // Save KRV data
+  const krvOutputPath = path.join(outputDir, 'krv_bible.json');
+  fs.writeFileSync(krvOutputPath, JSON.stringify(krvData, null, 2));
+  console.log(`\n💾 KRV saved: ${krvOutputPath} (${Object.keys(krvData).length} verses total)\n`);
+  
+  return krvData;
+}
+
 // Main execution
 async function main() {
   console.log('🚀 Starting Unified Translation Parser...\n');
   
   const kjvData = parseKJV();
   const netData = await parseNET();
+  const krvData = parseKRV();
   
   // Summary
   console.log('📊 Summary:');
   console.log(`  KJV: ${Object.keys(kjvData).length} verses`);
   console.log(`  NET: ${Object.keys(netData).length} verses`);
+  console.log(`  KRV: ${Object.keys(krvData).length} verses`);
   console.log('\n✅ Build complete!\n');
 }
 

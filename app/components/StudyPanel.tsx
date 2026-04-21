@@ -77,7 +77,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     async function loadLocalTranslations() {
       try {
         // Load KRV data
-        const krvResponse = await fetch('/data/kjv_data.json');
+        const krvResponse = await fetch('/data/krv_bible.json');
         if (krvResponse.ok) {
           const krvJson = await krvResponse.json();
           setKrvData(krvJson);
@@ -263,6 +263,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     // Common nouns - SBLGNT bad lemma data corrections
     'προφήτου': 'προφήτης', 'προφήτην': 'προφήτης',
     'ἄγγελος': 'ἄγγελος', 'ἀγγέλου': 'ἄγγελος',
+    // πλοῖον (ship) - ι subscript forms
+    'πλοίῳ': 'πλοῖον', 'πλοῖον': 'πλοῖον', 'πλοῖα': 'πλοῖον', 'πλοίου': 'πλοῖον', 'πλοία': 'πλοῖον',
     'υἱόν': 'υἱός', 'υἱοῦ': 'υἱός',
     'θεόν': 'θεός', 'θεοῦ': 'θεός',
     'Ἰησοῦν': 'Ἰησοῦς', 'Ἰησοῦ': 'Ἰησοῦς',
