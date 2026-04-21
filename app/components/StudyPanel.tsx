@@ -269,18 +269,24 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   };
 
   // Smart Morphology Parsing Engine (length/index independent)
-  const parseMorphCode = (morph: string): string => {
+  // Force article parsing for Greek articles regardless of morph code
+  const parseMorphCode = (morph: string, lemma?: string, text?: string): string => {
     if (!morph || morph.length < 3) return '미상의 품사';
+    
+    // Greek articles list for forced parsing
+    const articles = ['ὁ', 'ἡ', 'οἱ', 'αἱ', 'τό', 'τόν', 'τὴν', 'τῆς', 'τοὺς', 'τῷ', 'τῶν', 'τῇ', 'τὰ', 'τὸ', 'τοῦ', 'τούς', 'ταῖς'];
+    const isArticle = lemma && articles.includes(lemma) || text && articles.includes(text);
     
     const tMap: Record<string, string> = {'N':'명사','V':'동사','A':'형용사','D':'부사','P':'전치사','R':'대명사','T':'관사','C':'접속사','X':'불변화사','I':'감탄사'};
     const cMap: Record<string, string> = {'N':'주격','G':'속격','D':'여격','A':'대격','V':'호격'};
     const nMap: Record<string, string> = {'S':'단수','P':'복수'};
     const gMap: Record<string, string> = {'M':'남성','F':'여성','N':'중성'};
     
-    const type = tMap[morph[0]] || '기타';
+    // Force article type if it's an article
+    const type = isArticle ? '관사' : (tMap[morph[0]] || '기타');
     let details: string[] = [];
     
-    if (morph[0] === 'V') {
+    if (!isArticle && morph[0] === 'V') {
       // Verb parsing
       const pMap: Record<string, string> = {'1':'1인칭','2':'2인칭','3':'3인칭'};
       const teMap: Record<string, string> = {'P':'현재','I':'미완료','F':'미래','A':'부정과거','R':'완료','V':'과거완료'};
@@ -372,14 +378,32 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               {(() => {
                 const w = selectedWord.word;
                 const entry = getWordDefinition(w.lemma, w.text);
-                // Lemma Fixer: hardcoded corrections for common lemmas
+                // Lemma Fixer: hardcoded corrections for common lemmas + articles
                 const lemmaFixer: Record<string, string> = {
                   'ἐστί(ν)': 'εἰμί',
                   'εἰσίν': 'εἰμί',
                   'αὐτῆς': 'αὐτός',
                   'αὐτοῦ': 'αὐτός',
                   'αὐτῷ': 'αὐτός',
-                  'αὐτόν': 'αὐτός'
+                  'αὐτόν': 'αὐτός',
+                  // Greek Articles
+                  'τόν': 'ὁ',
+                  'τὴν': 'ὁ',
+                  'τῆς': 'ὁ',
+                  'τοὺς': 'ὁ',
+                  'τῷ': 'ὁ',
+                  'τῶν': 'ὁ',
+                  'τῇ': 'ὁ',
+                  'τὰ': 'ὁ',
+                  'τὸ': 'ὁ',
+                  'τοῦ': 'ὁ',
+                  'οἱ': 'ὁ',
+                  'αἱ': 'ὁ',
+                  'ὁ': 'ὁ',
+                  'ἡ': 'ὁ',
+                  'τό': 'ὁ',
+                  'τούς': 'ὁ',
+                  'ταῖς': 'ὁ'
                 };
                 const rawLemma = entry?.lemma || w.lemma || w.text || '';
                 const cleanedLemma = lemmaFixer[rawLemma] || rawLemma.replace(/\(.*\)/g, '');
@@ -391,7 +415,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                     {cleanedLemma || '⚠️ 원형 없음'}
                   </div>
                   <div className="text-sm text-blue-700 font-medium">
-                    {parseMorphCode(w.morph)}
+                    {parseMorphCode(w.morph, cleanedLemma, w.text)}
                   </div>
                   {entry?.definition && (
                     <p className="text-sm text-stone-700 leading-relaxed">{entry.definition}</p>
