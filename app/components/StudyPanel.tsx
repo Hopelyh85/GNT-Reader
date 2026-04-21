@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search } from 'lucide-react';
+import { getSupabase } from '../lib/supabase';
 
 interface StudyPanelProps {
   selectedVerse: SelectedVerse | null;
@@ -84,16 +85,41 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           setKoreanTranslation('');
         }
         
-        // Fetch NET English translation
-        const netResponse = await fetch(
-          `/api/translations?version=net&book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}`
-        );
-        if (netResponse.ok) {
-          const netData = await netResponse.json();
-          setNetTranslation(netData.text || netData.translation || '');
-        } else {
-          setNetTranslation('');
+        // Fetch NET English translation via API first
+        let netText = '';
+        try {
+          const netResponse = await fetch(
+            `/api/translations?version=net&book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}`
+          );
+          if (netResponse.ok) {
+            const netData = await netResponse.json();
+            netText = netData.text || netData.translation || '';
+          }
+        } catch (apiErr) {
+          console.log('API fetch failed, trying Supabase directly...');
         }
+        
+        // Fallback: Direct Supabase fetch for NET translation
+        if (!netText) {
+          try {
+            const supabase = getSupabase();
+            const { data: netData, error: netError } = await supabase
+              .from('net_translations')
+              .select('text')
+              .eq('book', selectedVerse!.book)
+              .eq('chapter', selectedVerse!.chapter)
+              .eq('verse', selectedVerse!.verse)
+              .single();
+            
+            if (!netError && netData) {
+              netText = netData.text || '';
+            }
+          } catch (supabaseErr) {
+            console.error('Supabase NET fetch error:', supabaseErr);
+          }
+        }
+        
+        setNetTranslation(netText);
       } catch (err) {
         console.error('Error loading translations:', err);
         setKoreanTranslation('');
@@ -335,24 +361,32 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               <Search className="w-3 h-3" />
               단어 분석
             </label>
-            {(() => {
-              const w = selectedWord.word;
-              const entry = getWordDefinition(w.lemma, w.text);
-              
-              return (
-              <div className="space-y-2">
-                <div className="font-greek text-2xl font-bold text-amber-700">
-                  {w.lemma || w.text}
+              {(() => {
+                const w = selectedWord.word;
+                const entry = getWordDefinition(w.lemma, w.text);
+                
+                return (
+                <div className="space-y-3">
+                  {/* 원형 - FORCE RENDER */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-stone-500">원형:</span>
+                    <span className="font-greek text-3xl font-bold text-amber-700">
+                      {w.lemma || w.text || '⚠️ 원형 없음'}
+                    </span>
+                  </div>
+                  {/* Debug info */}
+                  <div className="text-xs text-stone-400 font-mono">
+                    lemma: {w.lemma || 'N/A'} | text: {w.text || 'N/A'}
+                  </div>
+                  <div className="text-sm text-blue-700 font-medium">
+                    {parseMorphCode(w.morph)}
+                  </div>
+                  {entry?.definition && (
+                    <p className="text-sm text-stone-700 leading-relaxed">{entry.definition}</p>
+                  )}
                 </div>
-                <div className="text-sm text-blue-700 font-medium">
-                  {parseMorphCode(w.morph)}
-                </div>
-                {entry?.definition && (
-                  <p className="text-sm text-stone-700 leading-relaxed">{entry.definition}</p>
-                )}
-              </div>
-            );
-          })()}
+              );
+            })()}
           </div>
         )}
 
@@ -429,7 +463,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             ) : netTranslation ? (
               <p className="text-sm text-stone-700 leading-relaxed">{netTranslation}</p>
             ) : (
-              <p className="text-sm text-stone-400 italic">데이터 준비 중</p>
+              <div className="space-y-2">
+                <p className="text-sm text-amber-600 font-medium">⚠️ NET 영어 성경 데이터가 Supabase에 없습니다</p>
+                <p className="text-xs text-stone-500">Table Editor에서 net_translations 테이블을 확인하거나 CSV Import 하세요.</p>
+              </div>
             )}
           </div>
         </div>

@@ -387,17 +387,22 @@ export function BiblePanel({
         })}
       </div>
 
-      {/* Word Analysis Card - Fixed at Bottom */}
+      {/* Word Analysis Card - Fixed at Bottom with Scroll */}
       {internalSelectedWord && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-stone-200 bg-amber-50 p-4 shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-stone-200 bg-amber-50 p-4 shadow-lg max-h-[50vh] overflow-y-auto">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0 space-y-3">
-              {/* Line 1: 원형 (Lemma) */}
+              {/* Line 1: 원형 (Lemma) - FORCE RENDER */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-stone-500 w-14 shrink-0">원형:</span>
-                <span className="font-greek text-2xl font-bold text-amber-700">
-                  {internalSelectedWord.word.lemma || internalSelectedWord.word.text}
+                <span className="font-greek text-3xl font-bold text-amber-700 leading-tight">
+                  {internalSelectedWord.word.lemma || internalSelectedWord.word.text || '⚠️ 원형 없음'}
                 </span>
+              </div>
+              
+              {/* Debug info - show what's available */}
+              <div className="text-xs text-stone-400 font-mono">
+                lemma: {internalSelectedWord.word.lemma || 'N/A'} | text: {internalSelectedWord.word.text || 'N/A'} | morph: {internalSelectedWord.word.morph || 'N/A'}
               </div>
               
               {/* Line 2: 한글 문법 풀이 */}
@@ -408,17 +413,34 @@ export function BiblePanel({
               {/* Line 3: 사전 뜻 */}
               {(() => {
                 const w = internalSelectedWord.word;
-                const def = lexicon[w.lemma]?.definition || lexicon[w.text]?.definition || null;
+                const entry = lexicon[w.lemma] || lexicon[w.text];
+                const def = entry?.definition || null;
+                const strongs = entry?.strongs || null;
                 
-                if (def) {
+                if (def || strongs) {
                   return (
-                    <div className="flex items-start gap-2">
-                      <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
-                      <p className="text-sm text-stone-700 leading-relaxed">{def}</p>
+                    <div className="space-y-1">
+                      {strongs && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-medium text-stone-500 w-14 shrink-0">Strong:</span>
+                          <span className="text-xs font-mono bg-blue-100 px-2 py-0.5 rounded text-blue-700">{strongs}</span>
+                        </div>
+                      )}
+                      {def && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
+                          <p className="text-sm text-stone-700 leading-relaxed">{def}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 }
-                return null;
+                return (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-stone-500 w-14 shrink-0">뜻:</span>
+                    <p className="text-sm text-stone-400 italic">(사전 데이터 없음)</p>
+                  </div>
+                );
               })()}
             </div>
             <button
@@ -426,7 +448,7 @@ export function BiblePanel({
                 setInternalSelectedWord(null);
                 onSelectWord(null);
               }}
-              className="p-1.5 hover:bg-stone-200 rounded transition-colors flex-shrink-0"
+              className="p-1.5 hover:bg-stone-200 rounded transition-colors flex-shrink-0 sticky top-0"
             >
               <span className="text-sm text-stone-400">✕</span>
             </button>
