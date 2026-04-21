@@ -488,11 +488,13 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               단어 분석
             </label>
               {(() => {
-                const w = selectedWord.word;
+                const w = selectedWord?.word;
+                if (!w) return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
+                
                 // Calculate searchKey with fallbackFixer as 1st priority
-                const searchKey = fallbackFixer[w.text] || fallbackFixer[w.lemma] || w.lemma || w.text;
+                const searchKey = fallbackFixer[w?.text] || fallbackFixer[w?.lemma] || w?.lemma || w?.text || '';
                 // Use getWordDefinition with fallbackFixer
-                const entry = getWordDefinition(w.lemma, w.text);
+                const entry = getWordDefinition(w?.lemma || '', w?.text || '');
                 const cleanedLemma = entry?.lemma || searchKey;
                 
                 return (
@@ -500,19 +502,19 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                   {/* Header: Surface Form + Lemma (showing fallback-corrected searchKey) */}
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-greek text-3xl font-bold text-amber-700">
-                      {w.text}
+                      {w?.text || ''}
                     </span>
-                    {searchKey && searchKey !== w.text && (
+                    {searchKey && searchKey !== w?.text && (
                       <span className="text-sm text-stone-500">
-                        (원형: <span className="font-greek text-amber-600">{searchKey}</span>)
+                        (원형: <span className="font-greek text-amber-600">{String(searchKey)}</span>)
                       </span>
                     )}
                   </div>
                   <div className="text-sm text-blue-700 font-medium">
-                    {parseMorphCode(w.morph, cleanedLemma, w.text)}
+                    {parseMorphCode(w?.morph || '', cleanedLemma, w?.text || '')}
                   </div>
                   {entry?.definition && (
-                    <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">{entry.definition}</p>
+                    <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">{String(entry.definition)}</p>
                   )}
                 </div>
               );
@@ -528,16 +530,19 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               원어 사전 (Strong's Dictionary)
             </label>
             {(() => {
-              const w = selectedWord.word;
+              const w = selectedWord?.word;
+              if (!w) return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
+              
               // Use getWordDefinition with fallbackFixer
-              const entry = getWordDefinition(w.lemma, w.text);
-              const cleanedLemma = entry?.lemma || w.lemma || w.text;
+              const entry = getWordDefinition(w?.lemma || '', w?.text || '');
+              const searchKey = fallbackFixer[w?.text] || fallbackFixer[w?.lemma] || w?.lemma || w?.text || '';
+              const cleanedLemma = entry?.lemma || searchKey;
               
               return (
                 <div className="space-y-2 p-3 bg-blue-50/50 border border-blue-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="font-greek text-xl font-bold text-blue-700">
-                      {cleanedLemma}
+                      {String(cleanedLemma)}
                     </span>
                   </div>
                   {entry ? (
@@ -545,10 +550,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                       {/* Header: Strong's + Transliteration */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded text-blue-700">
-                          {entry.strongs}
+                          {String(entry?.strongs || 'N/A')}
                         </span>
                         <span className="text-xs text-stone-500">
-                          [{entry.transliteration}]
+                          [{String(entry?.transliteration || '')}]
                         </span>
                       </div>
                       
@@ -559,28 +564,28 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                       
                       {/* English definition - split Strongs and KJV */}
                       <div className="space-y-1 border-l-2 border-stone-300 pl-2">
-                        {entry.definition.includes('[Strongs]') ? (
+                        {entry?.definition?.includes('[Strongs]') ? (
                           <>
                             <p className="text-xs text-stone-600">
                               <span className="font-semibold">Strongs:</span>{' '}
-                              {entry.definition.split('[KJV]')[0].replace('[Strongs]', '').trim()}
+                              {String(entry?.definition?.split('[KJV]')?.[0]?.replace('[Strongs]', '')?.trim() || '')}
                             </p>
-                            {entry.definition.includes('[KJV]') && (
+                            {entry?.definition?.includes('[KJV]') && (
                               <p className="text-xs text-stone-600">
                                 <span className="font-semibold">KJV:</span>{' '}
-                                {entry.definition.split('[KJV]')[1].trim()}
+                                {String(entry?.definition?.split('[KJV]')?.[1]?.trim() || '')}
                               </p>
                             )}
                           </>
                         ) : (
                           <p className="text-xs text-stone-600 whitespace-pre-line">
-                            {entry.definition}
+                            {String(entry?.definition || '')}
                           </p>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-red-500 italic">⚠️ '{cleanedLemma}'에 대한 영문 사전 데이터가 없습니다.</p>
+                    <p className="text-sm text-red-500 italic">⚠️ '{String(cleanedLemma)}'에 대한 영문 사전 데이터가 없습니다.</p>
                   )}
                 </div>
               );
@@ -597,7 +602,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </label>
           <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
             <p className="text-xs font-semibold text-amber-700 mb-1">📜 GNT 원문</p>
-            <p className="text-sm text-stone-700 font-greek leading-relaxed">{selectedVerse.text}</p>
+            <p className="text-sm text-stone-700 font-greek leading-relaxed">{String(selectedVerse?.text || '')}</p>
           </div>
           
           <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
@@ -668,15 +673,15 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </label>
           
           {/* Reflection List */}
-          {reflections.length > 0 && (
+          {reflections?.length > 0 && (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {reflections.map((reflection) => (
-                <div key={reflection.id} className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-lg">
-                  <p className="text-sm text-stone-700 leading-relaxed">{reflection.content}</p>
+                <div key={reflection?.id || 'unknown'} className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-lg">
+                  <p className="text-sm text-stone-700 leading-relaxed">{String(reflection?.content || '')}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-stone-400">{reflection.user_name}</span>
+                    <span className="text-xs text-stone-400">{String(reflection?.user_name || '')}</span>
                     <span className="text-xs text-stone-400">
-                      {new Date(reflection.created_at).toLocaleDateString('ko-KR')}
+                      {reflection?.created_at ? new Date(reflection.created_at).toLocaleDateString('ko-KR') : ''}
                     </span>
                   </div>
                 </div>
