@@ -26,37 +26,44 @@ interface BiblePanelProps {
   loading: boolean;
 }
 
-// Parse morphology code - USER PROVIDED VERSION (returns string)
+// Smart Morphology Parsing Engine (length/index independent)
 const parseMorphCode = (morph: string): string => {
-  if (!morph || morph.length < 8) return '미상의 품사';
+  if (!morph || morph.length < 3) return '미상의 품사';
   
-  const typeMap: Record<string, string> = {'N':'명사', 'V':'동사', 'A':'형용사', 'D':'부사', 'P':'전치사', 'R':'대명사', 'T':'관사', 'C':'접속사', 'X':'불변화사', 'I':'감탄사'};
-  const caseMap: Record<string, string> = {'N':'주격', 'G':'속격', 'D':'여격', 'A':'대격', 'V':'호격'};
-  const numberMap: Record<string, string> = {'S':'단수', 'P':'복수'};
-  const genderMap: Record<string, string> = {'M':'남성', 'F':'여성', 'N':'중성'};
-  const personMap: Record<string, string> = {'1':'1인칭', '2':'2인칭', '3':'3인칭'};
-  const tenseMap: Record<string, string> = {'P':'현재', 'I':'미완료', 'F':'미래', 'A':'부정과거', 'R':'완료', 'V':'과거완료'};
-  const voiceMap: Record<string, string> = {'A':'능동태', 'M':'중간태', 'P':'수동태', 'D':'디포넌트'};
-  const moodMap: Record<string, string> = {'I':'직설법', 'S':'가정법', 'O':'희구법', 'M':'명령법', 'N':'부정사', 'P':'분사'};
-
-  const type = typeMap[morph[0]] || '기타';
+  const tMap: Record<string, string> = {'N':'명사','V':'동사','A':'형용사','D':'부사','P':'전치사','R':'대명사','T':'관사','C':'접속사','X':'불변화사','I':'감탄사'};
+  const cMap: Record<string, string> = {'N':'주격','G':'속격','D':'여격','A':'대격','V':'호격'};
+  const nMap: Record<string, string> = {'S':'단수','P':'복수'};
+  const gMap: Record<string, string> = {'M':'남성','F':'여성','N':'중성'};
+  
+  const type = tMap[morph[0]] || '기타';
   let details: string[] = [];
-
-  if (type === '동사') {
-    if (morph[1] !== '-') details.push(personMap[morph[1]]);
-    if (morph[2] !== '-') details.push(tenseMap[morph[2]]);
-    if (morph[3] !== '-') details.push(voiceMap[morph[3]]);
-    if (morph[4] !== '-') details.push(moodMap[morph[4]]);
-    if (morph[6] !== '-') details.push(numberMap[morph[6]]);
-    if (morph[7] !== '-') details.push(genderMap[morph[7]]);
+  
+  if (morph[0] === 'V') {
+    // Verb parsing
+    const pMap: Record<string, string> = {'1':'1인칭','2':'2인칭','3':'3인칭'};
+    const teMap: Record<string, string> = {'P':'현재','I':'미완료','F':'미래','A':'부정과거','R':'완료','V':'과거완료'};
+    const vMap: Record<string, string> = {'A':'능동태','M':'중간태','P':'수동태','D':'디포넌트'};
+    const mMap: Record<string, string> = {'I':'직설법','S':'가정법','O':'희구법','M':'명령법','N':'부정사','P':'분사'};
+    if(morph[1] && morph[1] !== '-') details.push(pMap[morph[1]]);
+    if(morph[2] && morph[2] !== '-') details.push(teMap[morph[2]]);
+    if(morph[3] && morph[3] !== '-') details.push(vMap[morph[3]]);
+    if(morph[4] && morph[4] !== '-') details.push(mMap[morph[4]]);
+    if(morph[5] && morph[5] !== '-') details.push(cMap[morph[5]]);
+    if(morph[6] && morph[6] !== '-') details.push(nMap[morph[6]]);
+    if(morph[7] && morph[7] !== '-') details.push(gMap[morph[7]]);
   } else {
-    if (morph[5] !== '-') details.push(caseMap[morph[5]]);
-    if (morph[6] !== '-') details.push(numberMap[morph[6]]);
-    if (morph[7] !== '-') details.push(genderMap[morph[7]]);
+    // Non-verb: extract last 3 chars after removing hyphens
+    const core = morph.slice(1).replace(/-/g, '');
+    if (core.length >= 3) {
+      const cng = core.slice(-3);
+      if(cMap[cng[0]]) details.push(cMap[cng[0]]);
+      if(nMap[cng[1]]) details.push(nMap[cng[1]]);
+      if(gMap[cng[2]]) details.push(gMap[cng[2]]);
+    }
   }
-
-  const detailStr = details.filter(Boolean).join(' • ');
-  return detailStr ? `[${type} • ${detailStr}]` : `[${type}]`;
+  
+  const validDetails = details.filter(Boolean).join(' • ');
+  return validDetails ? `[${type} • ${validDetails}]` : `[${type}]`;
 };
 
 export function BiblePanel({
@@ -397,9 +404,17 @@ export function BiblePanel({
               {(() => {
                 const w = internalSelectedWord.word;
                 const entry = lexicon[w.lemma] || lexicon[w.text];
-                const cleanedLemma = entry?.lemma 
-                  ? entry.lemma 
-                  : (w.lemma || w.text || '').replace(/\(.*\)/g, '');
+                // Lemma Fixer: hardcoded corrections for common lemmas
+                const lemmaFixer: Record<string, string> = {
+                  'ἐστί(ν)': 'εἰμί',
+                  'εἰσίν': 'εἰμί',
+                  'αὐτῆς': 'αὐτός',
+                  'αὐτοῦ': 'αὐτός',
+                  'αὐτῷ': 'αὐτός',
+                  'αὐτόν': 'αὐτός'
+                };
+                const rawLemma = entry?.lemma || w.lemma || w.text || '';
+                const cleanedLemma = lemmaFixer[rawLemma] || rawLemma.replace(/\(.*\)/g, '');
                 return (
                   <div className="font-greek text-3xl font-bold text-amber-700 leading-tight">
                     {cleanedLemma || '⚠️ 원형 없음'}
