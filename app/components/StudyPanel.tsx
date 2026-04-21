@@ -275,21 +275,29 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     loadLexicon();
   }, []);
 
-  // Lightweight fallback fixer for DB lemma errors
+  // Lightweight fallback fixer for DB lemma errors - SBLGNT corrections
   const fallbackFixer: Record<string, string> = {
+    // Articles
+    'τοῦ': 'ὁ', 'τόν': 'ὁ', 'τήν': 'ὁ', 'τῆς': 'ὁ', 'τῷ': 'ὁ', 'τούς': 'ὁ',
+    // Common nouns
     'προφήτου': 'προφήτης', 'προφήτην': 'προφήτης',
     'ἄγγελος': 'ἄγγελος', 'ἀγγέλου': 'ἄγγελος',
-    'τοῦ': 'ὁ', 'τόν': 'ὁ', 'τήν': 'ὁ', 'τῆς': 'ὁ',
     'υἱόν': 'υἱός', 'υἱοῦ': 'υἱός',
     'θεόν': 'θεός', 'θεοῦ': 'θεός',
     'Ἰησοῦν': 'Ἰησοῦς', 'Ἰησοῦ': 'Ἰησοῦς',
     'χριστόν': 'χριστός', 'χριστοῦ': 'χριστός',
     'κύριον': 'κύριος', 'κυρίου': 'κύριος',
     'ἀδελφόν': 'ἀδελφός', 'ἀδελφοῦ': 'ἀδελφός',
-    'ἀγαπῶντος': 'ἀγαπάω', 'ἀγαπῶντα': 'ἀγαπάω',
-    'ποιοῦντος': 'ποιέω', 'ποιοῦντα': 'ποιέω',
-    'λέγοντος': 'λέγω', 'λέγοντα': 'λέγω',
-    'ἔχοντος': 'ἔχω', 'ἔχοντα': 'ἔχω',
+    // Participles (SBLGNT often lists these as lemmas incorrectly)
+    'λέγων': 'λέγω', 'λέγοντος': 'λέγω', 'λέγοντα': 'λέγω',
+    'λέγουσα': 'λέγω', 'λέγουσαν': 'λέγω',
+    'ἀγαπῶν': 'ἀγαπάω', 'ἀγαπῶντος': 'ἀγαπάω', 'ἀγαπῶντα': 'ἀγαπάω',
+    'ποιῶν': 'ποιέω', 'ποιοῦντος': 'ποιέω', 'ποιοῦντα': 'ποιέω',
+    'ἔχων': 'ἔχω', 'ἔχοντος': 'ἔχω', 'ἔχοντα': 'ἔχω',
+    // Aorist verbs (SBLGNT often lists aorist as lemma)
+    'ἐκάλεσε(ν)': 'καλέω', 'ἐκάλεσεν': 'καλέω', 'ἐκάλεσε': 'καλέω',
+    'ἐποίησε(ν)': 'ποιέω', 'ἐποίησεν': 'ποιέω', 'ἐποίησε': 'ποιέω',
+    'εἶπεν': 'λέγω', 'εἶπον': 'λέγω',
   };
 
   // Get definition with fallback: fallback → lemma → text → accent-stripped
@@ -523,20 +531,44 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                     </span>
                   </div>
                   {entry ? (
-                    <>
-                      {/* Strong's number */}
-                      <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded text-blue-700">
-                        {entry.strongs}
-                      </span>
-                      {/* Transliteration */}
-                      <p className="text-xs text-stone-500">
-                        [{entry.transliteration}]
-                      </p>
-                      {/* English definition - 100% preserved with line breaks */}
-                      <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">
-                        {entry.definition}
-                      </p>
-                    </>
+                    <div className="space-y-2">
+                      {/* Header: Strong's + Transliteration */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded text-blue-700">
+                          {entry.strongs}
+                        </span>
+                        <span className="text-xs text-stone-500">
+                          [{entry.transliteration}]
+                        </span>
+                      </div>
+                      
+                      {/* Korean meaning (placeholder for future DB) */}
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-stone-800">[한글 뜻 업데이트 예정]</p>
+                      </div>
+                      
+                      {/* English definition - split Strongs and KJV */}
+                      <div className="space-y-1 border-l-2 border-stone-300 pl-2">
+                        {entry.definition.includes('[Strongs]') ? (
+                          <>
+                            <p className="text-xs text-stone-600">
+                              <span className="font-semibold">Strongs:</span>{' '}
+                              {entry.definition.split('[KJV]')[0].replace('[Strongs]', '').trim()}
+                            </p>
+                            {entry.definition.includes('[KJV]') && (
+                              <p className="text-xs text-stone-600">
+                                <span className="font-semibold">KJV:</span>{' '}
+                                {entry.definition.split('[KJV]')[1].trim()}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-xs text-stone-600 whitespace-pre-line">
+                            {entry.definition}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   ) : (
                     <p className="text-sm text-red-500 italic">⚠️ '{cleanedLemma}'에 대한 영문 사전 데이터가 없습니다.</p>
                   )}
