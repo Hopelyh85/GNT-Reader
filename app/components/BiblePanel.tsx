@@ -26,30 +26,46 @@ interface BiblePanelProps {
   loading: boolean;
 }
 
-// Smart Morphology Parsing Engine (length/index independent)
-// Force article parsing for Greek articles regardless of morph code
+// Smart Morphology Parsing Engine - Returns STRING with Korean + English
 const parseMorphCode = (morph: string, lemma?: string, text?: string): string => {
-  if (!morph || morph.length < 3) return '미상의 품사';
+  if (!morph || morph.length < 3) return '[미상 (Unknown)]';
   
   // Greek articles list for forced parsing
   const articles = ['ὁ', 'ἡ', 'οἱ', 'αἱ', 'τό', 'τόν', 'τὴν', 'τῆς', 'τοὺς', 'τῷ', 'τῶν', 'τῇ', 'τὰ', 'τὸ', 'τοῦ', 'τούς', 'ταῖς'];
-  const isArticle = lemma && articles.includes(lemma) || text && articles.includes(text);
+  const isArticle = (lemma && articles.includes(lemma)) || (text && articles.includes(text));
   
-  const tMap: Record<string, string> = {'N':'명사','V':'동사','A':'형용사','D':'부사','P':'전치사','R':'대명사','T':'관사','C':'접속사','X':'불변화사','I':'감탄사'};
-  const cMap: Record<string, string> = {'N':'주격','G':'속격','D':'여격','A':'대격','V':'호격'};
-  const nMap: Record<string, string> = {'S':'단수','P':'복수'};
-  const gMap: Record<string, string> = {'M':'남성','F':'여성','N':'중성'};
+  // Korean + English bilingual maps
+  const tMap: Record<string, string> = {
+    'N': '명사 (Noun)', 'V': '동사 (Verb)', 'A': '형용사 (Adj)', 'D': '부사 (Adv)', 
+    'P': '전치사 (Prep)', 'R': '대명사 (Pron)', 'T': '관사 (Art)', 'C': '접속사 (Conj)', 
+    'X': '불변화사 (Part)', 'I': '감탄사 (Interj)'
+  };
+  const cMap: Record<string, string> = {
+    'N': '주격 (Nom)', 'G': '속격 (Gen)', 'D': '여격 (Dat)', 'A': '대격 (Acc)', 'V': '호격 (Voc)'
+  };
+  const nMap: Record<string, string> = {'S': '단수 (Sing)', 'P': '복수 (Plur)'};
+  const gMap: Record<string, string> = {
+    'M': '남성 (Masc)', 'F': '여성 (Fem)', 'N': '중성 (Neut)'
+  };
   
   // Force article type if it's an article
-  const type = isArticle ? '관사' : (tMap[morph[0]] || '기타');
+  const type = isArticle ? '관사 (Article)' : (tMap[morph[0]] || '기타 (Misc)');
   let details: string[] = [];
   
   if (!isArticle && morph[0] === 'V') {
-    // Verb parsing
-    const pMap: Record<string, string> = {'1':'1인칭','2':'2인칭','3':'3인칭'};
-    const teMap: Record<string, string> = {'P':'현재','I':'미완료','F':'미래','A':'부정과거','R':'완료','V':'과거완료'};
-    const vMap: Record<string, string> = {'A':'능동태','M':'중간태','P':'수동태','D':'디포넌트'};
-    const mMap: Record<string, string> = {'I':'직설법','S':'가정법','O':'희구법','M':'명령법','N':'부정사','P':'분사'};
+    // Verb parsing with English
+    const pMap: Record<string, string> = {'1': '1인칭 (1st)', '2': '2인칭 (2nd)', '3': '3인칭 (3rd)'};
+    const teMap: Record<string, string> = {
+      'P': '현재 (Pres)', 'I': '미완료 (Impf)', 'F': '미래 (Fut)', 
+      'A': '부정과거 (Aor)', 'R': '완료 (Perf)', 'V': '과거완료 (Plup)'
+    };
+    const vMap: Record<string, string> = {
+      'A': '능동태 (Act)', 'M': '중간태 (Mid)', 'P': '수동태 (Pass)', 'D': '디포넌트 (Dep)'
+    };
+    const mMap: Record<string, string> = {
+      'I': '직설법 (Ind)', 'S': '가정법 (Subj)', 'O': '희구법 (Opt)', 
+      'M': '명령법 (Imp)', 'N': '부정사 (Inf)', 'P': '분사 (Part)'
+    };
     if(morph[1] && morph[1] !== '-') details.push(pMap[morph[1]]);
     if(morph[2] && morph[2] !== '-') details.push(teMap[morph[2]]);
     if(morph[3] && morph[3] !== '-') details.push(vMap[morph[3]]);
@@ -127,11 +143,29 @@ export function BiblePanel({
     loadKRV();
   }, []);
   
-  // Ultra-lightweight lexicon lookup: lemma → text → accent-stripped
+  // Lightweight fallback fixer for DB lemma errors
+  const fallbackFixer: Record<string, string> = {
+    'προφήτου': 'προφήτης', 'προφήτην': 'προφήτης',
+    'ἄγγελος': 'ἄγγελος', 'ἀγγέλου': 'ἄγγελος',
+    'τοῦ': 'ὁ', 'τόν': 'ὁ', 'τήν': 'ὁ', 'τῆς': 'ὁ',
+    'υἱόν': 'υἱός', 'υἱοῦ': 'υἱός',
+    'θεόν': 'θεός', 'θεοῦ': 'θεός',
+    'Ἰησοῦν': 'Ἰησοῦς', 'Ἰησοῦ': 'Ἰησοῦς',
+    'χριστόν': 'χριστός', 'χριστοῦ': 'χριστός',
+    'κύριον': 'κύριος', 'κυρίου': 'κύριος',
+    'ἀδελφόν': 'ἀδελφός', 'ἀδελφοῦ': 'ἀδελφός',
+    'ἀγαπῶντος': 'ἀγαπάω', 'ἀγαπῶντα': 'ἀγαπάω',
+    'ποιοῦντος': 'ποιέω', 'ποιοῦντα': 'ποιέω',
+    'λέγοντος': 'λέγω', 'λέγοντα': 'λέγω',
+    'ἔχοντος': 'ἔχω', 'ἔχοντα': 'ἔχω',
+  };
+
+  // Ultra-lightweight lexicon lookup with fallback: fallback → lemma → text → accent-stripped
   const getWordDefinition = (lemma: string, surfaceForm: string): { entry: LexiconEntry | null; cleanedLemma: string } => {
+    const searchKey = fallbackFixer[surfaceForm] || fallbackFixer[lemma] || lemma || surfaceForm;
     const stripped = surfaceForm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const entry = lexicon[lemma] || lexicon[surfaceForm] || lexicon[stripped];
-    const cleanedLemma = entry?.lemma || lemma || surfaceForm;
+    const entry = lexicon[searchKey] || lexicon[surfaceForm] || lexicon[stripped];
+    const cleanedLemma = entry?.lemma || searchKey || surfaceForm;
     return { entry, cleanedLemma };
   };
 

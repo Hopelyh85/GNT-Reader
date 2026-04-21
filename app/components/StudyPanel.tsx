@@ -275,15 +275,38 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     loadLexicon();
   }, []);
 
-  // Get definition for selected word - DUAL LOOKUP: try lemma first, then surface form
+  // Lightweight fallback fixer for DB lemma errors
+  const fallbackFixer: Record<string, string> = {
+    'προφήτου': 'προφήτης', 'προφήτην': 'προφήτης',
+    'ἄγγελος': 'ἄγγελος', 'ἀγγέλου': 'ἄγγελος',
+    'τοῦ': 'ὁ', 'τόν': 'ὁ', 'τήν': 'ὁ', 'τῆς': 'ὁ',
+    'υἱόν': 'υἱός', 'υἱοῦ': 'υἱός',
+    'θεόν': 'θεός', 'θεοῦ': 'θεός',
+    'Ἰησοῦν': 'Ἰησοῦς', 'Ἰησοῦ': 'Ἰησοῦς',
+    'χριστόν': 'χριστός', 'χριστοῦ': 'χριστός',
+    'κύριον': 'κύριος', 'κυρίου': 'κύριος',
+    'ἀδελφόν': 'ἀδελφός', 'ἀδελφοῦ': 'ἀδελφός',
+    'ἀγαπῶντος': 'ἀγαπάω', 'ἀγαπῶντα': 'ἀγαπάω',
+    'ποιοῦντος': 'ποιέω', 'ποιοῦντα': 'ποιέω',
+    'λέγοντος': 'λέγω', 'λέγοντα': 'λέγω',
+    'ἔχοντος': 'ἔχω', 'ἔχοντα': 'ἔχω',
+  };
+
+  // Get definition with fallback: fallback → lemma → text → accent-stripped
   const getWordDefinition = (lemma: string, surfaceForm: string): LexiconEntry | null => {
-    // 1. Try lemma (root form) first - for proper nouns and base forms
-    if (lexicon[lemma]) {
-      return lexicon[lemma];
+    const searchKey = fallbackFixer[surfaceForm] || fallbackFixer[lemma] || lemma;
+    const stripped = surfaceForm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    // 1. Try fallback/lemma first
+    if (lexicon[searchKey]) {
+      return lexicon[searchKey];
     }
-    // 2. Fallback to surface form - for inflected forms
+    // 2. Fallback to surface form
     if (lexicon[surfaceForm]) {
       return lexicon[surfaceForm];
+    }
+    // 3. Fallback to accent-stripped
+    if (lexicon[stripped]) {
+      return lexicon[stripped];
     }
     return null;
   };
@@ -450,9 +473,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
               {(() => {
                 const w = selectedWord.word;
-                // Ultra-lightweight lookup: lemma → text → accent-stripped
-                const stripped = w.text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-                const entry = lexicon[w.lemma] || lexicon[w.text] || lexicon[stripped];
+                // Use getWordDefinition with fallbackFixer
+                const entry = getWordDefinition(w.lemma, w.text);
                 const cleanedLemma = entry?.lemma || w.lemma || w.text;
                 
                 return (
@@ -472,7 +494,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                     {parseMorphCode(w.morph, cleanedLemma, w.text)}
                   </div>
                   {entry?.definition && (
-                    <p className="text-sm text-stone-700 leading-relaxed">{entry.definition}</p>
+                    <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">{entry.definition}</p>
                   )}
                 </div>
               );
@@ -489,9 +511,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
             {(() => {
               const w = selectedWord.word;
-              // Ultra-lightweight lookup: lemma → text → accent-stripped
-              const stripped = w.text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-              const entry = lexicon[w.lemma] || lexicon[w.text] || lexicon[stripped];
+              // Use getWordDefinition with fallbackFixer
+              const entry = getWordDefinition(w.lemma, w.text);
               const cleanedLemma = entry?.lemma || w.lemma || w.text;
               
               return (
@@ -511,7 +532,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                       <p className="text-xs text-stone-500">
                         [{entry.transliteration}]
                       </p>
-                      {/* English definition - 100% preserved */}
+                      {/* English definition - 100% preserved with line breaks */}
                       <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">
                         {entry.definition}
                       </p>
@@ -578,37 +599,37 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
         )}
 
-        {/* 4. 나의 사역 (Private Translation) */}
+        {/* 4. 나의 번역 (Translation) */}
         <div className="border-t border-stone-200 pt-4 space-y-2">
-          <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
-            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-            나의 사역 - 번역 및 주석 (Private Translation)
-            {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
+          <label className="flex items-center gap-2 text-sm font-serif font-medium text-blue-700">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+            나의 번역 (Translation)
+            {!canWrite && <span className="text-xs text-blue-600">(로그인 필요)</span>}
           </label>
           <textarea
             value={ministryNote}
             onChange={(e) => canWrite && setMinistryNote(e.target.value)}
             disabled={!canWrite}
             placeholder={canWrite 
-              ? "이 말씀을 내 언어와 상황으로 옮긴다면..." 
+              ? "성경 본문을 직접 번역해보세요..." 
               : "로그인 후 작성할 수 있습니다."}
-            className="w-full h-32 p-3 text-sm leading-relaxed bg-stone-50 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 placeholder:text-stone-400 disabled:bg-stone-100"
+            className="w-full h-32 p-3 text-sm leading-relaxed bg-blue-50/30 border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 placeholder:text-stone-400 disabled:bg-stone-100"
           />
         </div>
 
-        {/* 5. 나의 묵상 (Reflection) */}
+        {/* 5. 나의 묵상 및 적용 (Reflection) */}
         <div className="border-t border-stone-200 pt-4 space-y-2">
-          <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
-            <BookOpen className="w-3 h-3 text-amber-500" />
-            나의 묵상 - 삶의 적용 (Reflection)
-            {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
+          <label className="flex items-center gap-2 text-sm font-serif font-medium text-emerald-700">
+            <BookOpen className="w-3 h-3 text-emerald-500" />
+            나의 묵상 및 적용 (Reflection)
+            {!canWrite && <span className="text-xs text-emerald-600">(로그인 필요)</span>}
           </label>
           
           {/* Reflection List */}
           {reflections.length > 0 && (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {reflections.map((reflection) => (
-                <div key={reflection.id} className="p-3 bg-amber-50/50 border border-amber-100 rounded-lg">
+                <div key={reflection.id} className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-lg">
                   <p className="text-sm text-stone-700 leading-relaxed">{reflection.content}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-xs text-stone-400">{reflection.user_name}</span>
@@ -627,9 +648,9 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             onChange={(e) => canWrite && setReflectionNote(e.target.value)}
             disabled={!canWrite}
             placeholder={canWrite 
-              ? "이 말씀에 대한 묵상과 적용을 작성하세요..." 
+              ? "번역한 말씀을 삶에 적용해보세요..." 
               : "로그인 후 작성할 수 있습니다."}
-            className="w-full h-24 p-3 text-sm leading-relaxed bg-amber-50/30 border border-amber-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 placeholder:text-stone-400 disabled:bg-stone-100"
+            className="w-full h-24 p-3 text-sm leading-relaxed bg-emerald-50/30 border border-emerald-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 placeholder:text-stone-400 disabled:bg-stone-100"
           />
         </div>
 
