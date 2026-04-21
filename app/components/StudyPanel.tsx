@@ -59,6 +59,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   // Translation states
   const [koreanTranslation, setKoreanTranslation] = useState<string>('');
   const [netTranslation, setNetTranslation] = useState<string>('');
+  const [kjvTranslation, setKjvTranslation] = useState<string>('');
   const [translationLoading, setTranslationLoading] = useState(false);
 
   const verseRef = selectedVerse
@@ -70,6 +71,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     if (!selectedVerse) {
       setKoreanTranslation('');
       setNetTranslation('');
+      setKjvTranslation('');
       return;
     }
     
@@ -122,10 +124,27 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         }
         
         setNetTranslation(netText);
+        
+        // Fetch KJV translation via API
+        let kjvText = '';
+        try {
+          const kjvResponse = await fetch(
+            `/api/translations?version=kjv&book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}`
+          );
+          if (kjvResponse.ok) {
+            const kjvData = await kjvResponse.json();
+            kjvText = kjvData.text || kjvData.translation || '';
+          }
+        } catch (kjvErr) {
+          console.log('KJV API fetch failed:', kjvErr);
+        }
+        setKjvTranslation(kjvText);
+        
       } catch (err) {
         console.error('Error loading translations:', err);
         setKoreanTranslation('');
         setNetTranslation('');
+        setKjvTranslation('');
       } finally {
         setTranslationLoading(false);
       }
@@ -269,30 +288,46 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     return null;
   };
 
-  // Smart Morphology Parsing Engine (length/index independent)
-  // Force article parsing for Greek articles regardless of morph code
+  // Smart Morphology Parsing Engine - Returns STRING with Korean + English
   const parseMorphCode = (morph: string, lemma?: string, text?: string): string => {
-    if (!morph || morph.length < 3) return '미상의 품사';
+    if (!morph || morph.length < 3) return '[미상 (Unknown)]';
     
     // Greek articles list for forced parsing
     const articles = ['ὁ', 'ἡ', 'οἱ', 'αἱ', 'τό', 'τόν', 'τὴν', 'τῆς', 'τοὺς', 'τῷ', 'τῶν', 'τῇ', 'τὰ', 'τὸ', 'τοῦ', 'τούς', 'ταῖς'];
-    const isArticle = lemma && articles.includes(lemma) || text && articles.includes(text);
+    const isArticle = (lemma && articles.includes(lemma)) || (text && articles.includes(text));
     
-    const tMap: Record<string, string> = {'N':'명사','V':'동사','A':'형용사','D':'부사','P':'전치사','R':'대명사','T':'관사','C':'접속사','X':'불변화사','I':'감탄사'};
-    const cMap: Record<string, string> = {'N':'주격','G':'속격','D':'여격','A':'대격','V':'호격'};
-    const nMap: Record<string, string> = {'S':'단수','P':'복수'};
-    const gMap: Record<string, string> = {'M':'남성','F':'여성','N':'중성'};
+    // Korean + English bilingual maps
+    const tMap: Record<string, string> = {
+      'N': '명사 (Noun)', 'V': '동사 (Verb)', 'A': '형용사 (Adj)', 'D': '부사 (Adv)', 
+      'P': '전치사 (Prep)', 'R': '대명사 (Pron)', 'T': '관사 (Art)', 'C': '접속사 (Conj)', 
+      'X': '불변화사 (Part)', 'I': '감탄사 (Interj)'
+    };
+    const cMap: Record<string, string> = {
+      'N': '주격 (Nom)', 'G': '속격 (Gen)', 'D': '여격 (Dat)', 'A': '대격 (Acc)', 'V': '호격 (Voc)'
+    };
+    const nMap: Record<string, string> = {'S': '단수 (Sing)', 'P': '복수 (Plur)'};
+    const gMap: Record<string, string> = {
+      'M': '남성 (Masc)', 'F': '여성 (Fem)', 'N': '중성 (Neut)'
+    };
     
     // Force article type if it's an article
-    const type = isArticle ? '관사' : (tMap[morph[0]] || '기타');
+    const type = isArticle ? '관사 (Article)' : (tMap[morph[0]] || '기타 (Misc)');
     let details: string[] = [];
     
     if (!isArticle && morph[0] === 'V') {
-      // Verb parsing
-      const pMap: Record<string, string> = {'1':'1인칭','2':'2인칭','3':'3인칭'};
-      const teMap: Record<string, string> = {'P':'현재','I':'미완료','F':'미래','A':'부정과거','R':'완료','V':'과거완료'};
-      const vMap: Record<string, string> = {'A':'능동태','M':'중간태','P':'수동태','D':'디포넌트'};
-      const mMap: Record<string, string> = {'I':'직설법','S':'가정법','O':'희구법','M':'명령법','N':'부정사','P':'분사'};
+      // Verb parsing with English
+      const pMap: Record<string, string> = {'1': '1인칭 (1st)', '2': '2인칭 (2nd)', '3': '3인칭 (3rd)'};
+      const teMap: Record<string, string> = {
+        'P': '현재 (Pres)', 'I': '미완료 (Impf)', 'F': '미래 (Fut)', 
+        'A': '부정과거 (Aor)', 'R': '완료 (Perf)', 'V': '과거완료 (Plup)'
+      };
+      const vMap: Record<string, string> = {
+        'A': '능동태 (Act)', 'M': '중간태 (Mid)', 'P': '수동태 (Pass)', 'D': '디포넌트 (Dep)'
+      };
+      const mMap: Record<string, string> = {
+        'I': '직설법 (Ind)', 'S': '가정법 (Subj)', 'O': '희구법 (Opt)', 
+        'M': '명령법 (Imp)', 'N': '부정사 (Inf)', 'P': '분사 (Part)'
+      };
       if(morph[1] && morph[1] !== '-') details.push(pMap[morph[1]]);
       if(morph[2] && morph[2] !== '-') details.push(teMap[morph[2]]);
       if(morph[3] && morph[3] !== '-') details.push(vMap[morph[3]]);
@@ -422,9 +457,16 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                 
                 return (
                 <div className="space-y-3">
-                  {/* 원형 - 클린 출력 */}
-                  <div className="font-greek text-3xl font-bold text-amber-700">
-                    {cleanedLemma || '⚠️ 원형 없음'}
+                  {/* Header: Surface Form + Lemma */}
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="font-greek text-3xl font-bold text-amber-700">
+                      {w.text}
+                    </span>
+                    {cleanedLemma && cleanedLemma !== w.text && (
+                      <span className="text-sm text-stone-500">
+                        (원형: <span className="font-greek text-amber-600">{cleanedLemma}</span>)
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm text-blue-700 font-medium">
                     {parseMorphCode(w.morph, cleanedLemma, w.text)}
@@ -483,7 +525,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
         )}
 
-        {/* 3. 본문 대조 (GNT / KRV / NET) - Only show when verse selected */}
+        {/* 3. 본문 대조 (GNT / KRV / NET / KJV) - Only show when verse selected */}
         {selectedVerse && (
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
@@ -519,10 +561,24 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               </div>
             )}
           </div>
+          
+          <div className="p-3 bg-red-50 rounded border-l-4 border-red-500">
+            <p className="text-xs font-semibold text-red-700 mb-1">📖 KJV (King James Version)</p>
+            {translationLoading ? (
+              <p className="text-sm text-stone-500">로딩 중...</p>
+            ) : kjvTranslation ? (
+              <p className="text-sm text-stone-700 leading-relaxed">{kjvTranslation}</p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-amber-600 font-medium">⚠️ KJV 데이터가 없습니다</p>
+                <p className="text-xs text-stone-500">KJV 번역 데이터를 준비 중입니다.</p>
+              </div>
+            )}
+          </div>
         </div>
         )}
 
-        {/* 3. 나의 사역 (Private Translation) */}
+        {/* 4. 나의 사역 (Private Translation) */}
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
             <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
@@ -576,6 +632,23 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             className="w-full h-24 p-3 text-sm leading-relaxed bg-amber-50/30 border border-amber-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 placeholder:text-stone-400 disabled:bg-stone-100"
           />
         </div>
+
+        {/* 6. 주석 (Commentary) - Admin Only */}
+        {isAdmin && selectedVerse && (
+          <div className="border-t border-stone-200 pt-4 space-y-2">
+            <label className="flex items-center gap-2 text-sm font-serif font-medium text-purple-700">
+              <BookOpen className="w-3 h-3 text-purple-500" />
+              주석 (Commentary) - 관리자용
+              <span className="text-xs text-purple-500">(Admin Only)</span>
+            </label>
+            <textarea
+              value={commentary}
+              onChange={(e) => setCommentary(e.target.value)}
+              placeholder="관리자용 주석을 입력하세요... (Public Commentary)"
+              className="w-full h-32 p-3 text-sm leading-relaxed bg-purple-50/30 border border-purple-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-200 placeholder:text-stone-400"
+            />
+          </div>
+        )}
 
       </div>
     </div>
