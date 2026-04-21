@@ -429,53 +429,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
               {(() => {
                 const w = selectedWord.word;
-                // ===== AUTOMATIC LEMMA TRACKING with 3-Level Fallback =====
-                const stripAccents = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-                
-                // Level 1: Direct lookup with lemmaFixer corrections
-                const lemmaFixer: Record<string, string> = {
-                  'ἐστί(ν)': 'εἰμί', 'εἰσίν': 'εἰμί',
-                  'αὐτῆς': 'αὐτός', 'αὐτοῦ': 'αὐτός', 'αὐτῷ': 'αὐτός', 'αὐτόν': 'αὐτός',
-                  // Greek Articles
-                  'τόν': 'ὁ', 'τὴν': 'ὁ', 'τῆς': 'ὁ', 'τοὺς': 'ὁ', 'τῷ': 'ὁ', 'τῶν': 'ὁ',
-                  'τῇ': 'ὁ', 'τὰ': 'ὁ', 'τὸ': 'ὁ', 'τοῦ': 'ὁ', 'οἱ': 'ὁ', 'αἱ': 'ὁ',
-                  'ὁ': 'ὁ', 'ἡ': 'ὁ', 'τό': 'ὁ', 'τούς': 'ὁ', 'ταῖς': 'ὁ',
-                  // Demonstrative Pronouns
-                  'ταῦτα': 'οὗτος', 'τοῦτο': 'οὗτος', 'τούτῳ': 'οὗτος', 'τούτου': 'οὗτος',
-                  'ταύτην': 'οὗτος', 'ταύτης': 'οὗτος', 'αὕτη': 'οὗτος', 'οὗτοι': 'οὗτος',
-                  'ἐκείναις': 'ἐκεῖνος', 'ἐκείνῃ': 'ἐκεῖνος',
-                  // Emergency common words
-                  'δέ': 'δέ', 'Ἰησοῦν': 'Ἰησοῦς', 'Ἰησοῦ': 'Ἰησοῦς', 'Ἰησοῦς': 'Ἰησοῦς',
-                  'χριστοῦ': 'χριστός', 'χριστόν': 'χριστός', 'χριστός': 'χριστός',
-                  'θεοῦ': 'θεός', 'θεόν': 'θεός', 'θεός': 'θεός'
-                };
-                
-                let entry = lexicon[w.lemma] || lexicon[w.text];
-                let cleanedLemma = w.lemma || w.text;
-                
-                // Apply lemmaFixer if direct lookup failed
-                if (!entry && lemmaFixer[w.lemma || w.text]) {
-                  const fixed = lemmaFixer[w.lemma || w.text];
-                  entry = lexicon[fixed];
-                  if (entry) cleanedLemma = fixed;
-                }
-                
-                // Level 2: Strip parentheses and retry
-                if (!entry) {
-                  const basicLemma = (w.lemma || w.text).replace(/\(.*\)/g, '').trim();
-                  entry = lexicon[basicLemma];
-                  if (entry) cleanedLemma = basicLemma;
-                }
-                
-                // Level 3: Strip accents and search all keys (accuracy priority)
-                if (!entry) {
-                  const targetNoAccent = stripAccents((w.lemma || w.text).replace(/\(.*\)/g, '').trim());
-                  const foundKey = Object.keys(lexicon).find(key => stripAccents(key) === targetNoAccent);
-                  if (foundKey) {
-                    entry = lexicon[foundKey];
-                    cleanedLemma = foundKey;
-                  }
-                }
+                // Ultra-lightweight lookup: lemma → text → accent-stripped
+                const stripped = w.text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                const entry = lexicon[w.lemma] || lexicon[w.text] || lexicon[stripped];
+                const cleanedLemma = entry?.lemma || w.lemma || w.text;
                 
                 return (
                 <div className="space-y-3">
@@ -504,81 +461,32 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
             {(() => {
               const w = selectedWord.word;
-              // ===== AUTOMATIC LEMMA TRACKING with 3-Level Fallback =====
-              const stripAccents = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-              
-              // Level 1: Direct lookup with lemmaFixer corrections
-              const lemmaFixer: Record<string, string> = {
-                'ἐστί(ν)': 'εἰμί', 'εἰσίν': 'εἰμί',
-                'αὐτῆς': 'αὐτός', 'αὐτοῦ': 'αὐτός', 'αὐτῷ': 'αὐτός', 'αὐτόν': 'αὐτός',
-                // Greek Articles
-                'τόν': 'ὁ', 'τὴν': 'ὁ', 'τῆς': 'ὁ', 'τοὺς': 'ὁ', 'τῷ': 'ὁ', 'τῶν': 'ὁ',
-                'τῇ': 'ὁ', 'τὰ': 'ὁ', 'τὸ': 'ὁ', 'τοῦ': 'ὁ', 'οἱ': 'ὁ', 'αἱ': 'ὁ',
-                'ὁ': 'ὁ', 'ἡ': 'ὁ', 'τό': 'ὁ', 'τούς': 'ὁ', 'ταῖς': 'ὁ',
-                // Demonstrative Pronouns
-                'ταῦτα': 'οὗτος', 'τοῦτο': 'οὗτος', 'τούτῳ': 'οὗτος', 'τούτου': 'οὗτος',
-                'ταύτην': 'οὗτος', 'ταύτης': 'οὗτος', 'αὕτη': 'οὗτος', 'οὗτοι': 'οὗτος',
-                'ἐκείναις': 'ἐκεῖνος', 'ἐκείνῃ': 'ἐκεῖνος',
-                // Emergency common words
-                'δέ': 'δέ', 'Ἰησοῦν': 'Ἰησοῦς', 'Ἰησοῦ': 'Ἰησοῦς', 'Ἰησοῦς': 'Ἰησοῦς',
-                'χριστοῦ': 'χριστός', 'χριστόν': 'χριστός', 'χριστός': 'χριστός',
-                'θεοῦ': 'θεός', 'θεόν': 'θεός', 'θεός': 'θεός'
-              };
-              
-              let entry = lexicon[w.lemma] || lexicon[w.text];
-              let cleanedLemma = w.lemma || w.text;
-              
-              // Apply lemmaFixer if direct lookup failed
-              if (!entry && lemmaFixer[w.lemma || w.text]) {
-                const fixed = lemmaFixer[w.lemma || w.text];
-                entry = lexicon[fixed];
-                if (entry) cleanedLemma = fixed;
-              }
-              
-              // Level 2: Strip parentheses and retry
-              if (!entry) {
-                const basicLemma = (w.lemma || w.text).replace(/\(.*\)/g, '').trim();
-                entry = lexicon[basicLemma];
-                if (entry) cleanedLemma = basicLemma;
-              }
-              
-              // Level 3: Strip accents and search all keys (accuracy priority)
-              if (!entry) {
-                const targetNoAccent = stripAccents((w.lemma || w.text).replace(/\(.*\)/g, '').trim());
-                const foundKey = Object.keys(lexicon).find(key => stripAccents(key) === targetNoAccent);
-                if (foundKey) {
-                  entry = lexicon[foundKey];
-                  cleanedLemma = foundKey;
-                }
-              }
+              // Ultra-lightweight lookup: lemma → text → accent-stripped
+              const stripped = w.text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const entry = lexicon[w.lemma] || lexicon[w.text] || lexicon[stripped];
+              const cleanedLemma = entry?.lemma || w.lemma || w.text;
               
               return (
                 <div className="space-y-2 p-3 bg-blue-50/50 border border-blue-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="font-greek text-xl font-bold text-blue-700">
-                      {cleanedLemma || w.lemma || w.text}
+                      {cleanedLemma}
                     </span>
                   </div>
                   {entry ? (
                     <>
-                      {/* ALWAYS show Strong's number */}
+                      {/* Strong's number */}
                       <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded text-blue-700">
-                        {entry.strongs || 'G0000'}
+                        {entry.strongs}
                       </span>
-                      {/* ALWAYS show transliteration */}
+                      {/* Transliteration */}
                       <p className="text-xs text-stone-500">
-                        [{entry.transliteration || 'n/a'}]
+                        [{entry.transliteration}]
                       </p>
-                      {/* ALWAYS show English definition */}
-                      <p className="text-sm text-stone-700 leading-relaxed">
-                        {entry.definition || 'No English definition available.'}
+                      {/* English definition - 100% preserved */}
+                      <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">
+                        {entry.definition}
                       </p>
-                      {/* Show frequency if available */}
-                      {entry.frequency && (
-                        <p className="text-xs text-stone-400">
-                          Frequency: {entry.frequency}
-                        </p>
-                      )}
                     </>
                   ) : (
                     <p className="text-sm text-red-500 italic">⚠️ '{cleanedLemma}'에 대한 영문 사전 데이터가 없습니다.</p>
