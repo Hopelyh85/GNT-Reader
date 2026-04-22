@@ -234,21 +234,26 @@ export function BiblePanel({
     console.log('word.morph (문법코드):', word.morph);
     
     // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
-    const displayLemma = word.lemma || word.text || '';
-    const rawText = word.text || '';
+    const displayLemma = String(word?.lemma || word?.text || '');
+    const rawText = String(word?.text || '');
+    const morphCode = String(word?.morph || '');
     
     // 검색 전용: 괄호 제거 및 fallbackFixer 적용
     const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
     const searchLemma = fallbackFixer[displayLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
     
-    // 문법 분석용 (searchLemma 사용)
-    const parsed = parseMorphCode(word.morph, searchLemma, word.text);
-    console.log('parsed (한국어 문법):', parsed);
-    
-    // 사전 검색 with searchLemma
+    // 사전 검색 with searchLemma (parseMorphCode는 StudyPanel에서만 렌더링)
     const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
     const cleanedLemma = entry?.lemma || searchLemma;
+    
+    // 안전한 디버깅: parseMorphCode 결과를 문자열로만 출력
+    try {
+      const parsed = parseMorphCode(morphCode, searchLemma, rawText);
+      console.log('parsed (한국어 문법):', parsed);
+    } catch (e) {
+      console.log('parseMorphCode error:', e);
+    }
     
     console.log('lexicon entry:', entry);
     console.log('searchLemma:', searchLemma);
