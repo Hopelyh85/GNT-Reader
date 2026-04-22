@@ -177,6 +177,10 @@ export function BiblePanel({
     'ἐκάλεσε(ν)': 'καλέω', 'ἐκάλεσεν': 'καλέω', 'ἐκάλεσε': 'καλέω',
     'ἐποίησε(ν)': 'ποιέω', 'ἐποίησεν': 'ποιέω', 'ἐποίησε': 'ποιέω',
     'εἶπεν': 'λέγω', 'εἶπον': 'λέγω',
+    // γεννάω (beget) - aorist forms with (ν)
+    'ἐγέννησε(ν)': 'γεννάω', 'ἐγέννησεν': 'γεννάω', 'ἐγέννησε': 'γεννάω',
+    // βοῦς (cow/ox) - declension forms
+    'βόες': 'βοῦς', 'βόας': 'βοῦς', 'βοῶν': 'βοῦς',
   };
 
   // Ultra-lightweight lexicon lookup with fallback: fallback → lemma → text → accent-stripped
@@ -229,18 +233,35 @@ export function BiblePanel({
     console.log('word.lemma (원형):', word.lemma);
     console.log('word.morph (문법코드):', word.morph);
     
-    const parsed = parseMorphCode(word.morph);
+    // 무적의 원형 추출 로직
+    const rawLemma = word.lemma || word.text || '';
+    const rawText = word.text || '';
+    // 괄호 완벽 파괴
+    const strippedParen = rawLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
+    // 최종 원형
+    const finalLemma = fallbackFixer[rawLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
+    
+    const parsed = parseMorphCode(word.morph, finalLemma, word.text);
     console.log('parsed (한국어 문법):', parsed);
     
-    const { entry, cleanedLemma } = getWordDefinition(word.lemma, word.text);
+    // 사전 검색 with finalLemma
+    const strippedAccent = finalLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const entry = lexicon[finalLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
+    const cleanedLemma = entry?.lemma || finalLemma;
+    
     console.log('lexicon entry:', entry);
+    console.log('finalLemma:', finalLemma);
     console.log('cleanedLemma:', cleanedLemma);
     console.log('lexicon[word.lemma]:', lexicon[word.lemma]);
     console.log('lexicon[word.text]:', lexicon[word.text]);
     console.log('=======================');
     
     const selectedWordData = {
-      word,
+      word: {
+        ...word,
+        // Send cleaned lemma to StudyPanel
+        lemma: finalLemma,
+      },
       bookName: book.name,
       book: bookAbbrevMap[book.name] || book.name,
       chapter: chapterNum,
@@ -248,7 +269,7 @@ export function BiblePanel({
       wordIndex,
     };
     
-    setInternalSelectedWord({word, bookName: book.name, chapter: chapterNum, verse: verseNum, wordIndex});
+    setInternalSelectedWord({word: {...word, lemma: finalLemma}, bookName: book.name, chapter: chapterNum, verse: verseNum, wordIndex});
     onSelectWord(selectedWordData);
   };
 
