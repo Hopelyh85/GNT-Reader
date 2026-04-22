@@ -233,35 +233,33 @@ export function BiblePanel({
     console.log('word.lemma (원형):', word.lemma);
     console.log('word.morph (문법코드):', word.morph);
     
-    // 무적의 원형 추출 로직
-    const rawLemma = word.lemma || word.text || '';
+    // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
+    const displayLemma = word.lemma || word.text || '';
     const rawText = word.text || '';
-    // 괄호 완벽 파괴
-    const strippedParen = rawLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
-    // 최종 원형
-    const finalLemma = fallbackFixer[rawLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
     
-    const parsed = parseMorphCode(word.morph, finalLemma, word.text);
+    // 검색 전용: 괄호 제거 및 fallbackFixer 적용
+    const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
+    const searchLemma = fallbackFixer[displayLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
+    
+    // 문법 분석용 (searchLemma 사용)
+    const parsed = parseMorphCode(word.morph, searchLemma, word.text);
     console.log('parsed (한국어 문법):', parsed);
     
-    // 사전 검색 with finalLemma
-    const strippedAccent = finalLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const entry = lexicon[finalLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
-    const cleanedLemma = entry?.lemma || finalLemma;
+    // 사전 검색 with searchLemma
+    const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
+    const cleanedLemma = entry?.lemma || searchLemma;
     
     console.log('lexicon entry:', entry);
-    console.log('finalLemma:', finalLemma);
+    console.log('searchLemma:', searchLemma);
     console.log('cleanedLemma:', cleanedLemma);
     console.log('lexicon[word.lemma]:', lexicon[word.lemma]);
     console.log('lexicon[word.text]:', lexicon[word.text]);
     console.log('=======================');
     
+    // 원본 word 데이터를 그대로 전달 (StudyPanel에서 투트랙 처리)
     const selectedWordData = {
-      word: {
-        ...word,
-        // Send cleaned lemma to StudyPanel
-        lemma: finalLemma,
-      },
+      word,
       bookName: book.name,
       book: bookAbbrevMap[book.name] || book.name,
       chapter: chapterNum,
@@ -269,7 +267,7 @@ export function BiblePanel({
       wordIndex,
     };
     
-    setInternalSelectedWord({word: {...word, lemma: finalLemma}, bookName: book.name, chapter: chapterNum, verse: verseNum, wordIndex});
+    setInternalSelectedWord({word, bookName: book.name, chapter: chapterNum, verse: verseNum, wordIndex});
     onSelectWord(selectedWordData);
   };
 

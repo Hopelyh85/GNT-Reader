@@ -475,34 +475,33 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                 const w = selectedWord?.word;
                 if (!w) return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
                 
-                // 무적의 원형 추출 로직
-                const rawLemma = w?.lemma || w?.text || '';
+                // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
+                const displayLemma = w?.lemma || w?.text || '';
                 const rawText = w?.text || '';
-                // 괄호 완벽 파괴
-                const strippedParen = rawLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
                 
-                // 최종 원형 (이 변수만 써야 함)
-                const finalLemma = fallbackFixer[rawLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
+                // 검색 전용: 괄호 제거 및 fallbackFixer 적용
+                const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
+                const searchLemma = fallbackFixer[displayLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
                 
-                // 사전 검색
-                const strippedAccent = finalLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-                const entry = lexicon[finalLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
+                // 사전 검색 (searchLemma 사용)
+                const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
                 
                 return (
                 <div className="space-y-3">
-                  {/* Header: Surface Form + Lemma (showing finalLemma) */}
+                  {/* Header: Surface Form + Lemma (원본 그대로 표시) */}
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-greek text-3xl font-bold text-amber-700">
                       {w?.text || ''}
                     </span>
-                    {finalLemma && finalLemma !== w?.text && (
+                    {displayLemma && displayLemma !== w?.text && (
                       <span className="text-sm text-stone-500">
-                        (원형: <span className="font-greek text-amber-600">{String(finalLemma)}</span>)
+                        (원형: <span className="font-greek text-amber-600">{String(displayLemma)}</span>)
                       </span>
                     )}
                   </div>
                   <div className="text-sm text-blue-700 font-medium">
-                    {parseMorphCode(w?.morph || '', finalLemma, w?.text || '')}
+                    {parseMorphCode(w?.morph || '', searchLemma, w?.text || '')}
                   </div>
                   {entry?.definition && (
                     <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">{String(entry.definition)}</p>
@@ -524,24 +523,23 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               const w = selectedWord?.word;
               if (!w) return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
               
-              // 무적의 원형 추출 로직 (원어 사전용)
-              const rawLemma = w?.lemma || w?.text || '';
+              // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
+              const displayLemma = w?.lemma || w?.text || '';
               const rawText = w?.text || '';
-              // 괄호 완벽 파괴
-              const strippedParen = rawLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
               
-              // 최종 원형 (이 변수만 써야 함)
-              const finalLemma = fallbackFixer[rawLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
+              // 검색 전용: 괄호 제거 및 fallbackFixer 적용
+              const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
+              const searchLemma = fallbackFixer[displayLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
               
-              // 사전 검색
-              const strippedAccent = finalLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-              const entry = lexicon[finalLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
+              // 사전 검색 (searchLemma 사용)
+              const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
               
               return (
                 <div className="space-y-2 p-3 bg-blue-50/50 border border-blue-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="font-greek text-xl font-bold text-blue-700">
-                      {String(finalLemma)}
+                      {String(displayLemma)}
                     </span>
                   </div>
                   {entry ? (
@@ -592,7 +590,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-red-500 italic">⚠️ '{String(finalLemma)}'에 대한 영문 사전 데이터가 없습니다.</p>
+                    <p className="text-sm text-red-500 italic">⚠️ '{String(displayLemma)}'에 대한 영문 사전 데이터가 없습니다.</p>
                   )}
                 </div>
               );
