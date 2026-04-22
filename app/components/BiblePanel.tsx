@@ -196,6 +196,13 @@ export function BiblePanel({
     'βασιλέα': 'βασιλεύς',
     'βασιλέως': 'βασιλεύς',
     'βασιλεῖ': 'βασιλεύς',
+    // Missing Nouns, Adjectives, and Irregular Verbs
+    'γενέσεως': 'γένεσις',
+    'παρέδωκαν': 'παραδίδωμι',
+    'ἔλαβον': 'λαμβάνω',
+    'πάντες': 'πᾶς',
+    'θέλετε': 'θέλω',
+    'θέλετέ': 'θέλω',
   };
 
   // Ultra-lightweight lexicon lookup with symbol cleaning and fallback

@@ -305,6 +305,13 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     'βασιλέα': 'βασιλεύς',
     'βασιλέως': 'βασιλεύς',
     'βασιλεῖ': 'βασιλεύς',
+    // Missing Nouns, Adjectives, and Irregular Verbs
+    'γενέσεως': 'γένεσις',
+    'παρέδωκαν': 'παραδίδωμι',
+    'ἔλαβον': 'λαμβάνω',
+    'πάντες': 'πᾶς',
+    'θέλετε': 'θέλω',
+    'θέλετέ': 'θέλω',
   };
 
   // Get definition with symbol cleaning and fallback
