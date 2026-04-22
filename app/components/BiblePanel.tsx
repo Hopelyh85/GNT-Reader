@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Book, GreekWord } from '@/app/types';
 import { ChevronDown, ChevronRight, BookOpen, Loader2 } from 'lucide-react';
-import { fallbackFixer } from '../lib/greekMapping';
+import { fallbackFixer, getSmartLemma } from '../lib/greekMapping';
 
 interface LexiconEntry {
   lemma?: string;
@@ -213,8 +213,13 @@ export function BiblePanel({
     const cleanRawText = rawText.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
     const cleanRawLemma = displayLemma.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
     
-    // 3. Check fallbackFixer using the cleaned text
-    const searchLemma = fallbackFixer[cleanRawLemma] || fallbackFixer[cleanRawText] || cleanRawLemma || cleanRawText;
+    // 3. Check fallbackFixer using the cleaned text, then apply smart stemming
+    const searchLemma = fallbackFixer[cleanRawLemma] || 
+                       fallbackFixer[cleanRawText] || 
+                       getSmartLemma(cleanRawLemma) || 
+                       getSmartLemma(cleanRawText) ||
+                       cleanRawLemma || 
+                       cleanRawText;
     
     // 4. 사전 검색 with searchLemma (parseMorphCode는 StudyPanel에서만 렌더링)
     const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
-import { fallbackFixer } from '../lib/greekMapping';
+import { fallbackFixer, getSmartLemma } from '../lib/greekMapping';
 
 interface StudyPanelProps {
   selectedVerse: SelectedVerse | null;
@@ -516,12 +516,34 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               const cleanRawText = rawText.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
               const cleanRawLemma = displayLemma.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
               
-              // 3. Check fallbackFixer using the cleaned text
-              const searchLemma = fallbackFixer[cleanRawLemma] || fallbackFixer[cleanRawText] || cleanRawLemma || cleanRawText;
+              // 3. Check fallbackFixer using the cleaned text, then apply smart stemming
+              const searchLemma = fallbackFixer[cleanRawLemma] || 
+                                 fallbackFixer[cleanRawText] || 
+                                 getSmartLemma(cleanRawLemma) || 
+                                 getSmartLemma(cleanRawText) ||
+                                 cleanRawLemma || 
+                                 cleanRawText;
               
               // 4. 사전 검색 (searchLemma 사용)
               const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
               const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[cleanRawText];
+              
+              // HOTFIX: Hardcode corrupted entries (Director's emergency fix)
+              const getFixedDefinition = (lemma: string, origEntry: any) => {
+                // G3303 μέν data corruption fix
+                if (lemma === 'μέν') {
+                  return {
+                    definition: "[Strongs] affirmation, yea, surely\n[KJV] verily, indeed, surely, truly, doubtless\n\n진실로, 참으로, 한편으로는 (affirmation/concession particle)",
+                    transliteration: 'men',
+                    strongs: 'G3303',
+                    korean_def: '진실로, 참으로, 한편으로는 (불변화사)',
+                    manual: true
+                  };
+                }
+                return origEntry;
+              };
+              
+              const fixedEntry = getFixedDefinition(searchLemma, entry);
               
               return (
                 <div className="space-y-2 p-3 bg-blue-50/50 border border-blue-200 rounded-lg">
@@ -530,23 +552,24 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                       {String(displayLemma)}
                     </span>
                   </div>
-                  {entry ? (
+                  {fixedEntry ? (
                     <div className="space-y-2">
                       {/* Header: Strong's + [English pron | Korean pron] */}
                       <div className="flex items-baseline gap-2 flex-wrap">
                         <span className="font-semibold text-stone-800">
-                          {String(entry?.strongs || 'N/A')}
+                          {String(fixedEntry?.strongs || 'N/A')}
+                          {fixedEntry?.manual && <span className="ml-1 text-xs text-amber-600">[수정됨]</span>}
                         </span>
                         <span className="text-sm text-stone-500 font-mono">
-                          [{String(entry?.transliteration || '')}{entry?.korean_pron && ` | ${String(entry.korean_pron)}`}]
+                          [{String(fixedEntry?.transliteration || '')}{fixedEntry?.korean_pron && ` | ${String(fixedEntry.korean_pron)}`}]
                         </span>
                       </div>
                       
                       {/* 1. Korean meaning (TOP priority) */}
-                      {entry?.korean_def ? (
+                      {fixedEntry?.korean_def ? (
                         <div className="space-y-1">
                           <p className="text-base font-bold text-blue-700 leading-relaxed">
-                            {String(entry.korean_def)}
+                            {String(fixedEntry.korean_def)}
                           </p>
                         </div>
                       ) : (
@@ -557,22 +580,22 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                       
                       {/* 2. English definition - split Strongs and KJV */}
                       <div className="space-y-1 border-l-2 border-stone-300 pl-2 mt-2">
-                        {entry?.definition?.includes('[Strongs]') ? (
+                        {fixedEntry?.definition?.includes('[Strongs]') ? (
                           <>
                             <p className="text-xs text-stone-600">
                               <span className="font-semibold text-stone-700">Strongs:</span>{' '}
-                              {String(entry?.definition?.split('[KJV]')?.[0]?.replace('[Strongs]', '')?.trim() || '')}
+                              {String(fixedEntry?.definition?.split('[KJV]')?.[0]?.replace('[Strongs]', '')?.trim() || '')}
                             </p>
-                            {entry?.definition?.includes('[KJV]') && (
+                            {fixedEntry?.definition?.includes('[KJV]') && (
                               <p className="text-xs text-stone-600">
                                 <span className="font-semibold text-stone-700">KJV:</span>{' '}
-                                {String(entry?.definition?.split('[KJV]')?.[1]?.trim() || '')}
+                                {String(fixedEntry?.definition?.split('[KJV]')?.[1]?.trim() || '')}
                               </p>
                             )}
                           </>
                         ) : (
                           <p className="text-xs text-stone-600 whitespace-pre-line">
-                            {String(entry?.definition || '')}
+                            {String(fixedEntry?.definition || '')}
                           </p>
                         )}
                       </div>

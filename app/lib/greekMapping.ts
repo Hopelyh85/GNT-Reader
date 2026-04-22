@@ -276,6 +276,23 @@ export const fallbackFixer: Record<string, string> = {
   'ἔχων': 'ἔχω',
   'ἔχοντος': 'ἔχω',
   'ἔχοντα': 'ἔχω',
+  
+  // ============================================================================
+  // 12. CRITICAL MISSING BASIC WORDS (Director's hotfix)
+  // ============================================================================
+  'λόγον': 'λόγος',
+  'ἀποστόλοις': 'ἀπόστολος',
+  'ἀποστόλους': 'ἀπόστολος',
+  'ἀποστόλου': 'ἀπόστολος',
+  'ἀπόστολον': 'ἀπόστολος',
+  'ζῶντα': 'ζάω',
+  'πνεῦμα': 'πνεῦμα',
+  'πνεύματος': 'πνεῦμα',
+  'πνεύματι': 'πνεῦμα',
+  'ἐποιησάμην': 'ποιέω',
+  'μέν': 'μέν', // G3303 - prevent corruption
+  'Ἰσραηλίτης': 'Ἰσραηλίτης', // Keep this separate from μέν
+  'Ἰσραηλίτην': 'Ἰσραηλίτης',
 };
 
 // Helper function to clean symbols before lookup
@@ -316,5 +333,51 @@ export const getWordDefinition = (
 
   return { entry, cleanedLemma: entry?.lemma || searchKey, searchKey };
 };
+
+// ============================================================================
+// SMART LEMMA STEMMING ENGINE (규칙 기반 원형 추적기)
+// ============================================================================
+export function getSmartLemma(text: string): string {
+  // 1. Clean symbols first
+  let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, "").trim();
+  
+  // 2. Check fallbackFixer first
+  if (fallbackFixer[d]) return fallbackFixer[d];
+  
+  // 3. Rule-based stemming (based on Greek grammar PDFs)
+  // 3rd declension masculine/feminine nouns: -ον -> -ος
+  if (d.endsWith('ον')) return d.slice(0, -2) + 'ος'; // λόγον -> λόγος
+  if (d.endsWith('όν')) return d.slice(0, -2) + 'ός'; // λόγόν -> λόγός
+  
+  // Dative plural: -οις -> -ος
+  if (d.endsWith('οις')) return d.slice(0, -3) + 'ος'; // ἀποστόλοις -> ἀπόστολος
+  if (d.endsWith('οισι')) return d.slice(0, -4) + 'ος'; // ἀποστόλοισι -> ἀπόστολος
+  
+  // Accusative plural: -ους -> -ος
+  if (d.endsWith('ους')) return d.slice(0, -3) + 'ος'; // ἀποστόλους -> ἀπόστολος
+  
+  // Genitive singular: -ου -> -ος
+  if (d.endsWith('ου')) return d.slice(0, -2) + 'ος'; // ἀποστόλου -> ἀπόστολος
+  
+  // Present participles: -ων -> -ω
+  if (d.endsWith('ων')) return d.slice(0, -2) + 'ω'; // βαπτίζων -> βαπτίζω
+  if (d.endsWith('οντος')) return d.slice(0, -5) + 'ω'; // λέγοντος -> λέγω
+  if (d.endsWith('οντα')) return d.slice(0, -4) + 'ω'; // λέγοντα -> λέγω
+  
+  // Neuter participles: -τα -> approximated to -ω (imperfect but catches ζῶντα)
+  if (d.endsWith('τα') && d.length > 3) {
+    // Special case for ζῶντα -> ζάω
+    if (d.includes('ωντ')) return d.replace(/ωντα$/, 'αω'); // ζῶντα -> ζάω
+  }
+  
+  // 1st aorist middle: ἐ...άμην -> basic verb (simplified)
+  if (d.startsWith('ἐ') && d.endsWith('άμην')) {
+    // ἐποιησάμην -> ποιέω (rough approximation)
+    const stem = d.slice(1, -4); // Remove ἐ- and -άμην
+    if (stem.endsWith('ησ')) return stem.slice(0, -2) + 'έω'; // ποιησ -> ποιέω
+  }
+  
+  return d;
+}
 
 export default fallbackFixer;
