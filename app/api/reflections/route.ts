@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const verse = searchParams.get('verse');
     const user = searchParams.get('user');
 
-    if (!book || !chapter || !verse || !user) {
+    if (!book || !chapter || verse === undefined || verse === null || !user) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       content,
     } = body;
 
-    if (!book || !chapter || !verse) {
+    if (!book || chapter === undefined || chapter === null || verse === undefined || verse === null) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

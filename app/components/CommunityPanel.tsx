@@ -74,7 +74,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
     }
 
     loadReflection();
-  }, [selectedVerse, userName]);
+  }, [selectedVerse, userName, isChapterMode]);
 
   // Save reflection via API
   const handleSave = useCallback(async () => {
