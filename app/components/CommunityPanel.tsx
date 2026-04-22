@@ -37,7 +37,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
 
   // Load reflection when verse changes via API
   useEffect(() => {
-    if (!selectedVerse) {
+    if (selectedVerse === undefined) {
       setContent('');
       return;
     }
@@ -115,7 +115,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
 
   // Auto-save after 1 second of inactivity (debounce)
   useEffect(() => {
-    if (!selectedVerse) return;
+    if (selectedVerse === undefined) return;
 
     const timer = setTimeout(() => {
       handleSave();
@@ -139,7 +139,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
     return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
   };
 
-  if (!selectedVerse) {
+  if (selectedVerse === undefined) {
     return (
       <div className="h-full flex items-center justify-center p-8">
         <div className="text-center text-stone-400">
@@ -188,14 +188,16 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
           </p>
           <button
             onClick={() => setIsChapterMode(!isChapterMode)}
-            className={`text-xs px-2 py-1 rounded transition-colors ${
+            className={`text-xs px-3 py-1.5 rounded-md transition-colors font-medium ${
               isChapterMode 
-                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                ? (isAdmin 
+                    ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-300' 
+                    : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-300')
                 : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
             }`}
           >
             {isChapterMode 
-              ? (isAdmin ? '장 전체 주석' : '장 전체 묵상/번역')
+              ? (isAdmin ? '⭐⭐⭐ 장 전체 주석 (Admin)' : '⭐⭐ 장 전체 묵상/번역')
               : '절 단위'}
           </button>
         </div>
@@ -212,7 +214,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
               <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
               {isChapterMode 
-                ? (isAdmin ? '장 전체 주석 (Commentary)' : '장 전체 묵상/번역 (Chapter Overview)')
+                ? (isAdmin ? '장 전체 주석 (Admin Only)' : '장 전체 묵상/번역')
                 : '나의 묵상 (Reflection)'}
               {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
               {isChapterMode && isVIP2 && canWrite && (
