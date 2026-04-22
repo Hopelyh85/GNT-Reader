@@ -32,63 +32,14 @@ export const fallbackFixer: Record<string, string> = {
 };
 
 export function getSmartLemma(text: string): string {
-  // Clean Greek symbols but preserve apostrophes for elision
   let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, "").trim();
   const dLower = d.toLowerCase();
-
   if (fallbackFixer[d]) return fallbackFixer[d];
   if (fallbackFixer[dLower]) return fallbackFixer[dLower];
 
-  // Core suffix rules
   if (d.endsWith('ους') || d.endsWith('οις') || d.endsWith('ου') || d.endsWith('ον')) {
     return d.replace(/(ους|οις|ου|ον)$/, 'ος');
   }
   if (d.endsWith('ων')) return d.slice(0, -2) + 'ω';
-
   return d;
 }
-
-// Helper function to clean symbols before lookup
-export const cleanSymbols = (text: string): string => {
-  // AGGRESSIVE cleaning - remove ALL non-Greek alphabetic characters except accents and apostrophes (for elision)
-  return text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, '').trim();
-};
-
-// Comprehensive lexicon lookup with fallback chain
-export const getWordDefinition = (
-  lexicon: Record<string, any>,
-  lemma: string,
-  surfaceForm: string
-): { entry: any | null; cleanedLemma: string; searchKey: string } => {
-  // 1. Clean symbols (preserve apostrophes for elision)
-  const cleanedLemma = cleanSymbols(lemma);
-  const cleanedSurface = cleanSymbols(surfaceForm);
-
-  // 2. Check fallbackFixer with cleaned text (case-insensitive)
-  const surfaceLower = cleanedSurface.toLowerCase();
-  const lemmaLower = cleanedLemma.toLowerCase();
-  const searchKey =
-    fallbackFixer[cleanedSurface] ||
-    fallbackFixer[cleanedLemma] ||
-    fallbackFixer[surfaceLower] ||
-    fallbackFixer[lemmaLower] ||
-    cleanedLemma ||
-    cleanedSurface;
-
-  // 3. Try accent-stripped as last resort
-  const stripped = cleanedSurface
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-
-  // 4. Lookup chain
-  const entry =
-    lexicon[searchKey] ||
-    lexicon[cleanedSurface] ||
-    lexicon[stripped] ||
-    null;
-
-  return { entry, cleanedLemma: entry?.lemma || searchKey, searchKey };
-};
-
-export default fallbackFixer;
