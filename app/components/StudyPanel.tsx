@@ -19,6 +19,7 @@ interface LexiconEntry {
   transliteration: string;
   definition: string;
   korean_def?: string;
+  korean_pron?: string;
   strongs: string;
   frequency: string;
 }
@@ -526,13 +527,13 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                   </div>
                   {entry ? (
                     <div className="space-y-2">
-                      {/* Header: Strong's + Transliteration */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded text-blue-700">
+                      {/* Header: Strong's + [English pron | Korean pron] */}
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="font-semibold text-stone-800">
                           {String(entry?.strongs || 'N/A')}
                         </span>
-                        <span className="text-xs text-stone-500">
-                          [{String(entry?.transliteration || '')}]
+                        <span className="text-sm text-stone-500 font-mono">
+                          [{String(entry?.transliteration || '')}{entry?.korean_pron && ` | ${String(entry.korean_pron)}`}]
                         </span>
                       </div>
                       
