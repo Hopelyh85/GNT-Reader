@@ -290,6 +290,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     'ἐγέννησε(ν)': 'γεννάω', 'ἐγέννησεν': 'γεννάω', 'ἐγέννησε': 'γεννάω',
     // βοῦς (cow/ox) - declension forms
     'βόες': 'βοῦς', 'βόας': 'βοῦς', 'βοῶν': 'βοῦς',
+    // ἐνίστημι (be at hand, present) - future forms
+    'ἐνστήσονται': 'ἐνίστημι',
   };
 
   // Get definition with fallback: fallback → lemma → text → accent-stripped
@@ -424,6 +426,12 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               </h2>
             </div>
             <div className="flex items-center gap-2">
+              {lexiconLoading && (
+                <div className="flex items-center gap-1 text-xs text-stone-500">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>사전 로딩...</span>
+                </div>
+              )}
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
               ) : lastSaved ? (

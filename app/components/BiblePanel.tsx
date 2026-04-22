@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Book, GreekWord } from '@/app/types';
-import { ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, BookOpen, Loader2 } from 'lucide-react';
 
 interface LexiconEntry {
   lemma?: string;
@@ -181,6 +181,8 @@ export function BiblePanel({
     'ἐγέννησε(ν)': 'γεννάω', 'ἐγέννησεν': 'γεννάω', 'ἐγέννησε': 'γεννάω',
     // βοῦς (cow/ox) - declension forms
     'βόες': 'βοῦς', 'βόας': 'βοῦς', 'βοῶν': 'βοῦς',
+    // ἐνίστημι (be at hand, present) - future forms
+    'ἐνστήσονται': 'ἐνίστημι',
   };
 
   // Ultra-lightweight lexicon lookup with fallback: fallback → lemma → text → accent-stripped
@@ -318,6 +320,12 @@ export function BiblePanel({
         <h2 className="text-sm font-serif font-semibold text-stone-700">
           SBLGNT 헬라어 신약
         </h2>
+        {lexiconLoading && (
+          <div className="ml-auto flex items-center gap-1 text-xs text-stone-500">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span>사전 로딩...</span>
+          </div>
+        )}
       </div>
 
       {/* Bible Content - FORCED HORIZONTAL SCROLL */}
