@@ -465,7 +465,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         
         {/* 1. 단어 분석 (Word Analysis) */}
-        {selectedWord && (
+        {selectedWord?.word && (
           <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-amber-700 mb-3">
               <Search className="w-3 h-3" />
@@ -473,11 +473,12 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
               {(() => {
                 const w = selectedWord?.word;
-                if (!w) return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
+                if (!w || typeof w !== 'object') return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
                 
                 // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
-                const displayLemma = w?.lemma || w?.text || '';
-                const rawText = w?.text || '';
+                const displayLemma = String(w?.lemma || w?.text || '');
+                const rawText = String(w?.text || '');
+                const morphCode = String(w?.morph || '');
                 
                 // 검색 전용: 괄호 제거 및 fallbackFixer 적용
                 const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
@@ -492,16 +493,16 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                   {/* Header: Surface Form + Lemma (원본 그대로 표시) */}
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-greek text-3xl font-bold text-amber-700">
-                      {w?.text || ''}
+                      {String(w?.text || '')}
                     </span>
-                    {displayLemma && displayLemma !== w?.text && (
+                    {displayLemma && displayLemma !== String(w?.text || '') && (
                       <span className="text-sm text-stone-500">
                         (원형: <span className="font-greek text-amber-600">{String(displayLemma)}</span>)
                       </span>
                     )}
                   </div>
                   <div className="text-sm text-blue-700 font-medium">
-                    {parseMorphCode(w?.morph || '', searchLemma, w?.text || '')}
+                    {parseMorphCode(morphCode, searchLemma, rawText)}
                   </div>
                   {entry?.definition && (
                     <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">{String(entry.definition)}</p>
@@ -513,7 +514,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         )}
 
         {/* 2. 원어 사전 (Strong's Dictionary) */}
-        {selectedWord && (
+        {selectedWord?.word && (
           <div className="border-t border-stone-200 pt-4">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-blue-700 mb-3">
               <BookOpen className="w-3 h-3" />
@@ -521,11 +522,11 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             </label>
             {(() => {
               const w = selectedWord?.word;
-              if (!w) return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
+              if (!w || typeof w !== 'object') return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
               
               // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
-              const displayLemma = w?.lemma || w?.text || '';
-              const rawText = w?.text || '';
+              const displayLemma = String(w?.lemma || w?.text || '');
+              const rawText = String(w?.text || '');
               
               // 검색 전용: 괄호 제거 및 fallbackFixer 적용
               const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
@@ -672,7 +673,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </label>
           
           {/* Reflection List */}
-          {reflections?.length > 0 && (
+          {Array.isArray(reflections) && reflections.length > 0 && (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {reflections.map((reflection) => (
                 <div key={reflection?.id || 'unknown'} className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-lg">
