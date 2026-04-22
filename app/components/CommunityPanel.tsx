@@ -23,6 +23,8 @@ interface ReflectionData {
 
 export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }: CommunityPanelProps) {
   const canWrite = isLoggedIn;
+  const isAdmin = userRole === '⭐⭐⭐' || userRole === 'admin';
+  const isVIP2 = userRole === '⭐⭐' || userRole === 'vip' || isAdmin;
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -192,7 +194,9 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
                 : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
             }`}
           >
-            {isChapterMode ? '장 단위' : '절 단위'}
+            {isChapterMode 
+              ? (isAdmin ? '장 전체 주석' : '장 전체 묵상/번역')
+              : '절 단위'}
           </button>
         </div>
       </div>
@@ -207,8 +211,15 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
               <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
-              {isChapterMode ? '장 단위 묵상 (Chapter Commentary)' : '나의 묵상 (Reflection)'}
+              {isChapterMode 
+                ? (isAdmin ? '장 전체 주석 (Commentary)' : '장 전체 묵상/번역 (Chapter Overview)')
+                : '나의 묵상 (Reflection)'}
               {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
+              {isChapterMode && isVIP2 && canWrite && (
+                <span className="text-xs text-blue-600">
+                  {isAdmin ? '⭐⭐⭐ Admin' : '⭐⭐ VIP'}
+                </span>
+              )}
             </label>
             <textarea
               value={content}
@@ -216,7 +227,9 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
               disabled={!canWrite}
               placeholder={canWrite 
                 ? isChapterMode 
-                  ? "이 장 전체에 대한 묵상, 주제, 핵심 메시지, 적용점 등을 기록하세요... (1초 후 자동 저장)"
+                  ? (isAdmin 
+                      ? "이 장 전체에 대한 주석, 핵심 메시지, 신학적 해석, 적용점 등을 기록하세요... (1초 후 자동 저장)"
+                      : "이 장 전체에 대한 묵상, 주제, 핵심 메시지, 적용점 등을 기록하세요... (1초 후 자동 저장)")
                   : "이 말씀을 묵상하며 느낀 점, 적용할 점, 기도 제목 등을 자유롭게 기록하세요... (1초 후 자동 저장)" 
                 : "로그인 후 묵상을 작성할 수 있습니다."}
               className="w-full h-[calc(100vh-280px)] min-h-[300px] p-3 text-sm leading-relaxed bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"

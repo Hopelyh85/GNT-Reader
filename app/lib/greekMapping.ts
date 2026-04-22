@@ -14,6 +14,9 @@ export const fallbackFixer: Record<string, string> = {
   'ἐβάπτισεν': 'βαπτίζω',
   'ἐβάπτισε': 'βαπτίζω',
 
+  // γίνομαι (become/happen) - critical common verb
+  'γέγονεν': 'γίνομαι', 'γέγονε': 'γίνομαι', 'ἐγένετο': 'γίνομαι',
+
   // 2. 3rd Declension & Special Nouns
   'πνεύματος': 'πνεῦμα', 'πνεύματι': 'πνεῦμα',
   'ὕδατι': 'ὕδωρ', 'ἡμέρας': 'ἡμέρα',
