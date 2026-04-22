@@ -144,6 +144,11 @@ export function BiblePanel({
     loadKRV();
   }, []);
   
+  // Symbol cleaning: strip SBLGNT critical symbols and punctuation
+  const cleanSymbols = (text: string): string => {
+    return text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
+  };
+
   // Lightweight fallback fixer for DB lemma errors - SBLGNT corrections
   const fallbackFixer: Record<string, string> = {
     // Articles
@@ -183,15 +188,21 @@ export function BiblePanel({
     'βόες': 'βοῦς', 'βόας': 'βοῦς', 'βοῶν': 'βοῦς',
     // ἐνίστημι (be at hand, present) - future forms
     'ἐνστήσονται': 'ἐνίστημι',
+    // NEW: Critical mappings for common words
+    'εὐαγγελίου': 'εὐαγγέλιον',
   };
 
-  // Ultra-lightweight lexicon lookup with fallback: fallback → lemma → text → accent-stripped
+  // Ultra-lightweight lexicon lookup with symbol cleaning and fallback
   const getWordDefinition = (lemma: string, surfaceForm: string): { entry: LexiconEntry | null; cleanedLemma: string } => {
-    const searchKey = fallbackFixer[surfaceForm] || fallbackFixer[lemma] || lemma || surfaceForm;
-    const stripped = surfaceForm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const entry = lexicon[searchKey] || lexicon[surfaceForm] || lexicon[stripped];
-    const cleanedLemma = entry?.lemma || searchKey || surfaceForm;
-    return { entry, cleanedLemma };
+    // Two-track: clean symbols for search, keep original for display
+    const cleanedLemma = cleanSymbols(lemma);
+    const cleanedSurface = cleanSymbols(surfaceForm);
+    
+    const searchKey = fallbackFixer[cleanedSurface] || fallbackFixer[cleanedLemma] || cleanedLemma || cleanedSurface;
+    const stripped = cleanedSurface.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const entry = lexicon[searchKey] || lexicon[cleanedSurface] || lexicon[stripped];
+    const finalLemma = entry?.lemma || searchKey || cleanedLemma;
+    return { entry, cleanedLemma: finalLemma };
   };
 
 

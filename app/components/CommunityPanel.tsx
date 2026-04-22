@@ -27,6 +27,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [isChapterMode, setIsChapterMode] = useState(false);
 
   const verseRef = selectedVerse
     ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`
@@ -42,8 +43,10 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
     async function loadReflection() {
       setLoading(true);
       try {
+        // Use verse 0 for chapter-level reflection, or selected verse for verse-level
+        const verseNum = isChapterMode ? 0 : selectedVerse!.verse;
         const response = await fetch(
-          `/api/reflections?book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}&user=${encodeURIComponent(userName)}`
+          `/api/reflections?book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${verseNum}&user=${encodeURIComponent(userName)}`
         );
 
         if (!response.ok) {
@@ -86,10 +89,12 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
         },
         body: JSON.stringify({
           user_nickname: userName,
-          verse_ref: verseRef,
+          verse_ref: isChapterMode 
+            ? `${selectedVerse.book} ${selectedVerse.chapter}장 (전체)`
+            : verseRef,
           book: selectedVerse.book,
           chapter: selectedVerse.chapter,
-          verse: selectedVerse.verse,
+          verse: isChapterMode ? 0 : selectedVerse.verse,
           content: content,
         }),
       });
@@ -115,7 +120,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [content, selectedVerse, handleSave]);
+  }, [content, selectedVerse, handleSave, isChapterMode]);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -175,9 +180,21 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
             </button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-stone-500">
-          {selectedVerse.bookName || selectedVerse.book} {selectedVerse.chapter}:{selectedVerse.verse}
-        </p>
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-xs text-stone-500">
+            {selectedVerse.bookName || selectedVerse.book} {selectedVerse.chapter}:{isChapterMode ? '장 전체' : selectedVerse.verse}
+          </p>
+          <button
+            onClick={() => setIsChapterMode(!isChapterMode)}
+            className={`text-xs px-2 py-1 rounded transition-colors ${
+              isChapterMode 
+                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
+            }`}
+          >
+            {isChapterMode ? '장 단위' : '절 단위'}
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -190,7 +207,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
               <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
-              나의 묵상 (Reflection)
+              {isChapterMode ? '장 단위 묵상 (Chapter Commentary)' : '나의 묵상 (Reflection)'}
               {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
             </label>
             <textarea
@@ -198,7 +215,9 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
               onChange={(e) => canWrite && setContent(e.target.value)}
               disabled={!canWrite}
               placeholder={canWrite 
-                ? "이 말씀을 묵상하며 느낀 점, 적용할 점, 기도 제목 등을 자유롭게 기록하세요... (1초 후 자동 저장)" 
+                ? isChapterMode 
+                  ? "이 장 전체에 대한 묵상, 주제, 핵심 메시지, 적용점 등을 기록하세요... (1초 후 자동 저장)"
+                  : "이 말씀을 묵상하며 느낀 점, 적용할 점, 기도 제목 등을 자유롭게 기록하세요... (1초 후 자동 저장)" 
                 : "로그인 후 묵상을 작성할 수 있습니다."}
               className="w-full h-[calc(100vh-280px)] min-h-[300px] p-3 text-sm leading-relaxed bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
             />

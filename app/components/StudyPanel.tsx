@@ -253,6 +253,11 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     loadLexicon();
   }, []);
 
+  // Symbol cleaning: strip SBLGNT critical symbols and punctuation
+  const cleanSymbols = (text: string): string => {
+    return text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
+  };
+
   // Lightweight fallback fixer for DB lemma errors - SBLGNT corrections
   const fallbackFixer: Record<string, string> = {
     // Articles
@@ -292,19 +297,25 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     'βόες': 'βοῦς', 'βόας': 'βοῦς', 'βοῶν': 'βοῦς',
     // ἐνίστημι (be at hand, present) - future forms
     'ἐνστήσονται': 'ἐνίστημι',
+    // NEW: Critical mappings for common words
+    'εὐαγγελίου': 'εὐαγγέλιον',
   };
 
-  // Get definition with fallback: fallback → lemma → text → accent-stripped
+  // Get definition with symbol cleaning and fallback
   const getWordDefinition = (lemma: string, surfaceForm: string): LexiconEntry | null => {
-    const searchKey = fallbackFixer[surfaceForm] || fallbackFixer[lemma] || lemma;
-    const stripped = surfaceForm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    // Two-track: clean symbols for search, keep original for display
+    const cleanedLemma = cleanSymbols(lemma);
+    const cleanedSurface = cleanSymbols(surfaceForm);
+    
+    const searchKey = fallbackFixer[cleanedSurface] || fallbackFixer[cleanedLemma] || cleanedLemma;
+    const stripped = cleanedSurface.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     // 1. Try fallback/lemma first
     if (lexicon[searchKey]) {
       return lexicon[searchKey];
     }
-    // 2. Fallback to surface form
-    if (lexicon[surfaceForm]) {
-      return lexicon[surfaceForm];
+    // 2. Fallback to cleaned surface form
+    if (lexicon[cleanedSurface]) {
+      return lexicon[cleanedSurface];
     }
     // 3. Fallback to accent-stripped
     if (lexicon[stripped]) {
