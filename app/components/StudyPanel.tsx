@@ -299,6 +299,12 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     'ἐνστήσονται': 'ἐνίστημι',
     // NEW: Critical mappings for common words
     'εὐαγγελίου': 'εὐαγγέλιον',
+    // Proper nouns (Genealogy) & Irregular/Missing Lemmas
+    'Ἰεχονίαν': 'Ἰεχονίας',
+    'Μανασσῆ': 'Μανασσῆς',
+    'βασιλέα': 'βασιλεύς',
+    'βασιλέως': 'βασιλεύς',
+    'βασιλεῖ': 'βασιλεύς',
   };
 
   // Get definition with symbol cleaning and fallback
@@ -494,18 +500,21 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                 const w = selectedWord?.word;
                 if (!w || typeof w !== 'object') return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
                 
-                // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
+                // 1. Clean the raw text and lemma completely first
                 const displayLemma = String(w?.lemma || w?.text || '');
                 const rawText = String(w?.text || '');
                 const morphCode = String(w?.morph || '');
                 
-                // 검색 전용: 괄호 제거 및 fallbackFixer 적용
-                const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
-                const searchLemma = fallbackFixer[displayLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
+                // 2. Strict cleaning: remove ALL punctuation and critical symbols BEFORE lookup
+                const cleanRawText = rawText.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
+                const cleanRawLemma = displayLemma.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
                 
-                // 사전 검색 (searchLemma 사용)
+                // 3. Check fallbackFixer using the cleaned text
+                const searchLemma = fallbackFixer[cleanRawLemma] || fallbackFixer[cleanRawText] || cleanRawLemma || cleanRawText;
+                
+                // 4. 사전 검색 (searchLemma 사용)
                 const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-                const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
+                const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[cleanRawText];
                 
                 return (
                 <div className="space-y-3">
@@ -520,6 +529,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                       </span>
                     )}
                   </div>
+                  {/* DEBUG: Show search key */}
+                  <p className="text-sm text-stone-500 mb-1 font-mono">
+                    (검색원형: <span className="text-amber-600 font-greek">{searchLemma}</span>)
+                  </p>
                   <div className="text-sm text-blue-700 font-medium">
                     {parseMorphCode(morphCode, searchLemma, rawText)}
                   </div>
@@ -543,17 +556,20 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               const w = selectedWord?.word;
               if (!w || typeof w !== 'object') return <p className="text-sm text-red-500">⚠️ 단어 데이터 없음</p>;
               
-              // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
+              // 1. Clean the raw text and lemma completely first
               const displayLemma = String(w?.lemma || w?.text || '');
               const rawText = String(w?.text || '');
               
-              // 검색 전용: 괄호 제거 및 fallbackFixer 적용
-              const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
-              const searchLemma = fallbackFixer[displayLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
+              // 2. Strict cleaning: remove ALL punctuation and critical symbols BEFORE lookup
+              const cleanRawText = rawText.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
+              const cleanRawLemma = displayLemma.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
               
-              // 사전 검색 (searchLemma 사용)
+              // 3. Check fallbackFixer using the cleaned text
+              const searchLemma = fallbackFixer[cleanRawLemma] || fallbackFixer[cleanRawText] || cleanRawLemma || cleanRawText;
+              
+              // 4. 사전 검색 (searchLemma 사용)
               const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-              const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
+              const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[cleanRawText];
               
               return (
                 <div className="space-y-2 p-3 bg-blue-50/50 border border-blue-200 rounded-lg">

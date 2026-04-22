@@ -190,6 +190,12 @@ export function BiblePanel({
     'ἐνστήσονται': 'ἐνίστημι',
     // NEW: Critical mappings for common words
     'εὐαγγελίου': 'εὐαγγέλιον',
+    // Proper nouns (Genealogy) & Irregular/Missing Lemmas
+    'Ἰεχονίαν': 'Ἰεχονίας',
+    'Μανασσῆ': 'Μανασσῆς',
+    'βασιλέα': 'βασιλεύς',
+    'βασιλέως': 'βασιλεύς',
+    'βασιλεῖ': 'βασιλεύς',
   };
 
   // Ultra-lightweight lexicon lookup with symbol cleaning and fallback
@@ -246,18 +252,21 @@ export function BiblePanel({
     console.log('word.lemma (원형):', word.lemma);
     console.log('word.morph (문법코드):', word.morph);
     
-    // 투트랙 방식: 화면 표시용은 원본 그대로, 검색용만 정제
+    // 1. Clean the raw text and lemma completely first
     const displayLemma = String(word?.lemma || word?.text || '');
     const rawText = String(word?.text || '');
     const morphCode = String(word?.morph || '');
     
-    // 검색 전용: 괄호 제거 및 fallbackFixer 적용
-    const strippedParen = displayLemma.replace(/\(ν\)/g, '').replace(/[\(\)]/g, '').trim();
-    const searchLemma = fallbackFixer[displayLemma] || fallbackFixer[rawText] || fallbackFixer[strippedParen] || strippedParen;
+    // 2. Strict cleaning: remove ALL punctuation and critical symbols BEFORE lookup
+    const cleanRawText = rawText.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
+    const cleanRawLemma = displayLemma.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
     
-    // 사전 검색 with searchLemma (parseMorphCode는 StudyPanel에서만 렌더링)
+    // 3. Check fallbackFixer using the cleaned text
+    const searchLemma = fallbackFixer[cleanRawLemma] || fallbackFixer[cleanRawText] || cleanRawLemma || cleanRawText;
+    
+    // 4. 사전 검색 with searchLemma (parseMorphCode는 StudyPanel에서만 렌더링)
     const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[rawText] || lexicon[strippedParen];
+    const entry = lexicon[searchLemma] || lexicon[strippedAccent] || lexicon[cleanRawText];
     const cleanedLemma = entry?.lemma || searchLemma;
     
     // 안전한 디버깅: parseMorphCode 결과를 문자열로만 출력
