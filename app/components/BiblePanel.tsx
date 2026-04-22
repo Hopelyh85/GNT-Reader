@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Book, GreekWord } from '@/app/types';
 import { ChevronDown, ChevronRight, BookOpen, Loader2 } from 'lucide-react';
+import { fallbackFixer } from '../lib/greekMapping';
 
 interface LexiconEntry {
   lemma?: string;
@@ -144,65 +145,9 @@ export function BiblePanel({
     loadKRV();
   }, []);
   
-  // Symbol cleaning: strip SBLGNT critical symbols and punctuation
+  // Symbol cleaning: strip SBLGNT critical symbols and punctuation (preserves apostrophes for elision)
   const cleanSymbols = (text: string): string => {
     return text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
-  };
-
-  // Lightweight fallback fixer for DB lemma errors - SBLGNT corrections
-  const fallbackFixer: Record<string, string> = {
-    // Articles
-    'τοῦ': 'ὁ', 'τόν': 'ὁ', 'τήν': 'ὁ', 'τῆς': 'ὁ', 'τῷ': 'ὁ', 'τούς': 'ὁ',
-    // αὐτός pronoun forms - FORCE to G846 (he/him/his), avoid G847 (adverb) trap!
-    'αὐτός': 'αὐτός', 'αὐτοῦ': 'αὐτός', 'αὐτῷ': 'αὐτός', 'αὐτόν': 'αὐτός',
-    'αὐτή': 'αὐτός', 'αὐτῆς': 'αὐτός', 'αὐτῇ': 'αὐτός', 'αὐτήν': 'αὐτός',
-    'αὐτό': 'αὐτός', 'αὐτοί': 'αὐτός', 'αὐτῶν': 'αὐτός', 'αὐτοῖς': 'αὐτός', 'αὐτούς': 'αὐτός',
-    'αὐταί': 'αὐτός', 'αὐταῖς': 'αὐτός', 'αὐτάς': 'αὐτός',
-    // Common nouns - SBLGNT bad lemma data corrections
-    'προφήτου': 'προφήτης', 'προφήτην': 'προφήτης',
-    'ἄγγελος': 'ἄγγελος', 'ἀγγέλου': 'ἄγγελος',
-    // πλοῖον (ship) - ι subscript forms
-    'πλοίῳ': 'πλοῖον', 'πλοῖον': 'πλοῖον', 'πλοῖα': 'πλοῖον', 'πλοίου': 'πλοῖον', 'πλοία': 'πλοῖον',
-    'υἱόν': 'υἱός', 'υἱοῦ': 'υἱός',
-    'θεόν': 'θεός', 'θεοῦ': 'θεός',
-    'Ἰησοῦν': 'Ἰησοῦς', 'Ἰησοῦ': 'Ἰησοῦς',
-    'χριστόν': 'χριστός', 'χριστοῦ': 'χριστός',
-    'κύριον': 'κύριος', 'κυρίου': 'κύριος',
-    'ἀδελφόν': 'ἀδελφός', 'ἀδελφοῦ': 'ἀδελφός',
-    // λαός (people) - SBLGNT incorrect lemma fix
-    'λαός': 'λαός', 'λαὸς': 'λαός', 'λαόν': 'λαός', 'λαὸν': 'λαός',
-    'λαοῦ': 'λαός', 'λαῷ': 'λαός', 'λαοί': 'λαός', 'λαῶν': 'λαός', 'λαούς': 'λαός',
-    // Participles (SBLGNT often lists these as lemmas incorrectly)
-    'λέγων': 'λέγω', 'λέγοντος': 'λέγω', 'λέγοντα': 'λέγω',
-    'λέγουσα': 'λέγω', 'λέγουσαν': 'λέγω',
-    'ἀγαπῶν': 'ἀγαπάω', 'ἀγαπῶντος': 'ἀγαπάω', 'ἀγαπῶντα': 'ἀγαπάω',
-    'ποιῶν': 'ποιέω', 'ποιοῦντος': 'ποιέω', 'ποιοῦντα': 'ποιέω',
-    'ἔχων': 'ἔχω', 'ἔχοντος': 'ἔχω', 'ἔχοντα': 'ἔχω',
-    // Aorist verbs (SBLGNT often lists aorist as lemma)
-    'ἐκάλεσε(ν)': 'καλέω', 'ἐκάλεσεν': 'καλέω', 'ἐκάλεσε': 'καλέω',
-    'ἐποίησε(ν)': 'ποιέω', 'ἐποίησεν': 'ποιέω', 'ἐποίησε': 'ποιέω',
-    'εἶπεν': 'λέγω', 'εἶπον': 'λέγω',
-    // γεννάω (beget) - aorist forms with (ν)
-    'ἐγέννησε(ν)': 'γεννάω', 'ἐγέννησεν': 'γεννάω', 'ἐγέννησε': 'γεννάω',
-    // βοῦς (cow/ox) - declension forms
-    'βόες': 'βοῦς', 'βόας': 'βοῦς', 'βοῶν': 'βοῦς',
-    // ἐνίστημι (be at hand, present) - future forms
-    'ἐνστήσονται': 'ἐνίστημι',
-    // NEW: Critical mappings for common words
-    'εὐαγγελίου': 'εὐαγγέλιον',
-    // Proper nouns (Genealogy) & Irregular/Missing Lemmas
-    'Ἰεχονίαν': 'Ἰεχονίας',
-    'Μανασσῆ': 'Μανασσῆς',
-    'βασιλέα': 'βασιλεύς',
-    'βασιλέως': 'βασιλεύς',
-    'βασιλεῖ': 'βασιλεύς',
-    // Missing Nouns, Adjectives, and Irregular Verbs
-    'γενέσεως': 'γένεσις',
-    'παρέδωκαν': 'παραδίδωμι',
-    'ἔλαβον': 'λαμβάνω',
-    'πάντες': 'πᾶς',
-    'θέλετε': 'θέλω',
-    'θέλετέ': 'θέλω',
   };
 
   // Ultra-lightweight lexicon lookup with symbol cleaning and fallback
