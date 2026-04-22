@@ -28,7 +28,22 @@ export const fallbackFixer: Record<string, string> = {
   'Ἰεχονίαν': 'Ἰεχονίας', 'Μανασσῆ': 'Μανασσῆς', 'βασιλέα': 'βασιλεύς',
   'βοός': 'βοῦς', 'βόες': 'βοῦς', 'βόας': 'βοῦς',
   'λόγον': 'λόγος', 'ἀποστόλοις': 'ἀπόστολος', 'ἀδελφοὺς': 'ἀδελφός',
-  'μέν': 'μέν', 'Ἰσραηλίτης': 'Ἰσραηλίτης'
+  'μέν': 'μέν', 'Ἰσραηλίτης': 'Ἰσραηλίτης',
+
+  // 5. Basic Noun & Verb Inflections (Director's critical additions)
+  'ἡμέρας': 'ἡμέρα',        // day (gen. sing)
+  'ἐντειλάμενος': 'ἐντέλλομαι', // commanded (participle)
+  'ἐποιησάμην': 'ποιέω',     // I made (aorist middle)
+  'πνεύματος': 'πνεῦμα',      // spirit (gen. sing)
+  'πνεύματι': 'πνεῦμα',       // spirit (dat. sing)
+  'ὕδατι': 'ὕδωρ',           // water (dat. sing)
+  'ἐβάπτισεν': 'βαπτίζω',     // baptized (3rd sing aorist)
+  'ἐβάπτισε': 'βαπτίζω',      // baptized (3rd sing aorist variant)
+  'ἐβάπτισα': 'βαπτίζω',      // I baptized
+  'ἐβαπτίσθην': 'βαπτίζω',    // I was baptized (passive)
+  'ποιήσω': 'ποιέω',          // I will make
+  'ποιήσεις': 'ποιέω',        // you will make
+  'ποιήσει': 'ποιέω',         // he/she will make
 };
 
 export function getSmartLemma(text: string): string {
@@ -37,6 +52,20 @@ export function getSmartLemma(text: string): string {
   if (fallbackFixer[d]) return fallbackFixer[d];
   if (fallbackFixer[dLower]) return fallbackFixer[dLower];
 
+  // 3rd declension neuter nouns: -ματος/-ματι -> -μα (πνεῦμα pattern)
+  if (d.endsWith('ματος')) return d.slice(0, -5) + 'μα'; // πνεύματος -> πνεῦμα
+  if (d.endsWith('ματι')) return d.slice(0, -4) + 'μα';  // πνεύματι -> πνεῦμα
+  if (d.endsWith('ματα')) return d.slice(0, -4) + 'μα';  // πνεύματα -> πνεῦμα
+  if (d.endsWith('ματων')) return d.slice(0, -5) + 'μα'; // πνευμάτων -> πνεῦμα
+  if (d.endsWith('μασι')) return d.slice(0, -4) + 'μα';   // πνεύμασι -> πνεῦμα
+  if (d.endsWith('μασιν')) return d.slice(0, -5) + 'μα'; // πνεύμασιν -> πνεῦμα
+
+  // 3rd declension neuter in -ος/-ους: ὕδωρ pattern
+  if (d.endsWith('δατος')) return d.slice(0, -5) + 'δωρ';  // ὕδατος -> ὕδωρ
+  if (d.endsWith('δατι')) return d.slice(0, -4) + 'δωρ';   // ὕδατι -> ὕδωρ
+  if (d.endsWith('δατα')) return d.slice(0, -4) + 'δωρ';   // ὕδατα -> ὕδωρ
+
+  // 2nd declension patterns
   if (d.endsWith('ους') || d.endsWith('οις') || d.endsWith('ου') || d.endsWith('ον')) {
     return d.replace(/(ους|οις|ου|ον)$/, 'ος');
   }
