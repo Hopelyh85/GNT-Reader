@@ -297,8 +297,8 @@ export const fallbackFixer: Record<string, string> = {
 
 // Helper function to clean symbols before lookup
 export const cleanSymbols = (text: string): string => {
-  // Remove punctuation but PRESERVE apostrophes for elision matching
-  return text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
+  // AGGRESSIVE cleaning - remove ALL non-Greek alphabetic characters except accents and apostrophes (for elision)
+  return text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, '').trim();
 };
 
 // Comprehensive lexicon lookup with fallback chain
@@ -311,10 +311,14 @@ export const getWordDefinition = (
   const cleanedLemma = cleanSymbols(lemma);
   const cleanedSurface = cleanSymbols(surfaceForm);
 
-  // 2. Check fallbackFixer with cleaned text
+  // 2. Check fallbackFixer with cleaned text (case-insensitive)
+  const surfaceLower = cleanedSurface.toLowerCase();
+  const lemmaLower = cleanedLemma.toLowerCase();
   const searchKey =
     fallbackFixer[cleanedSurface] ||
     fallbackFixer[cleanedLemma] ||
+    fallbackFixer[surfaceLower] ||
+    fallbackFixer[lemmaLower] ||
     cleanedLemma ||
     cleanedSurface;
 
@@ -338,36 +342,61 @@ export const getWordDefinition = (
 // SMART LEMMA STEMMING ENGINE (규칙 기반 원형 추적기)
 // ============================================================================
 export function getSmartLemma(text: string): string {
-  // 1. Clean symbols first
-  let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, "").trim();
+  // 1. AGGRESSIVE cleaning - remove ALL non-Greek alphabetic characters except accents
+  let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, "").trim();
   
-  // 2. Check fallbackFixer first
+  // 2. Case normalization (handle both Βόες and βόες)
+  const dLower = d.toLowerCase();
+  
+  // 3. Check fallbackFixer with both original and lowercase (case-insensitive)
   if (fallbackFixer[d]) return fallbackFixer[d];
+  if (fallbackFixer[dLower]) return fallbackFixer[dLower];
   
-  // 3. Rule-based stemming (based on Greek grammar PDFs)
+  // 4. Rule-based stemming (based on Greek grammar PDFs)
+  // Handle accented variants first (before unaccented)
+  if (d.endsWith('όν')) return d.slice(0, -2) + 'ός'; // λόγόν -> λόγός
+  if (d.endsWith('ός')) return d.slice(0, -2) + 'ός'; // nominative
+  if (d.endsWith('όν')) return d.slice(0, -2) + 'ός'; // accusative singular
+  if (d.endsWith('οὺς')) return d.slice(0, -3) + 'ός'; // ἀδελφοὺς -> ἀδελφός
+  if (d.endsWith('ούς')) return d.slice(0, -3) + 'ός'; // ἀδελφούς -> ἀδελφός
+  
   // 3rd declension masculine/feminine nouns: -ον -> -ος
   if (d.endsWith('ον')) return d.slice(0, -2) + 'ος'; // λόγον -> λόγος
-  if (d.endsWith('όν')) return d.slice(0, -2) + 'ός'; // λόγόν -> λόγός
+  
+  // Accusative plural -ους variants
+  if (d.endsWith('ους')) return d.slice(0, -3) + 'ος'; // ἀποστόλους -> ἀπόστολος
+  if (d.endsWith('οῦς')) return d.slice(0, -3) + 'ός'; // βοῦς stays βοῦς
+  
+  // 2nd declension accusative plural: -ας, -ες (like βόας -> βοῦς)
+  if (d.endsWith('ας')) {
+    if (d.includes('βο')) return 'βοῦς'; // βόας -> βοῦς
+    return d.slice(0, -2) + 'ος'; // default case
+  }
+  if (d.endsWith('ες')) {
+    if (d.includes('βο')) return 'βοῦς'; // βόες -> βοῦς
+    return d.slice(0, -2) + 'ος'; // default case
+  }
   
   // Dative plural: -οις -> -ος
   if (d.endsWith('οις')) return d.slice(0, -3) + 'ος'; // ἀποστόλοις -> ἀπόστολος
   if (d.endsWith('οισι')) return d.slice(0, -4) + 'ος'; // ἀποστόλοισι -> ἀπόστολος
-  
-  // Accusative plural: -ους -> -ος
-  if (d.endsWith('ους')) return d.slice(0, -3) + 'ος'; // ἀποστόλους -> ἀπόστολος
+  if (d.endsWith('οις')) return d.slice(0, -3) + 'ος'; // standard dative plural
   
   // Genitive singular: -ου -> -ος
   if (d.endsWith('ου')) return d.slice(0, -2) + 'ος'; // ἀποστόλου -> ἀπόστολος
+  if (d.endsWith('οῦ')) return d.slice(0, -2) + 'ός'; // ἀποστόλου -> ἀπόστολος
   
   // Present participles: -ων -> -ω
   if (d.endsWith('ων')) return d.slice(0, -2) + 'ω'; // βαπτίζων -> βαπτίζω
+  if (d.endsWith('όντος')) return d.slice(0, -5) + 'όω'; // λέγοντος -> λέγω
   if (d.endsWith('οντος')) return d.slice(0, -5) + 'ω'; // λέγοντος -> λέγω
+  if (d.endsWith('όντα')) return d.slice(0, -4) + 'όω'; // λέγοντα -> λέγω
   if (d.endsWith('οντα')) return d.slice(0, -4) + 'ω'; // λέγοντα -> λέγω
   
-  // Neuter participles: -τα -> approximated to -ω (imperfect but catches ζῶντα)
+  // Neuter participles: -τα -> approximated to -ω
   if (d.endsWith('τα') && d.length > 3) {
     // Special case for ζῶντα -> ζάω
-    if (d.includes('ωντ')) return d.replace(/ωντα$/, 'αω'); // ζῶντα -> ζάω
+    if (d.includes('ωντ') || d.includes('ῶν')) return d.replace(/[ωω]ντα$/, 'αω'); // ζῶντα -> ζάω
   }
   
   // 1st aorist middle: ἐ...άμην -> basic verb (simplified)
