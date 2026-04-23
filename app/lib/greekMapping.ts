@@ -10,14 +10,21 @@ export const fallbackFixer: Record<string, string> = {
   'ἐβεβαιώθη': 'βεβαιόω', 'βεβαιώσει': 'βεβαιόω',
   'ἐβάπτισεν': 'βαπτίζω', 'ἐντειλάμενος': 'ἐντέλλομαι', 'ἐποιησάμην': 'ποιέω',
 
-  // 2. Core Theological Terms (God, Father, Christ, etc.)
+  // Matthew 1 Specific Fixes (Genealogy & Birth)
+  'ἐγέννησεν': 'γεννάω', 'ἐγέννησε': 'γεννάω',
+  'ἐποίησεν': 'ποιέω', 'ἐποίησε': 'ποιέω',
+  'ἐγίνωσκεν': 'γινώσκω', 'ἐγίνωσκε': 'γινώσκω',
+  'ἔτεκεν': 'τίκτω', 'ἔτεκε': 'τίκτω', 'τέξεται': 'τίκτω',
+  'Βαβυλῶνος': 'Βαβυλών', 'υἱόν': 'υἱός', 'Δαυίδ': 'Δαυίδ',
+
+  // 2. Core Theological Terms
   'πατρός': 'πατήρ', 'πατρὸς': 'πατήρ', 'πατρί': 'πατήρ', 'πατέρα': 'πατήρ',
   'θεῷ': 'θεός', 'θεοῦ': 'θεός', 'θεόν': 'θεός',
   'Χριστοῦ': 'Χριστός', 'Χριστῷ': 'Χριστός', 'Χριστόν': 'Χριστός',
   'πνεύματος': 'πνεῦμα', 'πνεύματι': 'πνεῦμα',
   'ἡμέρας': 'ἡμέρα', 'ὕδατι': 'ὕδωρ', 'λόγον': 'λόγος',
 
-  // 3. Pronouns & Others (Pure Greek Only)
+  // 3. Pronouns & Others
   'μου': 'ἐγώ', 'μοι': 'ἐγώ', 'με': 'ἐγώ', 'ἡμᾶς': 'ἐγώ',
   'σου': 'σύ', 'σοί': 'σύ', 'σε': 'σύ', 'ὑμῶν': 'σύ',
   'αὕτη': 'οὗτος', 'ταῦτα': 'οὗτος',
@@ -26,25 +33,21 @@ export const fallbackFixer: Record<string, string> = {
 };
 
 export function getSmartLemma(text: string): string {
-  // SBLGNT 기호 및 구두점 완벽 제거
+  // Strip SBLGNT symbols
   let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, "").trim();
   const dLower = d.toLowerCase();
 
-  // 1. 1순위: 하드코딩된 불규칙 사전에서 먼저 찾기
   if (fallbackFixer[d]) return fallbackFixer[d];
   if (fallbackFixer[dLower]) return fallbackFixer[dLower];
 
-  // 2. 2순위: 스마트 문법 변환 (논리 버그 수정 완료)
-
-  // 3변화 명사 처리 (예: σώματος -> σώμα)
+  // 3rd Declension Fix
   if (d.endsWith('ματος')) return d.replace(/ματος$/, 'μα');
   if (d.endsWith('ματι')) return d.replace(/ματι$/, 'μα');
 
-  // 1, 2변화 일반 명사 어미 처리 (-ος 로 통일)
-  if (d.endsWith('ου') || d.endsWith('ῳ') || d.endsWith('ον') || d.endsWith('οις') || d.endsWith('ους') || d.endsWith('ων')) {
-    return d.replace(/(ου|ῳ|ον|οις|ους|ων)$/, 'os').replace('os', 'ος');
+  // 1st & 2nd Declension Fix
+  if (d.endsWith('ου') || d.endsWith('ῳ') || d.endsWith('ον') || d.endsWith('οις') || d.endsWith('ους') || d.endsWith('ων') || d.endsWith('όν')) {
+    return d.replace(/(ου|ῳ|ον|οις|ους|ων|όν)$/, 'os').replace('os', 'ος');
   }
 
-  // 변환되지 않은 원본 반환
   return d;
 }
