@@ -658,8 +658,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
         )}
 
-        {/* 3b. GNT Chapter Text - Only shown in Chapter Mode (Verse 0) */}
-        {selectedVerse && isChapterMode && (
+        {/* 3b. GNT Chapter Text - Hidden in Chapter Mode (Verse 0) */}
+        {selectedVerse && !isChapterMode && (
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
             <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
