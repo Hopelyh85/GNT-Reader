@@ -1,5 +1,5 @@
 export const fallbackFixer: Record<string, string> = {
-  // 1. Matthew 1 & Gospel Vocabulary (Addressing your 'No Data' reports)
+  // 1. Matthew 1 & Gospel Vocabulary
   'γενέσεως': 'γένεσις',
   'Δαυίδ': 'Δαυίδ', 'Δαυὶδ': 'Δαυίδ',
   'Βόες': 'Βόες',
@@ -32,6 +32,7 @@ export function getSmartLemma(text: string): string {
   if (fallbackFixer[d]) return fallbackFixer[d];
   if (fallbackFixer[dLower]) return fallbackFixer[dLower];
 
+  // Logic for standard endings
   if (d.endsWith('ματος') || d.endsWith('ματι')) return d.replace(/(ματος|ματι)$/, 'μα');
   if (d.endsWith('ου') || d.endsWith('ῳ') || d.endsWith('ον') || d.endsWith('οις') || d.endsWith('ους') || d.endsWith('ων') || d.endsWith('ην') || d.endsWith('την')) {
     return d.replace(/(ου|ῳ|ον|οις|ους|ων|ην|την)$/, 'os').replace('os', 'ος');
