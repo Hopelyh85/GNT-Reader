@@ -46,6 +46,8 @@ interface Reflection {
 export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, userName, onClose }: StudyPanelProps) {
   const isAdmin = userRole === 'ADMIN';
   const canWrite = isLoggedIn;
+  // Chapter Mode: when verse is 0 (chapter-level reflection)
+  const isChapterMode = selectedVerse?.verse === 0;
   const [ministryNote, setMinistryNote] = useState('');
   const [commentary, setCommentary] = useState('');
   const [reflectionNote, setReflectionNote] = useState('');
@@ -609,8 +611,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
         )}
 
-        {/* 3. 본문 대조 (GNT / KRV / NET / KJV) - Only show when verse selected */}
-        {selectedVerse && (
+        {/* 3. 본문 대조 (GNT / KRV / NET / KJV) - Only show when verse selected (NOT in Chapter Mode) */}
+        {selectedVerse && !isChapterMode && (
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
             <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
@@ -656,7 +658,21 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
         )}
 
-        {/* 4. 나의 번역 (Translation) */}
+        {/* 3b. GNT Chapter Text - Only shown in Chapter Mode (Verse 0) */}
+        {selectedVerse && isChapterMode && (
+        <div className="border-t border-stone-200 pt-4 space-y-2">
+          <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
+            <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
+            📜 GNT 원문 (Chapter Text)
+          </label>
+          <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
+            <p className="text-sm text-stone-700 font-greek leading-relaxed">{String(selectedVerse?.text || '')}</p>
+          </div>
+        </div>
+        )}
+
+        {/* 4. 나의 번역 (Translation) - Hidden in Chapter Mode */}
+        {!isChapterMode && (
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-blue-700">
             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
@@ -673,12 +689,15 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             className="w-full h-32 p-3 text-sm leading-relaxed bg-blue-50/30 border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 placeholder:text-stone-400 disabled:bg-stone-100"
           />
         </div>
+        )}
 
-        {/* 5. 나의 묵상 및 적용 (Reflection) */}
+        {/* 5. 나의 묵상 및 적용 (Reflection) - Shows in both modes with dynamic title */}
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-emerald-700">
             <BookOpen className="w-3 h-3 text-emerald-500" />
-            나의 묵상 및 적용 (Reflection)
+            {isChapterMode 
+              ? (isAdmin ? '장 전체 주석 (Admin Only)' : '장 전체 묵상')
+              : '나의 묵상 및 적용 (Reflection)'}
             {!canWrite && <span className="text-xs text-emerald-600">(로그인 필요)</span>}
           </label>
           
