@@ -103,12 +103,21 @@ export async function getLemmaFromDatabase(text: string): Promise<string | null>
     return null;
   }
 
-  // Clean the text same way as getSmartLemma
-  let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, "").trim();
+  // ENHANCED: More thorough cleaning - remove ALL punctuation and critical symbols
+  let d = text
+    .replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-—–0-9]/g, "")  // punctuation, spaces, numbers
+    .replace(/[\u00AD\u200B-\u200F\uFEFF]/g, "")  // invisible chars (soft hyphen, zero-width, BOM)
+    .trim();
+  
   const dNoAccent = removeGreekAccents(d);
+  const dLower = d.toLowerCase();
+
+  // DEBUG: Log search start
+  console.log(`[LemmaSearch] Searching for: "${text}" -> cleaned: "${d}" -> noAccent: "${dNoAccent}"`);
 
   try {
     // 1. Query exact word match
+    console.log(`[LemmaSearch] Step 1: Exact word match for "${d}"`);
     const { data, error } = await client
       .from('greek_morphology')
       .select('lemma')
@@ -116,12 +125,17 @@ export async function getLemmaFromDatabase(text: string): Promise<string | null>
       .limit(1);
 
     if (error) {
-      console.error('Error querying greek_morphology:', error);
+      console.error('[LemmaSearch] Step 1 Error:', error);
     } else if (data && data.length > 0 && data[0]) {
-      return (data[0] as { lemma: string }).lemma;
+      const foundLemma = (data[0] as { lemma: string }).lemma;
+      console.log(`[LemmaSearch] ✅ Step 1 SUCCESS: lemma = "${foundLemma}"`);
+      return foundLemma;
+    } else {
+      console.log(`[LemmaSearch] Step 1: No exact match`);
     }
 
     // 2. Try normalized form if exact word not found
+    console.log(`[LemmaSearch] Step 2: Normalized match for "${d}"`);
     const { data: normalizedData, error: normalizedError } = await client
       .from('greek_morphology')
       .select('lemma')
@@ -129,11 +143,15 @@ export async function getLemmaFromDatabase(text: string): Promise<string | null>
       .limit(1);
 
     if (!normalizedError && normalizedData && normalizedData.length > 0 && normalizedData[0]) {
-      return (normalizedData[0] as { lemma: string }).lemma;
+      const foundLemma = (normalizedData[0] as { lemma: string }).lemma;
+      console.log(`[LemmaSearch] ✅ Step 2 SUCCESS: lemma = "${foundLemma}"`);
+      return foundLemma;
+    } else {
+      console.log(`[LemmaSearch] Step 2: No normalized match`);
     }
 
     // 3. Accent-insensitive search on word (using ilike with accent-stripped text)
-    // PostgreSQL unaccent is better but requires extension; we use client-side strip + ilike
+    console.log(`[LemmaSearch] Step 3: Accent-insensitive word match for "${dNoAccent}"`);
     const { data: accentData, error: accentError } = await client
       .from('greek_morphology')
       .select('lemma, word')
@@ -141,10 +159,15 @@ export async function getLemmaFromDatabase(text: string): Promise<string | null>
       .limit(1);
 
     if (!accentError && accentData && accentData.length > 0 && accentData[0]) {
-      return (accentData[0] as { lemma: string }).lemma;
+      const foundLemma = (accentData[0] as { lemma: string }).lemma;
+      console.log(`[LemmaSearch] ✅ Step 3 SUCCESS: lemma = "${foundLemma}" (matched word: "${(accentData[0] as { word: string }).word}")`);
+      return foundLemma;
+    } else {
+      console.log(`[LemmaSearch] Step 3: No accent-insensitive match`);
     }
 
     // 4. Accent-insensitive search on normalized
+    console.log(`[LemmaSearch] Step 4: Accent-insensitive normalized match for "${dNoAccent}"`);
     const { data: accentNormData, error: accentNormError } = await client
       .from('greek_morphology')
       .select('lemma, normalized')
@@ -152,11 +175,15 @@ export async function getLemmaFromDatabase(text: string): Promise<string | null>
       .limit(1);
 
     if (!accentNormError && accentNormData && accentNormData.length > 0 && accentNormData[0]) {
-      return (accentNormData[0] as { lemma: string }).lemma;
+      const foundLemma = (accentNormData[0] as { lemma: string }).lemma;
+      console.log(`[LemmaSearch] ✅ Step 4 SUCCESS: lemma = "${foundLemma}"`);
+      return foundLemma;
+    } else {
+      console.log(`[LemmaSearch] Step 4: No accent-insensitive normalized match`);
     }
 
     // 5. Try lowercase search (sometimes helps with proper nouns)
-    const dLower = d.toLowerCase();
+    console.log(`[LemmaSearch] Step 5: Lowercase match for "${dLower}"`);
     const { data: lowerData, error: lowerError } = await client
       .from('greek_morphology')
       .select('lemma')
@@ -164,12 +191,33 @@ export async function getLemmaFromDatabase(text: string): Promise<string | null>
       .limit(1);
 
     if (!lowerError && lowerData && lowerData.length > 0 && lowerData[0]) {
-      return (lowerData[0] as { lemma: string }).lemma;
+      const foundLemma = (lowerData[0] as { lemma: string }).lemma;
+      console.log(`[LemmaSearch] ✅ Step 5 SUCCESS: lemma = "${foundLemma}"`);
+      return foundLemma;
+    } else {
+      console.log(`[LemmaSearch] Step 5: No lowercase match`);
     }
 
+    // 6. FINAL FALLBACK: Try searching the 'lemma' column itself (for cases where word appears as lemma)
+    console.log(`[LemmaSearch] Step 6: Direct lemma match for "${d}"`);
+    const { data: lemmaData, error: lemmaError } = await client
+      .from('greek_morphology')
+      .select('lemma')
+      .eq('lemma', d)
+      .limit(1);
+
+    if (!lemmaError && lemmaData && lemmaData.length > 0 && lemmaData[0]) {
+      const foundLemma = (lemmaData[0] as { lemma: string }).lemma;
+      console.log(`[LemmaSearch] ✅ Step 6 SUCCESS: lemma = "${foundLemma}"`);
+      return foundLemma;
+    } else {
+      console.log(`[LemmaSearch] Step 6: No direct lemma match`);
+    }
+
+    console.log(`[LemmaSearch] ❌ ALL STEPS FAILED for "${text}" -> "${d}"`);
     return null;
   } catch (err) {
-    console.error('Unexpected error in getLemmaFromDatabase:', err);
+    console.error('[LemmaSearch] Unexpected error:', err);
     return null;
   }
 }
