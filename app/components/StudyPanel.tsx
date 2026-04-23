@@ -331,8 +331,16 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
       if(morph[5] && morph[5] !== '-') details.push(cMap[morph[5]]);
       if(morph[6] && morph[6] !== '-') details.push(nMap[morph[6]]);
       if(morph[7] && morph[7] !== '-') details.push(gMap[morph[7]]);
+    } else if (morph[0] === 'R') {
+      // Pronoun parsing: person, case, number, gender (e.g., RP----GS-)
+      const pMap: Record<string, string> = {'1': '1인칭 (1st)', '2': '2인칭 (2nd)', '3': '3인칭 (3rd)'};
+      if(morph[1] && morph[1] !== '-') details.push(pMap[morph[1]]);
+      // Pronoun case/number/gender at positions 5,6,7 (0-indexed)
+      if(morph[5] && morph[5] !== '-') details.push(cMap[morph[5]]);
+      if(morph[6] && morph[6] !== '-') details.push(nMap[morph[6]]);
+      if(morph[7] && morph[7] !== '-') details.push(gMap[morph[7]]);
     } else {
-      // Non-verb: extract last 3 chars after removing hyphens
+      // Non-verb, non-pronoun: extract last 3 chars after removing hyphens
       const core = morph.slice(1).replace(/-/g, '');
       if (core.length >= 3) {
         const cng = core.slice(-3);
