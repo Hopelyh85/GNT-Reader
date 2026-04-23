@@ -1,24 +1,40 @@
 'use client';
 
-import { useState } from 'react';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { BiblePanel } from '@/app/components/BiblePanel';
 import { StudyPanel } from '@/app/components/StudyPanel';
 import { CommunityPanel } from '@/app/components/CommunityPanel';
 import { useSBLGNT } from '@/app/hooks/useSBLGNT';
 import { SelectedVerse, SelectedWord } from '@/app/types';
-import { BookOpen, User, LogOut, LogIn } from 'lucide-react';
+import { BookOpen, LogOut, LogIn } from 'lucide-react';
+import { useAuth } from '@/app/components/AuthProvider';
+import { getMyProfile, signOut, Profile } from '@/app/lib/supabase';
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const { getBooks, loading, error } = useSBLGNT();
   const books = getBooks();
   const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
-  const isLoggedIn = status === 'authenticated';
-  const userRole = session?.user?.role || 'GUEST';
-  const userName = session?.user?.name || '게스트';
+  useEffect(() => {
+    if (user) {
+      getMyProfile().then(setProfile).catch(console.error);
+    }
+  }, [user]);
+
+  const isLoggedIn = !!user;
+  const userRole = profile?.tier || 'General';
+  const userName = profile?.nickname || user?.email || '게스트';
+  const userEmail = user?.email || '';
+
+  const handleLogout = async () => {
+    await signOut();
+    router.push('/');
+  };
 
   return (
     <div className="flex flex-col h-screen bg-[#faf9f7]">
@@ -42,10 +58,18 @@ export default function Home() {
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-stone-500">
-                {userRole === 'ADMIN' ? '👑 ' : ''}{userName}
+                {userRole === 'Admin' ? '👑 ' : ''}{userName}
               </span>
+              {userRole === 'Admin' && (
+                <a
+                  href="/admin"
+                  className="text-xs text-amber-600 hover:text-amber-700 underline mr-2"
+                >
+                  관리자
+                </a>
+              )}
               <button
-                onClick={() => signOut()}
+                onClick={handleLogout}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-600 hover:bg-stone-50 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
@@ -53,13 +77,13 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => signIn()}
+            <a
+              href="/login"
               className="flex items-center gap-2 px-3 py-1.5 bg-stone-700 text-white rounded-lg text-sm hover:bg-stone-600 transition-colors"
             >
               <LogIn className="w-4 h-4" />
               로그인
-            </button>
+            </a>
           )}
         </div>
       </header>

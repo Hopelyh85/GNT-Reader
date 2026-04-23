@@ -1,8 +1,8 @@
-import { auth } from "@/auth";
 import { createClient } from '@supabase/supabase-js';
+import { getMyProfile, Profile } from './supabase';
 
-// User roles
-export type UserRole = 'ADMIN' | 'USER';
+// User tiers
+export type UserTier = 'Admin' | 'Hardworking' | 'Regular' | 'General';
 
 // Extended session user type
 export interface SessionUser {
@@ -10,26 +10,27 @@ export interface SessionUser {
   email: string;
   name?: string;
   image?: string;
-  role: UserRole;
+  tier: UserTier;
 }
 
 // RBAC Permission checks
 export const canViewContent = () => true; // Everyone can view
 
-export const canWriteNote = (session: SessionUser | null): boolean => {
-  return !!session; // Must be logged in
+export const canWriteNote = (tier: UserTier | null): boolean => {
+  return tier === 'Admin' || tier === 'Hardworking';
 };
 
-export const canWriteCommentary = (session: SessionUser | null): boolean => {
-  return session?.role === 'ADMIN'; // Only admin
+export const canWriteCommentary = (tier: UserTier | null): boolean => {
+  return tier === 'Admin';
 };
 
 export const canEditContent = (
-  session: SessionUser | null,
+  tier: UserTier | null,
+  userId: string,
   contentOwnerId: string
 ): boolean => {
-  if (!session) return false;
-  return session.role === 'ADMIN' || session.id === contentOwnerId;
+  if (!tier) return false;
+  return tier === 'Admin' || userId === contentOwnerId;
 };
 
 // Supabase client with service role for server operations
@@ -42,15 +43,14 @@ export const getServiceSupabase = () => {
 
 // Get current session user
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  const session = await auth();
-  if (!session?.user?.email) return null;
+  const profile = await getMyProfile();
+  if (!profile) return null;
   
-  const supabase = getServiceSupabase();
-  const { data } = await supabase
-    .from('users')
-    .select('id, email, name, image, role')
-    .eq('email', session.user.email)
-    .single();
-    
-  return data as SessionUser | null;
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.nickname || profile.email,
+    image: undefined,
+    tier: profile.tier,
+  };
 }
