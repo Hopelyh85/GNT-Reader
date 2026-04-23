@@ -87,6 +87,15 @@ function getSupabaseClient() {
   return supabaseClient;
 }
 
+// Helper function to remove Greek accents for accent-insensitive search
+function removeGreekAccents(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')  // Remove combining diacritics
+    .replace(/[᾿῾]/g, '')              // Remove breathing marks
+    .normalize('NFC');
+}
+
 export async function getLemmaFromDatabase(text: string): Promise<string | null> {
   const client = getSupabaseClient();
   if (!client) {
@@ -96,9 +105,10 @@ export async function getLemmaFromDatabase(text: string): Promise<string | null>
 
   // Clean the text same way as getSmartLemma
   let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, "").trim();
+  const dNoAccent = removeGreekAccents(d);
 
   try {
-    // Query the greek_morphology table for lemma
+    // 1. Query exact word match
     const { data, error } = await client
       .from('greek_morphology')
       .select('lemma')
@@ -107,27 +117,54 @@ export async function getLemmaFromDatabase(text: string): Promise<string | null>
 
     if (error) {
       console.error('Error querying greek_morphology:', error);
-      return null;
-    }
-
-    if (data && data.length > 0 && data[0]) {
+    } else if (data && data.length > 0 && data[0]) {
       return (data[0] as { lemma: string }).lemma;
     }
 
-    // Try normalized form if exact word not found
+    // 2. Try normalized form if exact word not found
     const { data: normalizedData, error: normalizedError } = await client
       .from('greek_morphology')
       .select('lemma')
       .eq('normalized', d)
       .limit(1);
 
-    if (normalizedError) {
-      console.error('Error querying normalized form:', normalizedError);
-      return null;
+    if (!normalizedError && normalizedData && normalizedData.length > 0 && normalizedData[0]) {
+      return (normalizedData[0] as { lemma: string }).lemma;
     }
 
-    if (normalizedData && normalizedData.length > 0 && normalizedData[0]) {
-      return (normalizedData[0] as { lemma: string | null }).lemma ?? null;
+    // 3. Accent-insensitive search on word (using ilike with accent-stripped text)
+    // PostgreSQL unaccent is better but requires extension; we use client-side strip + ilike
+    const { data: accentData, error: accentError } = await client
+      .from('greek_morphology')
+      .select('lemma, word')
+      .ilike('word', dNoAccent)
+      .limit(1);
+
+    if (!accentError && accentData && accentData.length > 0 && accentData[0]) {
+      return (accentData[0] as { lemma: string }).lemma;
+    }
+
+    // 4. Accent-insensitive search on normalized
+    const { data: accentNormData, error: accentNormError } = await client
+      .from('greek_morphology')
+      .select('lemma, normalized')
+      .ilike('normalized', dNoAccent)
+      .limit(1);
+
+    if (!accentNormError && accentNormData && accentNormData.length > 0 && accentNormData[0]) {
+      return (accentNormData[0] as { lemma: string }).lemma;
+    }
+
+    // 5. Try lowercase search (sometimes helps with proper nouns)
+    const dLower = d.toLowerCase();
+    const { data: lowerData, error: lowerError } = await client
+      .from('greek_morphology')
+      .select('lemma')
+      .eq('word', dLower)
+      .limit(1);
+
+    if (!lowerError && lowerData && lowerData.length > 0 && lowerData[0]) {
+      return (lowerData[0] as { lemma: string }).lemma;
     }
 
     return null;

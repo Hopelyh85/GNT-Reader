@@ -556,57 +556,89 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                       {String(displayLemma)}
                     </span>
                   </div>
-                  {fixedEntry ? (
-                    <div className="space-y-2">
-                      {/* Header: Strong's + [English pron | Korean pron] */}
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="font-semibold text-stone-800">
-                          {String(fixedEntry?.strongs || 'N/A')}
-                          {fixedEntry?.manual && <span className="ml-1 text-xs text-amber-600">[수정됨]</span>}
+                  {/* Always show lemma and morphology info */}
+                  <div className="space-y-2">
+                    {/* Lemma display (always shown, even for proper nouns) */}
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-sm text-stone-500">원형 (Lemma):</span>
+                      <span className="font-greek font-semibold text-stone-700">
+                        {String(searchLemma || displayLemma)}
+                      </span>
+                      {w?.morph && (
+                        <span className="text-xs font-mono text-stone-400 bg-stone-100 px-2 py-0.5 rounded">
+                          {String(w.morph)}
                         </span>
-                        <span className="text-sm text-stone-500 font-mono">
-                          [{String(fixedEntry?.transliteration || '')}{fixedEntry?.korean_pron && ` | ${String(fixedEntry.korean_pron)}`}]
-                        </span>
-                      </div>
-                      
-                      {/* 1. Korean meaning (TOP priority) */}
-                      {fixedEntry?.korean_def ? (
-                        <div className="space-y-1">
-                          <p className="text-base font-bold text-blue-700 leading-relaxed">
-                            {String(fixedEntry.korean_def)}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          <p className="text-sm font-bold text-stone-400">[한글 뜻 준비중]</p>
-                        </div>
                       )}
-                      
-                      {/* 2. English definition - split Strongs and KJV */}
-                      <div className="space-y-1 border-l-2 border-stone-300 pl-2 mt-2">
-                        {fixedEntry?.definition?.includes('[Strongs]') ? (
-                          <>
-                            <p className="text-xs text-stone-600">
-                              <span className="font-semibold text-stone-700">Strongs:</span>{' '}
-                              {String(fixedEntry?.definition?.split('[KJV]')?.[0]?.replace('[Strongs]', '')?.trim() || '')}
+                    </div>
+                    
+                    {fixedEntry ? (
+                      <>
+                        {/* Header: Strong's + [English pron | Korean pron] */}
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="font-semibold text-stone-800">
+                            {String(fixedEntry?.strongs || 'N/A')}
+                            {fixedEntry?.manual && <span className="ml-1 text-xs text-amber-600">[수정됨]</span>}
+                          </span>
+                          <span className="text-sm text-stone-500 font-mono">
+                            [{String(fixedEntry?.transliteration || '')}{fixedEntry?.korean_pron && ` | ${String(fixedEntry.korean_pron)}`}]
+                          </span>
+                        </div>
+                        
+                        {/* 1. Korean meaning (TOP priority) */}
+                        {fixedEntry?.korean_def ? (
+                          <div className="space-y-1">
+                            <p className="text-base font-bold text-blue-700 leading-relaxed">
+                              {String(fixedEntry.korean_def)}
                             </p>
-                            {fixedEntry?.definition?.includes('[KJV]') && (
-                              <p className="text-xs text-stone-600">
-                                <span className="font-semibold text-stone-700">KJV:</span>{' '}
-                                {String(fixedEntry?.definition?.split('[KJV]')?.[1]?.trim() || '')}
-                              </p>
-                            )}
-                          </>
+                          </div>
                         ) : (
-                          <p className="text-xs text-stone-600 whitespace-pre-line">
-                            {String(fixedEntry?.definition || '')}
+                          <div className="space-y-1">
+                            <p className="text-sm font-bold text-stone-400">[한글 뜻 준비중]</p>
+                          </div>
+                        )}
+                        
+                        {/* 2. English definition - split Strongs and KJV */}
+                        <div className="space-y-1 border-l-2 border-stone-300 pl-2 mt-2">
+                          {fixedEntry?.definition?.includes('[Strongs]') ? (
+                            <>
+                              <p className="text-xs text-stone-600">
+                                <span className="font-semibold text-stone-700">Strongs:</span>{' '}
+                                {String(fixedEntry?.definition?.split('[KJV]')?.[0]?.replace('[Strongs]', '')?.trim() || '')}
+                              </p>
+                              {fixedEntry?.definition?.includes('[KJV]') && (
+                                <p className="text-xs text-stone-600">
+                                  <span className="font-semibold text-stone-700">KJV:</span>{' '}
+                                  {String(fixedEntry?.definition?.split('[KJV]')?.[1]?.trim() || '')}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-xs text-stone-600 whitespace-pre-line">
+                              {String(fixedEntry?.definition || '')}
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      /* No dictionary data - show proper noun / name indicator */
+                      <div className="space-y-2">
+                        <div className="p-2 bg-amber-50 border border-amber-200 rounded">
+                          <p className="text-sm text-amber-700">
+                            <span className="font-semibold">📍 고유명사 (Proper Noun)</span>
+                            <span className="text-xs text-amber-600 block mt-1">
+                              이 단어는 인명, 지명, 또는 사전에 등록되지 않은 고유명사입니다.
+                            </span>
                           </p>
+                        </div>
+                        {/* Show morphology if available */}
+                        {w?.morph && (
+                          <div className="text-xs text-stone-500">
+                            <span className="font-semibold">문법코드:</span> {String(w.morph)}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-red-500 italic">⚠️ '{String(displayLemma)}'에 대한 영문 사전 데이터가 없습니다.</p>
-                  )}
+                    )}
+                  </div>
                 </div>
               );
             })()}
