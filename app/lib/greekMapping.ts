@@ -10,7 +10,9 @@ export const fallbackFixer: Record<string, string> = {
   'ἐβεβαιώθη': 'βεβαιόω', 'βεβαιώσει': 'βεβαιόω',
   'ἐβάπτισεν': 'βαπτίζω', 'ἐντειλάμενος': 'ἐντέλλομαι', 'ἐποιησάμην': 'ποιέω',
 
-  // Matthew 1 Specific Fixes (Genealogy & Birth)
+  // 2. Gospel Context Expansion (Fixing 'No Data' issues)
+  'πολλοί': 'πολύς', 'πολλά': 'πολύς',
+  'παρέδοσαν': 'παραδίδωμι', 'παρέδωκεν': 'παραδίδωμι',
   'ἐγέννησεν': 'γεννάω', 'ἐγέννησε': 'γεννάω',
   'ἐποίησεν': 'ποιέω', 'ἐποίησε': 'ποιέω',
   'ἐγίνωσκεν': 'γινώσκω', 'ἐγίνωσκε': 'γινώσκω',
@@ -19,14 +21,14 @@ export const fallbackFixer: Record<string, string> = {
   'Βαβυλῶνος': 'Βαβυλών', 'υἱόν': 'υἱός', 'Δαυίδ': 'Δαυίδ',
   'Μανασσῆ': 'Μανασσῆς', 'Ἰεχονίαν': 'Ἰεχονίας', 'μετοικεσίαν': 'μετοικεσία',
 
-  // 2. Core Theological Terms
+  // 3. Core Theological Terms
   'πατρός': 'πατήρ', 'πατρὸς': 'πατήρ', 'πατρί': 'πατήρ', 'πατέρα': 'πατήρ',
   'θεῷ': 'θεός', 'θεοῦ': 'θεός', 'θεόν': 'θεός',
   'Χριστοῦ': 'Χριστός', 'Χριστῷ': 'Χριστός', 'Χριστόν': 'Χριστός',
   'πνεύματος': 'πνεῦμα', 'πνεύματι': 'πνεῦμα',
   'ἡμέρας': 'ἡμέρα', 'ὕδατι': 'ὕδωρ', 'λόγον': 'λόγος',
 
-  // 3. Pronouns & Others
+  // 4. Pronouns, Articles & Others
   'μου': 'ἐγώ', 'μοι': 'ἐγώ', 'με': 'ἐγώ', 'ἡμᾶς': 'ἐγώ',
   'σου': 'σύ', 'σοί': 'σύ', 'σε': 'σύ', 'ὑμῶν': 'σύ',
   'αὕτη': 'οὗτος', 'ταῦτα': 'οὗτος',
@@ -36,21 +38,16 @@ export const fallbackFixer: Record<string, string> = {
 };
 
 export function getSmartLemma(text: string): string {
-  // Strip SBLGNT symbols
   let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, "").trim();
   const dLower = d.toLowerCase();
-
   if (fallbackFixer[d]) return fallbackFixer[d];
   if (fallbackFixer[dLower]) return fallbackFixer[dLower];
 
-  // 3rd Declension Fix
   if (d.endsWith('ματος')) return d.replace(/ματος$/, 'μα');
   if (d.endsWith('ματι')) return d.replace(/ματι$/, 'μα');
 
-  // 1st & 2nd Declension Fix
   if (d.endsWith('ου') || d.endsWith('ῳ') || d.endsWith('ον') || d.endsWith('οις') || d.endsWith('ους') || d.endsWith('ων') || d.endsWith('όν')) {
     return d.replace(/(ου|ῳ|ον|οις|ους|ων|όν)$/, 'os').replace('os', 'ος');
   }
-
   return d;
 }
