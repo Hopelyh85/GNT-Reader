@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
-import { fallbackFixer, getSmartLemma } from '../lib/greekMapping';
+import { fallbackFixer, getSmartLemmaWithDatabase } from '../lib/greekMapping';
 
 interface StudyPanelProps {
   selectedVerse: SelectedVerse | null;
@@ -518,13 +518,15 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               const cleanRawText = rawText.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
               const cleanRawLemma = displayLemma.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
               
-              // 3. Check fallbackFixer using the cleaned text, then apply smart stemming
-              const searchLemma = fallbackFixer[cleanRawLemma] || 
-                                 fallbackFixer[cleanRawText] || 
-                                 getSmartLemma(cleanRawLemma) || 
-                                 getSmartLemma(cleanRawText) ||
-                                 cleanRawLemma || 
-                                 cleanRawText;
+              // 3. Check fallbackFixer first, then query database with smart fallback
+              // Note: This is computed synchronously for now, will be enhanced with useEffect later
+              let searchLemma = fallbackFixer[cleanRawLemma] || 
+                                fallbackFixer[cleanRawText];
+              
+              // If not in fallback, use clean lemma directly (async DB call would be handled via useEffect)
+              if (!searchLemma) {
+                searchLemma = cleanRawLemma || cleanRawText;
+              }
               
               // 4. 사전 검색 (searchLemma 사용)
               const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

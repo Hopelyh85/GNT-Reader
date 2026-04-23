@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Book, GreekWord } from '@/app/types';
 import { ChevronDown, ChevronRight, BookOpen, Loader2 } from 'lucide-react';
-import { fallbackFixer, getSmartLemma } from '../lib/greekMapping';
+import { fallbackFixer, getSmartLemmaWithDatabase } from '../lib/greekMapping';
 
 interface LexiconEntry {
   lemma?: string;
@@ -193,7 +193,7 @@ export function BiblePanel({
     setExpandedChapter(expandedChapter === key ? null : key);
   };
 
-  const handleWordClick = (
+  const handleWordClick = async (
     word: GreekWord,
     book: Book,
     chapterNum: number,
@@ -215,13 +215,17 @@ export function BiblePanel({
     const cleanRawText = rawText.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
     const cleanRawLemma = displayLemma.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
     
-    // 3. Check fallbackFixer using the cleaned text, then apply smart stemming
-    const searchLemma = fallbackFixer[cleanRawLemma] || 
-                       fallbackFixer[cleanRawText] || 
-                       getSmartLemma(cleanRawLemma) || 
-                       getSmartLemma(cleanRawText) ||
-                       cleanRawLemma || 
-                       cleanRawText;
+    // 3. Check fallbackFixer first, then query database with smart fallback
+    let searchLemma = fallbackFixer[cleanRawLemma] || 
+                      fallbackFixer[cleanRawText];
+    
+    // If not in fallback, try database with smart fallback
+    if (!searchLemma) {
+      searchLemma = await getSmartLemmaWithDatabase(cleanRawLemma) || 
+                    await getSmartLemmaWithDatabase(cleanRawText) ||
+                    cleanRawLemma || 
+                    cleanRawText;
+    }
     
     // 4. 사전 검색 with searchLemma (parseMorphCode는 StudyPanel에서만 렌더링)
     const strippedAccent = searchLemma.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
