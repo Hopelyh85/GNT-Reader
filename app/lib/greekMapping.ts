@@ -70,3 +70,81 @@ export function getSmartLemma(text: string): string {
   }
   return d;
 }
+
+// Supabase Database Query Function for Lemma Lookup
+// This queries the greek_morphology table for more accurate results
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+let supabaseClient: ReturnType<typeof createClient> | null = null;
+
+function getSupabaseClient() {
+  if (!supabaseClient && supabaseUrl && supabaseKey) {
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
+}
+
+export async function getLemmaFromDatabase(text: string): Promise<string | null> {
+  const client = getSupabaseClient();
+  if (!client) {
+    console.warn('Supabase client not initialized, falling back to local mapping');
+    return null;
+  }
+
+  // Clean the text same way as getSmartLemma
+  let d = text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)\[\]\{\}\s\-0-9]/g, "").trim();
+
+  try {
+    // Query the greek_morphology table for lemma
+    const { data, error } = await client
+      .from('greek_morphology')
+      .select('lemma')
+      .eq('word', d)
+      .limit(1);
+
+    if (error) {
+      console.error('Error querying greek_morphology:', error);
+      return null;
+    }
+
+    if (data && data.length > 0 && data[0]) {
+      return (data[0] as { lemma: string }).lemma;
+    }
+
+    // Try normalized form if exact word not found
+    const { data: normalizedData, error: normalizedError } = await client
+      .from('greek_morphology')
+      .select('lemma')
+      .eq('normalized', d)
+      .limit(1);
+
+    if (normalizedError) {
+      console.error('Error querying normalized form:', normalizedError);
+      return null;
+    }
+
+    if (normalizedData && normalizedData.length > 0 && normalizedData[0]) {
+      return (normalizedData[0] as { lemma: string | null }).lemma ?? null;
+    }
+
+    return null;
+  } catch (err) {
+    console.error('Unexpected error in getLemmaFromDatabase:', err);
+    return null;
+  }
+}
+
+// Combined function: tries database first, falls back to local mapping
+export async function getSmartLemmaWithDatabase(text: string): Promise<string> {
+  // First try database
+  const dbLemma = await getLemmaFromDatabase(text);
+  if (dbLemma) {
+    return dbLemma;
+  }
+
+  // Fall back to local algorithm
+  return getSmartLemma(text);
+}
