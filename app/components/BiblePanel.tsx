@@ -26,6 +26,7 @@ interface BiblePanelProps {
   onSelectVerse: (verse: { book: string; bookName: string; chapter: number; verse: number; text: string }) => void;
   onSelectWord: (word: SelectedWord | null) => void;
   loading: boolean;
+  userRole?: string;
 }
 
 // Smart Morphology Parsing Engine - Returns STRING with Korean + English
@@ -96,6 +97,7 @@ export function BiblePanel({
   onSelectVerse,
   onSelectWord,
   loading,
+  userRole,
 }: BiblePanelProps) {
   const [expandedBook, setExpandedBook] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
@@ -382,6 +384,51 @@ export function BiblePanel({
                           >
                             {/* Visible scrollbar indicator */}
                             <div className="md:hidden h-1 bg-gradient-to-r from-stone-300 via-amber-400 to-stone-300 rounded-full mb-2 opacity-60" />
+                            
+                            {/* Chapter Reflection Item (Verse 0) - Inserted before verses */}
+                            {(() => {
+                              const isChapterSelected = selectedVerse?.book === abbrev &&
+                                selectedVerse?.chapter === chapter.number &&
+                                selectedVerse?.verse === 0;
+                              const isAdmin = userRole === '⭐⭐⭐' || userRole === 'admin' || userRole === 'ADMIN';
+                              return (
+                                <div
+                                  onClick={() => {
+                                    // Set verse 0 for chapter reflection
+                                    onSelectVerse({
+                                      book: abbrev,
+                                      bookName: book.name,
+                                      chapter: chapter.number,
+                                      verse: 0,
+                                      text: `${book.name} ${chapter.number}장 전체`
+                                    });
+                                  }}
+                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer flex-shrink-0 border-l-2 ${
+                                    isChapterSelected
+                                      ? 'bg-purple-100 border-purple-500 text-purple-900'
+                                      : 'bg-gradient-to-r from-stone-100 to-white hover:bg-stone-50 text-stone-700 border-stone-300'
+                                  }`}
+                                  style={{ 
+                                    whiteSpace: 'normal',
+                                    lineHeight: '1.8',
+                                    display: 'block',
+                                    width: '100%'
+                                  }}
+                                >
+                                  <span className="font-serif text-xs text-stone-500 mr-2 select-none">📖</span>
+                                  <span className="font-serif font-medium">
+                                    {isAdmin 
+                                      ? `${chapter.number}장 전체 주석 (Admin Only)`
+                                      : `${chapter.number}장 전체 묵상/번역`
+                                    }
+                                  </span>
+                                  <span className="text-xs text-stone-400 ml-2">
+                                    (Chapter Overview)
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                            
                             {chapter.verses.map((verse, verseIdx) => {
                               const isSelected =
                                 selectedVerse?.book === abbrev &&

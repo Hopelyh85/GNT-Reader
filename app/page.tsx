@@ -83,6 +83,7 @@ export default function Home() {
             onSelectVerse={setSelectedVerse}
             onSelectWord={setSelectedWord}
             loading={loading}
+            userRole={userRole}
           />
         </div>
 

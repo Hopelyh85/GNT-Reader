@@ -184,7 +184,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
         </div>
         <div className="mt-2 flex items-center justify-between">
           <p className="text-xs text-stone-500">
-            {selectedVerse.bookName || selectedVerse.book} {selectedVerse.chapter}:{isChapterMode ? '장 전체' : selectedVerse.verse}
+            {selectedVerse ? `${selectedVerse.bookName || selectedVerse.book} ${selectedVerse.chapter}:${isChapterMode ? '장 전체' : selectedVerse.verse}` : ''}
           </p>
           <button
             onClick={() => setIsChapterMode(!isChapterMode)}
