@@ -32,11 +32,19 @@ export function CommunityPanel({
   selectedVerse, isLoggedIn, userRole, userName, initialPostId 
 }: CommunityPanelProps) {
   const canWrite = isLoggedIn;
-  const isAdmin = userRole === '⭐⭐⭐' || userRole === 'admin' || userRole === 'ADMIN' || userRole === 'Admin';
+  // Strong admin check - case insensitive and multiple variations
+  const isAdmin = Boolean(
+    userRole && (
+      userRole === '⭐⭐⭐' || 
+      userRole.toLowerCase().includes('admin')
+    )
+  );
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   // Debug admin status
-  console.log('[CommunityPanel] userRole:', userRole, 'isAdmin:', isAdmin);
+  useEffect(() => {
+    console.log('[CommunityPanel] userRole:', userRole, 'isAdmin:', isAdmin, 'isLoggedIn:', isLoggedIn);
+  }, [userRole, isAdmin, isLoggedIn]);
   
   // New post states
   const [newTitle, setNewTitle] = useState('');
