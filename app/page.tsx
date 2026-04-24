@@ -21,6 +21,15 @@ export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [globalNotice, setGlobalNotice] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [initialPostId, setInitialPostId] = useState<string | null>(null);
+  
+  // Get post_id from URL for deep linking (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setInitialPostId(params.get('post_id'));
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -234,6 +243,7 @@ export default function Home() {
             isLoggedIn={isLoggedIn}
             userRole={userRole}
             userName={userName}
+            initialPostId={initialPostId}
           />
         </div>
       </main>

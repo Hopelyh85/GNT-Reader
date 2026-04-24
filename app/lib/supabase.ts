@@ -327,11 +327,13 @@ export interface StudioReflection {
   book: string;
   chapter: number;
   verse: number;
+  title?: string | null;
   content: string;
   is_public: boolean;
   is_best: boolean;
+  is_pinned: boolean;
   likes_count: number;
-  category?: 'ministry' | 'commentary' | 'reflection';
+  category?: 'ministry' | 'commentary' | 'reflection' | 'general';
   parent_id?: string | null;
   created_at: string;
   updated_at: string;
@@ -409,7 +411,8 @@ export async function addPublicReflection(
   content: string,
   isPublic: boolean = true,
   category: 'ministry' | 'commentary' | 'reflection' | 'general' = 'reflection',
-  parentId: string | null = null
+  parentId: string | null = null,
+  title?: string | null
 ): Promise<void> {
   const supabase = getSupabase();
   const user = await getCurrentUser();
@@ -421,6 +424,7 @@ export async function addPublicReflection(
     book,
     chapter,
     verse,
+    title,
     content,
     is_public: isPublic,
     category,
@@ -428,6 +432,103 @@ export async function addPublicReflection(
   });
   
   if (error) throw error;
+}
+
+// Add reply to a post
+export async function addReply(
+  parentId: string,
+  content: string
+): Promise<void> {
+  const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+  
+  // Get parent post details
+  const { data: parent, error: parentError } = await supabase
+    .from('reflections')
+    .select('verse_ref, book, chapter, verse')
+    .eq('id', parentId)
+    .maybeSingle();
+    
+  if (parentError || !parent) throw new Error('Parent post not found');
+  
+  const { error } = await supabase.from('reflections').insert({
+    user_id: user.id,
+    verse_ref: parent.verse_ref,
+    book: parent.book,
+    chapter: parent.chapter,
+    verse: parent.verse,
+    content,
+    is_public: true,
+    category: 'general',
+    parent_id: parentId,
+  });
+  
+  if (error) throw error;
+}
+
+// Get replies for a post
+export async function getReplies(parentId: string): Promise<StudioReflection[]> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('*, profiles(nickname, tier, avatar_url)')
+    .eq('parent_id', parentId)
+    .eq('is_public', true)
+    .order('created_at', { ascending: true });
+    
+  if (error) {
+    console.error('Error fetching replies:', error.message);
+    return [];
+  }
+  
+  return data || [];
+}
+
+// Toggle pin status (Admin only)
+export async function togglePinPost(reflectionId: string, isPinned: boolean): Promise<void> {
+  const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+  
+  // Check admin status
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('tier')
+    .eq('id', user.id)
+    .maybeSingle();
+    
+  if (profileError || !profile?.tier?.toLowerCase().includes('admin')) {
+    throw new Error('Admin access required');
+  }
+  
+  const { error } = await supabase
+    .from('reflections')
+    .update({ is_pinned: isPinned, updated_at: new Date().toISOString() })
+    .eq('id', reflectionId);
+    
+  if (error) throw error;
+}
+
+// Get pinned posts
+export async function getPinnedPosts(): Promise<StudioReflection[]> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('*, profiles(nickname, tier, avatar_url)')
+    .eq('is_public', true)
+    .eq('is_pinned', true)
+    .order('created_at', { ascending: false })
+    .limit(5);
+    
+  if (error) {
+    console.error('Error fetching pinned posts:', error.message);
+    return [];
+  }
+  
+  return data || [];
 }
 
 export async function deleteReflection(reflectionId: string): Promise<void> {
@@ -477,6 +578,9 @@ export async function markReflectionAsBest(
   
   if (error) throw error;
 }
+
+// Alias for toggle functionality
+export const toggleBestReflection = markReflectionAsBest;
 
 // ============================================
 // STUDIO API - Likes
