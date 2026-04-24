@@ -672,6 +672,47 @@ export async function exportMyStudyNotes(): Promise<any[]> {
 }
 
 // ============================================
+// ADMIN API - Admin Dashboard
+// ============================================
+
+export interface AdminUserStats {
+  id: string;
+  email: string;
+  nickname: string | null;
+  tier: string;
+  total_reflections: number;
+  total_notes: number;
+  created_at: string;
+}
+
+export async function getAdminUserStats(): Promise<AdminUserStats[]> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase
+    .from('admin_user_stats')
+    .select('*')
+    .order('total_reflections', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching admin user stats:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function checkIsAdmin(): Promise<boolean> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase.rpc('is_admin');
+  
+  if (error) {
+    console.error('Error checking admin status:', error);
+    return false;
+  }
+  return data || false;
+}
+
+// ============================================
 // STUDIO API - Global Notice
 // ============================================
 

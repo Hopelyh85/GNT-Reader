@@ -10,7 +10,8 @@ import {
 import { 
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
   addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection,
-  addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser
+  addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser,
+  checkIsAdmin
 } from '@/app/lib/supabase';
 
 interface CommunityPanelProps {
@@ -32,14 +33,16 @@ export function CommunityPanel({
   selectedVerse, isLoggedIn, userRole, userName, initialPostId 
 }: CommunityPanelProps) {
   const canWrite = isLoggedIn;
-  // Strong admin check - case insensitive and multiple variations
-  const isAdmin = Boolean(
-    userRole && (
-      userRole === '⭐⭐⭐' || 
-      userRole.toLowerCase().includes('admin')
-    )
-  );
+  // Use RPC is_admin() function for accurate admin check
+  const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Check admin status via Supabase RPC
+  useEffect(() => {
+    if (isLoggedIn) {
+      checkIsAdmin().then(setIsAdmin);
+    }
+  }, [isLoggedIn]);
   
   // Debug admin status
   useEffect(() => {
