@@ -5,11 +5,12 @@ import { SelectedVerse } from '@/app/types';
 import { 
   Users, Send, Loader2, MessageSquare, Pin, BookOpen, Hash, 
   ChevronDown, ChevronUp, Link2, Crown, MessageCircle, CornerDownRight,
-  X
+  Heart, Trash2
 } from 'lucide-react';
 import { 
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
-  addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection 
+  addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection,
+  addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser
 } from '@/app/lib/supabase';
 
 interface CommunityPanelProps {
@@ -22,6 +23,8 @@ interface CommunityPanelProps {
 
 interface Post extends StudioReflection {
   replyCount?: number;
+  likesCount?: number;
+  userHasLiked?: boolean;
 }
 
 export function CommunityPanel({ 
@@ -29,6 +32,7 @@ export function CommunityPanel({
 }: CommunityPanelProps) {
   const canWrite = isLoggedIn;
   const isAdmin = userRole === '⭐⭐⭐' || userRole === 'admin' || userRole === 'ADMIN';
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   // New post states
   const [newTitle, setNewTitle] = useState('');
@@ -43,7 +47,7 @@ export function CommunityPanel({
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   
-  // Accordion state - which post is expanded
+  // Accordion state
   const [expandedPostId, setExpandedPostId] = useState<string | null>(initialPostId || null);
   
   // Replies state
@@ -52,29 +56,52 @@ export function CommunityPanel({
   const [newReply, setNewReply] = useState<Record<string, string>>({});
   const [savingReply, setSavingReply] = useState<Record<string, boolean>>({});
 
-  // Load pinned posts
+  // Get current user ID
+  useEffect(() => {
+    getCurrentUser().then(user => setCurrentUserId(user?.id || null));
+  }, []);
+
+  // Load pinned posts with likes
   const loadPinnedPosts = useCallback(async () => {
     try {
       const data = await getPinnedPosts();
-      setPinnedPosts(data as Post[]);
+      const postsWithLikes = await Promise.all(
+        (data as Post[]).map(async (post) => {
+          const [count, liked] = await Promise.all([
+            getLikesCount(post.id),
+            hasUserLiked(post.id)
+          ]);
+          return { ...post, likesCount: count, userHasLiked: liked };
+        })
+      );
+      setPinnedPosts(postsWithLikes);
     } catch (err: any) {
       console.error('Error loading pinned posts:', err?.message);
     }
   }, []);
 
-  // Load regular posts
+  // Load regular posts with likes
   const loadPosts = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     setLoadingPosts(true);
     try {
       const result = await getPublicReflections(undefined, pageNum, 20);
-      // Filter out pinned posts from regular posts
       const pinnedIds = new Set(pinnedPosts.map(p => p.id));
       const filteredPosts = (result.data || []).filter(p => !pinnedIds.has(p.id));
       
+      const postsWithLikes = await Promise.all(
+        (filteredPosts as Post[]).map(async (post) => {
+          const [count, liked] = await Promise.all([
+            getLikesCount(post.id),
+            hasUserLiked(post.id)
+          ]);
+          return { ...post, likesCount: count, userHasLiked: liked };
+        })
+      );
+      
       if (append) {
-        setPosts(prev => [...prev, ...(filteredPosts as Post[])]);
+        setPosts(prev => [...prev, ...postsWithLikes]);
       } else {
-        setPosts(filteredPosts as Post[]);
+        setPosts(postsWithLikes);
       }
       
       setHasMore((result.data || []).length === 20);
@@ -85,7 +112,7 @@ export function CommunityPanel({
     }
   }, [pinnedPosts]);
 
-  // Load reply count for posts
+  // Load reply counts
   const loadReplyCounts = useCallback(async () => {
     const supabase = getSupabase();
     const allPosts = [...pinnedPosts, ...posts];
@@ -150,10 +177,10 @@ export function CommunityPanel({
         selectedVerse?.chapter || 0,
         selectedVerse?.verse || 0,
         newContent,
-        true, // isPublic
-        'general', // category
-        null, // parentId
-        newTitle.trim() || null // title
+        true,
+        'general',
+        null,
+        newTitle.trim() || null
       );
 
       setNewTitle('');
@@ -184,6 +211,51 @@ export function CommunityPanel({
       alert('댓글 저장 중 오류: ' + (err?.message || 'Unknown error'));
     } finally {
       setSavingReply(prev => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  // Toggle like
+  const handleToggleLike = async (postId: string, currentLiked: boolean) => {
+    if (!isLoggedIn) {
+      alert('로그인 후 좋아요를 누를 수 있습니다.');
+      return;
+    }
+    try {
+      if (currentLiked) {
+        await removeLike(postId);
+      } else {
+        await addLike(postId);
+      }
+      // Update local state
+      const newCount = await getLikesCount(postId);
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, likesCount: newCount, userHasLiked: !currentLiked } : p
+      ));
+      setPinnedPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, likesCount: newCount, userHasLiked: !currentLiked } : p
+      ));
+    } catch (err: any) {
+      console.error('Error toggling like:', err?.message);
+    }
+  };
+
+  // Delete post
+  const handleDelete = async (postId: string, postUserId: string) => {
+    const canDelete = currentUserId === postUserId || isAdmin;
+    if (!canDelete) {
+      alert('삭제 권한이 없습니다.');
+      return;
+    }
+    
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    
+    try {
+      await deleteReflection(postId);
+      await loadPosts(1, false);
+      await loadPinnedPosts();
+    } catch (err: any) {
+      console.error('Error deleting post:', err?.message);
+      alert('삭제 중 오류: ' + (err?.message || 'Unknown error'));
     }
   };
 
@@ -229,31 +301,36 @@ export function CommunityPanel({
     loadPosts(nextPage, true);
   };
 
+  // Absolute time format: YYYY. MM. DD. HH:mm
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}. ${month}. ${day}. ${hours}:${minutes}`;
+  };
 
-    if (minutes < 1) return '방금 전';
-    if (minutes < 60) return `${minutes}분 전`;
-    if (hours < 24) return `${hours}시간 전`;
-    if (days < 7) return `${days}일 전`;
-    return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  // Get display name from profile (check multiple possible fields)
+  const getDisplayName = (profile: any, userId: string) => {
+    if (!profile) return userId.slice(0, 8);
+    return profile.nickname || profile.username || profile.full_name || userId.slice(0, 8);
   };
 
   // Avatar component
-  const Avatar = ({ url, tier }: { url?: string | null; tier?: string }) => {
+  const Avatar = ({ url, tier, size = 'md' }: { url?: string | null; tier?: string; size?: 'sm' | 'md' }) => {
     const isAdminUser = tier?.toLowerCase().includes('admin');
+    const sizeClass = size === 'sm' ? 'w-6 h-6' : 'w-8 h-8';
+    const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-4 h-4';
+    
     return (
-      <div className={`relative w-8 h-8 rounded-full overflow-hidden ${isAdminUser ? 'ring-2 ring-amber-400' : 'bg-stone-200'}`}>
+      <div className={`relative ${sizeClass} rounded-full overflow-hidden ${isAdminUser ? 'ring-2 ring-amber-400' : 'bg-stone-200'}`}>
         {url ? (
           <img src={url} alt="avatar" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-stone-400">
-            <Users className="w-4 h-4" />
+            <Users className={iconSize} />
           </div>
         )}
         {isAdminUser && (
@@ -268,7 +345,7 @@ export function CommunityPanel({
   // Render post item
   const renderPost = (post: Post, isPinned: boolean = false) => {
     const isExpanded = expandedPostId === post.id;
-    const hasReplies = (post.replyCount || 0) > 0 || (replies[post.id]?.length || 0) > 0;
+    const canDelete = currentUserId === post.user_id || isAdmin;
     
     return (
       <div key={post.id} className={`bg-white rounded-lg border ${isPinned ? 'border-amber-300 bg-amber-50/20' : 'border-stone-200'} overflow-hidden`}>
@@ -283,7 +360,7 @@ export function CommunityPanel({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-medium text-stone-800">
-                  {post.profiles?.nickname || post.user_id.slice(0, 8)}
+                  {getDisplayName(post.profiles, post.user_id)}
                 </span>
                 {post.profiles?.tier && !post.profiles.tier.toLowerCase().includes('admin') && (
                   <span className="text-xs bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded">
@@ -315,6 +392,10 @@ export function CommunityPanel({
                   <MessageCircle className="w-3 h-3" />
                   {post.replyCount || 0}
                 </span>
+                <span className="flex items-center gap-1 text-red-500">
+                  <Heart className="w-3 h-3" />
+                  {post.likesCount || 0}
+                </span>
               </div>
             </div>
             
@@ -336,7 +417,20 @@ export function CommunityPanel({
             </div>
             
             {/* Action Buttons */}
-            <div className="px-4 pb-3 flex items-center gap-2">
+            <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
+              {/* Like Button */}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleToggleLike(post.id, post.userHasLiked || false); }}
+                className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                  post.userHasLiked 
+                    ? 'text-red-600 bg-red-50 hover:bg-red-100' 
+                    : 'text-stone-600 hover:text-red-600 hover:bg-stone-100'
+                }`}
+              >
+                <Heart className={`w-3 h-3 ${post.userHasLiked ? 'fill-current' : ''}`} />
+                좋아요 {post.likesCount || 0}
+              </button>
+              
               <button
                 onClick={(e) => { e.stopPropagation(); handleShare(post.id); }}
                 className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded transition-colors"
@@ -344,6 +438,17 @@ export function CommunityPanel({
                 <Link2 className="w-3 h-3" />
                 링크 복사
               </button>
+              
+              {/* Delete Button - Only for author or admin */}
+              {canDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(post.id, post.user_id); }}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  삭제
+                </button>
+              )}
               
               {isAdmin && (
                 <>
@@ -393,13 +498,13 @@ export function CommunityPanel({
                       <CornerDownRight className="w-4 h-4 text-stone-300 mt-1 flex-shrink-0" />
                       <div className="flex-1 bg-white rounded-lg p-3 border border-stone-100">
                         <div className="flex items-center gap-2 mb-1">
-                          <Avatar url={reply.profiles?.avatar_url} tier={reply.profiles?.tier} />
+                          <Avatar url={reply.profiles?.avatar_url} tier={reply.profiles?.tier} size="sm" />
                           <span className="text-xs font-medium text-stone-700">
-                            {reply.profiles?.nickname || reply.user_id.slice(0, 8)}
+                            {getDisplayName(reply.profiles, reply.user_id)}
                           </span>
                           <span className="text-xs text-stone-400">{formatTime(reply.created_at)}</span>
                         </div>
-                        <p className="text-sm text-stone-700 leading-relaxed break-words whitespace-pre-wrap pl-10">
+                        <p className="text-sm text-stone-700 leading-relaxed break-words whitespace-pre-wrap pl-8">
                           {reply.content}
                         </p>
                       </div>

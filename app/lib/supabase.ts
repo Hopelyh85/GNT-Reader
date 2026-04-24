@@ -631,6 +631,22 @@ export async function hasUserLiked(reflectionId: string): Promise<boolean> {
   return !!data;
 }
 
+export async function getLikesCount(reflectionId: string): Promise<number> {
+  const supabase = getSupabase();
+  
+  const { count, error } = await supabase
+    .from('likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('reflection_id', reflectionId);
+  
+  if (error) {
+    console.error('Error getting likes count:', error.message);
+    return 0;
+  }
+  
+  return count || 0;
+}
+
 // ============================================
 // STUDIO API - Data Export
 // ============================================
