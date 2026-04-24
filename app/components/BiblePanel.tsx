@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Book, GreekWord } from '@/app/types';
-import { ChevronDown, ChevronRight, BookOpen, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, BookOpen, Loader2, MessageCircle, Send, Sparkles, Info, Bell } from 'lucide-react';
 import { fallbackFixer, getSmartLemmaWithDatabase } from '../lib/greekMapping';
+import { getSupabase, addPublicReflection, getPublicReflections } from '../lib/supabase';
 
 interface LexiconEntry {
   lemma?: string;
@@ -27,6 +28,27 @@ interface BiblePanelProps {
   onSelectWord: (word: SelectedWord | null) => void;
   loading: boolean;
   userRole?: string;
+  isLoggedIn?: boolean;
+  userName?: string;
+}
+
+interface Reflection {
+  id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles?: {
+    nickname: string | null;
+    tier: string;
+  };
+}
+
+interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  is_pinned: boolean;
 }
 
 // Smart Morphology Parsing Engine - Returns STRING with Korean + English
@@ -106,10 +128,23 @@ export function BiblePanel({
   onSelectWord,
   loading,
   userRole,
+  isLoggedIn,
+  userName,
 }: BiblePanelProps) {
   const [expandedBook, setExpandedBook] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
+  const [expandedVerse, setExpandedVerse] = useState<string | null>(null); // For inline reflection panel
   const [internalSelectedWord, setInternalSelectedWord] = useState<{word: GreekWord, bookName: string, chapter: number, verse: number, wordIndex: number} | null>(null);
+  
+  // Inline reflection states
+  const [verseReflections, setVerseReflections] = useState<Record<string, Reflection[]>>({});
+  const [newReflection, setNewReflection] = useState('');
+  const [loadingReflections, setLoadingReflections] = useState(false);
+  const [savingReflection, setSavingReflection] = useState(false);
+  
+  // Notices for empty state
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [loadingNotices, setLoadingNotices] = useState(false);
   
   // Load lexicon data
   const [lexicon, setLexicon] = useState<Record<string, LexiconEntry>>({});
@@ -153,6 +188,36 @@ export function BiblePanel({
       }
     }
     loadKRV();
+  }, []);
+  
+  // Load notices for empty state dashboard
+  useEffect(() => {
+    async function loadNotices() {
+      setLoadingNotices(true);
+      try {
+        const supabase = getSupabase();
+        const { data, error } = await supabase
+          .from('announcements')
+          .select('*')
+          .order('is_pinned', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(5);
+          
+        if (error) {
+          console.error('Error loading notices:', error.message);
+          return;
+        }
+        
+        if (data) {
+          setNotices(data);
+        }
+      } catch (err: any) {
+        console.error('Error loading notices:', err?.message);
+      } finally {
+        setLoadingNotices(false);
+      }
+    }
+    loadNotices();
   }, []);
   
   // Symbol cleaning: strip SBLGNT critical symbols and punctuation (preserves apostrophes for elision)
@@ -290,6 +355,63 @@ export function BiblePanel({
       verse: verseNum,
       text: fullText,
     });
+    
+    // Toggle inline reflection panel
+    const verseKey = `${abbrev}-${chapterNum}-${verseNum}`;
+    if (expandedVerse === verseKey) {
+      setExpandedVerse(null);
+    } else {
+      setExpandedVerse(verseKey);
+      loadReflections(abbrev, chapterNum, verseNum);
+    }
+  };
+  
+  // Load reflections for a verse
+  const loadReflections = async (book: string, chapter: number, verse: number) => {
+    setLoadingReflections(true);
+    try {
+      const verseRef = `${book} ${chapter}:${verse}`;
+      const result = await getPublicReflections(verseRef, 1, 20);
+      
+      const verseKey = `${book}-${chapter}-${verse}`;
+      setVerseReflections(prev => ({
+        ...prev,
+        [verseKey]: result.data || []
+      }));
+    } catch (err: any) {
+      console.error('Error loading reflections:', err?.message);
+    } finally {
+      setLoadingReflections(false);
+    }
+  };
+  
+  // Save reflection for a verse
+  const handleSaveReflection = async (book: string, chapter: number, verse: number) => {
+    if (!newReflection.trim() || !isLoggedIn) return;
+    
+    setSavingReflection(true);
+    try {
+      const verseRef = `${book} ${chapter}:${verse}`;
+      await addPublicReflection(
+        verseRef,
+        book,
+        chapter,
+        verse,
+        newReflection,
+        true, // isPublic
+        'reflection',
+        null // parentId
+      );
+      
+      setNewReflection('');
+      // Reload reflections
+      await loadReflections(book, chapter, verse);
+    } catch (err: any) {
+      console.error('Error saving reflection:', err?.message, err?.details);
+      alert('묵상 저장 중 오류: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setSavingReflection(false);
+    }
   };
 
   if (loading) {
@@ -438,57 +560,125 @@ export function BiblePanel({
                                 selectedVerse?.book === abbrev &&
                                 selectedVerse?.chapter === chapter.number &&
                                 selectedVerse?.verse === verseIdx + 1;
+                              const verseKey = `${abbrev}-${chapter.number}-${verseIdx + 1}`;
+                              const isVerseExpanded = expandedVerse === verseKey;
+                              const reflections = verseReflections[verseKey] || [];
                               
                               const krvText = getKRVText(abbrev, chapter.number, verseIdx + 1);
 
                               return (
-                                <div
-                                  key={verseIdx}
-                                  onClick={() =>
-                                    handleVerseClick(
-                                      book,
-                                      chapter.number,
-                                      verseIdx + 1,
-                                      verse
-                                    )
-                                  }
-                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer min-w-0 ${
-                                    isSelected
-                                      ? 'bg-amber-100 border-l-2 border-amber-500 text-stone-800'
-                                      : 'bg-white hover:bg-stone-100 text-stone-600'
-                                  }`}
-                                  style={{ lineHeight: '1.8' }}
-                                >
-                                  <span className="font-serif text-xs text-stone-400 mr-2 select-none">
-                                    {verseIdx + 1}
-                                  </span>
-                                  <span className="font-greek text-stone-700 break-all whitespace-pre-wrap w-full overflow-hidden" style={{ lineHeight: '1.8' }}>
-                                    {verse.map((word, wordIdx) => (
-                                      <span key={`word-${wordIdx}`} className="inline-block">
-                                        <span
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleWordClick(
-                                              word,
-                                              book,
-                                              chapter.number,
-                                              verseIdx + 1,
-                                              wordIdx
-                                            );
-                                          }}
-                                          className="inline-block cursor-pointer hover:bg-amber-200 hover:text-amber-900 rounded px-0.5 transition-colors"
-                                        >
-                                          {word.text}
+                                <div key={verseIdx} className="space-y-1">
+                                  {/* Verse Content */}
+                                  <div
+                                    onClick={() =>
+                                      handleVerseClick(
+                                        book,
+                                        chapter.number,
+                                        verseIdx + 1,
+                                        verse
+                                      )
+                                    }
+                                    className={`text-left p-3 rounded transition-all text-sm cursor-pointer min-w-0 ${
+                                      isSelected
+                                        ? 'bg-amber-100 border-l-2 border-amber-500 text-stone-800'
+                                        : 'bg-white hover:bg-stone-100 text-stone-600'
+                                    }`}
+                                    style={{ lineHeight: '1.8' }}
+                                  >
+                                    <span className="font-serif text-xs text-stone-400 mr-2 select-none">
+                                      {verseIdx + 1}
+                                    </span>
+                                    <span className="font-greek text-stone-700 break-all whitespace-pre-wrap w-full overflow-hidden" style={{ lineHeight: '1.8' }}>
+                                      {verse.map((word, wordIdx) => (
+                                        <span key={`word-${wordIdx}`} className="inline-block">
+                                          <span
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleWordClick(
+                                                word,
+                                                book,
+                                                chapter.number,
+                                                verseIdx + 1,
+                                                wordIdx
+                                              );
+                                            }}
+                                            className="inline-block cursor-pointer hover:bg-amber-200 hover:text-amber-900 rounded px-0.5 transition-colors"
+                                          >
+                                            {word.text}
+                                          </span>
+                                          {' '}
                                         </span>
-                                        {' '}
-                                      </span>
-                                    ))}
-                                  </span>
-                                  {/* KRV Translation */}
-                                  {krvText && (
-                                    <p className="mt-2 text-sm text-stone-600 font-serif border-t border-stone-200 pt-2 break-all whitespace-pre-wrap w-full overflow-hidden">
-                                      {krvText}
-                                    </p>
+                                      ))}
+                                    </span>
+                                    {/* KRV Translation */}
+                                    {krvText && (
+                                      <p className="mt-2 text-sm text-stone-600 font-serif border-t border-stone-200 pt-2 break-all whitespace-pre-wrap w-full overflow-hidden">
+                                        {krvText}
+                                      </p>
+                                    )}
+                                    {/* Reflection indicator */}
+                                    <div className="mt-2 flex items-center gap-2 text-xs text-stone-400">
+                                      <MessageCircle className="w-3 h-3" />
+                                      <span>{reflections.length > 0 ? `${reflections.length}개의 묵상` : '묵상 남기기'}</span>
+                                      {isVerseExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Inline Reflection Panel (Accordion) */}
+                                  {isVerseExpanded && (
+                                    <div className="bg-stone-50 rounded-lg border border-stone-200 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+                                      {/* Reflection List */}
+                                      <div className="p-3 space-y-3 max-h-60 overflow-y-auto">
+                                        {loadingReflections ? (
+                                          <div className="flex items-center justify-center py-4">
+                                            <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
+                                          </div>
+                                        ) : reflections.length === 0 ? (
+                                          <p className="text-xs text-stone-400 text-center py-2">
+                                            아직 묵상이 없습니다. 첫 번째 묵상을 남겨보세요!
+                                          </p>
+                                        ) : (
+                                          reflections.map((reflection) => (
+                                            <div key={reflection.id} className="bg-white p-3 rounded border border-stone-100">
+                                              <p className="text-sm text-stone-700 leading-relaxed break-words">
+                                                {reflection.content}
+                                              </p>
+                                              <div className="mt-2 flex items-center gap-2 text-xs text-stone-400">
+                                                <span className="font-medium">{reflection.profiles?.nickname || reflection.user_id.slice(0, 8)}</span>
+                                                <span>•</span>
+                                                <span>{new Date(reflection.created_at).toLocaleDateString('ko-KR')}</span>
+                                              </div>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+                                      
+                                      {/* Write Reflection */}
+                                      {isLoggedIn && (
+                                        <div className="p-3 border-t border-stone-200 bg-stone-100/50">
+                                          <textarea
+                                            value={newReflection}
+                                            onChange={(e) => setNewReflection(e.target.value)}
+                                            placeholder={`${book.name} ${chapter.number}:${verseIdx + 1}에 대한 묵상을 작성하세요...`}
+                                            className="w-full h-20 p-2 text-sm bg-white border border-stone-200 rounded resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 placeholder:text-stone-400"
+                                          />
+                                          <div className="flex justify-end mt-2">
+                                            <button
+                                              onClick={() => handleSaveReflection(abbrev, chapter.number, verseIdx + 1)}
+                                              disabled={!newReflection.trim() || savingReflection}
+                                              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                              {savingReflection ? (
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                              ) : (
+                                                <Send className="w-3 h-3" />
+                                              )}
+                                              {savingReflection ? '저장 중...' : '묵상 남기기'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               );
@@ -505,26 +695,93 @@ export function BiblePanel({
         })}
       </div>
 
-      {/* Mobile Reflection Input - at bottom of Bible text */}
-      <div className="md:hidden border-t border-stone-200 bg-white p-4 mt-4">
-        <h3 className="text-sm font-serif font-semibold text-stone-700 mb-2 flex items-center gap-2">
-          <BookOpen className="w-4 h-4" />
-          나의 묵상
-        </h3>
-        <textarea
-          className="w-full h-24 p-3 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400"
-          placeholder={selectedVerse ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}에 대한 묵상을 입력하세요...` : '먼저 성경 구절을 선택하세요...'}
-          disabled={!selectedVerse}
-        />
-        <div className="flex justify-end mt-2">
-          <button
-            className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg disabled:bg-stone-300 disabled:cursor-not-allowed"
-            disabled={!selectedVerse}
-          >
-            저장
-          </button>
+      {/* Empty State Dashboard - Shows when no book is expanded */}
+      {!expandedBook && (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-2xl mx-auto space-y-4">
+            {/* Welcome Card */}
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-200">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-amber-600" />
+                </div>
+                <h3 className="text-lg font-serif font-semibold text-stone-800">
+                  기독교 커뮤니티 성경 원어 연구소
+                </h3>
+              </div>
+              <p className="text-sm text-stone-600 leading-relaxed">
+                SBLGNT 헬라어 신약 성경을 원어로 읽고, 사전을 통해 단어의 의미를 탐구하며,
+                묵상을 나누는 공간입니다. 왼쪽 패널에서 성경을 선택하여 시작하세요.
+              </p>
+            </div>
+            
+            {/* Quick Guide */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="bg-white rounded-lg p-4 border border-stone-200">
+                <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center mb-2">
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                </div>
+                <h4 className="text-sm font-medium text-stone-700 mb-1">성경 읽기</h4>
+                <p className="text-xs text-stone-500">원어 헬라어와 개역한글(KRV)을 함께 읽어보세요.</p>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-stone-200">
+                <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center mb-2">
+                  <Info className="w-4 h-4 text-green-600" />
+                </div>
+                <h4 className="text-sm font-medium text-stone-700 mb-1">단어 탐구</h4>
+                <p className="text-xs text-stone-500">헬라어 단어를 클릭하여 사전 정의와 문법 정보를 확인하세요.</p>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-stone-200">
+                <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center mb-2">
+                  <MessageCircle className="w-4 h-4 text-purple-600" />
+                </div>
+                <h4 className="text-sm font-medium text-stone-700 mb-1">묵상 나눔</h4>
+                <p className="text-xs text-stone-500">구절을 클릭하면 묵상을 작성하고 다른 사람과 나눌 수 있습니다.</p>
+              </div>
+            </div>
+            
+            {/* Notices */}
+            {loadingNotices ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+              </div>
+            ) : notices.length > 0 ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <Bell className="w-4 h-4 text-amber-600" />
+                  <h4 className="text-sm font-medium text-stone-700">공지사항</h4>
+                </div>
+                {notices.map((notice) => (
+                  <div 
+                    key={notice.id} 
+                    className={`bg-white rounded-lg p-4 border ${notice.is_pinned ? 'border-amber-300 bg-amber-50/30' : 'border-stone-200'}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {notice.is_pinned && (
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-medium shrink-0">
+                          공지
+                        </span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h5 className="text-sm font-medium text-stone-800 mb-1">{notice.title}</h5>
+                        <p className="text-xs text-stone-600 leading-relaxed break-words">{notice.content}</p>
+                        <p className="text-xs text-stone-400 mt-2">
+                          {new Date(notice.created_at).toLocaleDateString('ko-KR')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-stone-50 rounded-lg p-6 text-center border border-stone-200">
+                <Bell className="w-8 h-8 text-stone-300 mx-auto mb-2" />
+                <p className="text-sm text-stone-500">새로운 공지사항이 없습니다.</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

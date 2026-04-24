@@ -194,6 +194,8 @@ export default function Home() {
             onSelectWord={setSelectedWord}
             loading={loading}
             userRole={userRole}
+            isLoggedIn={isLoggedIn}
+            userName={userName}
           />
         </div>
 
