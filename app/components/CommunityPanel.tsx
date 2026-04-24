@@ -25,6 +25,7 @@ interface Post extends StudioReflection {
   replyCount?: number;
   likesCount?: number;
   userHasLiked?: boolean;
+  post_number?: number;
 }
 
 export function CommunityPanel({ 
@@ -402,9 +403,21 @@ export function CommunityPanel({
                 )}
               </div>
               
-              {/* Title */}
+              {/* Title with Post Number */}
               <h3 className="text-base font-semibold text-stone-900 mb-1 line-clamp-2">
-                {post.title || '제목 없음'}
+                {isPinned ? (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-amber-600">📌</span>
+                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">공지</span>
+                    <span className="text-stone-400 font-normal">|</span>
+                    {post.title || '제목 없음'}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="text-sm text-stone-400 font-normal">{post.post_number || '#'}</span>
+                    {post.title || '제목 없음'}
+                  </span>
+                )}
               </h3>
               
               {/* Meta info */}

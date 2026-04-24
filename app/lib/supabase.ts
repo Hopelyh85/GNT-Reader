@@ -332,6 +332,7 @@ export interface StudioReflection {
   is_public: boolean;
   is_best: boolean;
   is_pinned: boolean;
+  post_number?: number;
   likes_count: number;
   category?: 'ministry' | 'commentary' | 'reflection' | 'general';
   parent_id?: string | null;
