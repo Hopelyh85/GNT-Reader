@@ -249,9 +249,35 @@ export default function Home() {
             isLoggedIn={isLoggedIn}
             userRole={userRole}
             userName={userName}
-            initialPostId={initialPostId}
+            initialPostId={focusPostId || initialPostId}
           />
         </div>
+
+        {/* Mobile Community Panel Overlay */}
+        {activePanel === 'community' && (
+          <div className="md:hidden fixed inset-0 z-50 bg-white flex flex-col">
+            {/* Mobile Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50">
+              <h2 className="text-lg font-semibold text-stone-800">커뮤니티 게시판</h2>
+              <button
+                onClick={() => setActivePanel('bible')}
+                className="p-2 hover:bg-stone-200 rounded-full transition-colors"
+              >
+                <span className="text-2xl">×</span>
+              </button>
+            </div>
+            {/* Mobile Community Content */}
+            <div className="flex-1 overflow-hidden">
+              <CommunityPanel
+                selectedVerse={selectedVerse}
+                isLoggedIn={isLoggedIn}
+                userRole={userRole}
+                userName={userName}
+                initialPostId={focusPostId || initialPostId}
+              />
+            </div>
+          </div>
+        )}
       </main>
 
     </div>

@@ -702,7 +702,7 @@ export function BiblePanel({
                 원문의 정확성을 추구하는 현대 성서학의 표준 텍스트입니다. 본 앱은 이 원문을 바탕으로 연구와 묵상을 돕습니다.
               </p>
               <p className="text-xs text-stone-500">
-                왼쪽 패널에서 성경을 선택하여 원어 헬라어와 개역한글(KRV)을 함께 읽어보세요.
+                위의 성경 패널에서 성경을 선택하여 원어 헬라어와 개역한글(KRV)을 함께 읽어보세요.
               </p>
             </div>
             
@@ -727,7 +727,7 @@ export function BiblePanel({
               
               {/* Sermon Archive Card */}
               <a 
-                href="https://hopelyh.com" 
+                href="https://sermon-archive.vercel.app/" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="bg-white rounded-lg p-4 border border-stone-200 hover:border-blue-300 hover:shadow-md transition-all group"
