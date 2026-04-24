@@ -34,15 +34,10 @@ export async function getStudyNote(
     .select('*')
     .eq('user_nickname', userNickname)
     .eq('verse_ref', verseRef)
-    .single();
-
-  // PGRST116 = no rows found (404) - return null without error
-  if (error && error.code === 'PGRST116') {
-    return null;
-  }
+    .maybeSingle();
 
   if (error) {
-    console.error('Error fetching study note:', error);
+    console.error('Error fetching study note:', error.message, error.details);
     return null; // Return null instead of throwing error
   }
 
@@ -203,10 +198,10 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
   
   if (error) {
-    console.error('Error fetching profile:', error);
+    console.error('Error fetching profile:', error.message, error.details);
     return null;
   }
   return data;
@@ -413,7 +408,7 @@ export async function addPublicReflection(
   verse: number,
   content: string,
   isPublic: boolean = true,
-  category: 'ministry' | 'commentary' | 'reflection' = 'reflection',
+  category: 'ministry' | 'commentary' | 'reflection' | 'general' = 'reflection',
   parentId: string | null = null
 ): Promise<void> {
   const supabase = getSupabase();
@@ -441,19 +436,21 @@ export async function deleteReflection(reflectionId: string): Promise<void> {
   if (!user) throw new Error('Not authenticated');
   
   // Check if user owns the reflection or has admin/staff role
-  const { data: reflection } = await supabase
+  const { data: reflection, error: reflectionError } = await supabase
     .from('reflections')
     .select('user_id')
     .eq('id', reflectionId)
-    .single();
+    .maybeSingle();
     
-  if (!reflection) throw new Error('Reflection not found');
+  if (reflectionError || !reflection) throw new Error('Reflection not found');
   
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('tier')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
+    
+  if (profileError) console.error('Error fetching profile:', profileError.message);
     
   const canDelete = reflection.user_id === user.id || 
     ['Admin', 'Staff'].includes(profile?.tier);

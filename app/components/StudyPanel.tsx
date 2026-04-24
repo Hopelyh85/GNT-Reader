@@ -36,13 +36,6 @@ interface NoteData {
   updated_at: string;
 }
 
-interface Reflection {
-  id: string;
-  content: string;
-  user_name: string;
-  created_at: string;
-}
-
 export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, userName, onClose }: StudyPanelProps) {
   const isAdmin = userRole === 'ADMIN';
   const canWrite = isLoggedIn;
@@ -50,8 +43,6 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const isChapterMode = selectedVerse?.verse === 0;
   const [ministryNote, setMinistryNote] = useState('');
   const [commentary, setCommentary] = useState('');
-  const [reflectionNote, setReflectionNote] = useState('');
-  const [reflections, setReflections] = useState<Reflection[]>([]);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [noteTimestamp, setNoteTimestamp] = useState<string | null>(null);
@@ -755,46 +746,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
         )}
 
-        {/* 5. 나의 묵상 및 적용 (Reflection) - Shows in both modes with dynamic title */}
-        <div className="border-t border-stone-200 pt-4 space-y-2">
-          <label className="flex items-center gap-2 text-sm font-serif font-medium text-emerald-700">
-            <BookOpen className="w-3 h-3 text-emerald-500" />
-            {isChapterMode 
-              ? (isAdmin ? '장 전체 주석 (Admin Only)' : '장 전체 묵상')
-              : '나의 묵상 및 적용 (Reflection)'}
-            {!canWrite && <span className="text-xs text-emerald-600">(로그인 필요)</span>}
-          </label>
-          
-          {/* Reflection List */}
-          {Array.isArray(reflections) && reflections.length > 0 && (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {reflections.map((reflection) => (
-                <div key={reflection?.id || 'unknown'} className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-lg">
-                  <p className="text-sm text-stone-700 leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(reflection?.content || '')}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-stone-400">{String(reflection?.user_name || '')}</span>
-                    <span className="text-xs text-stone-400">
-                      {reflection?.created_at ? new Date(reflection.created_at).toLocaleDateString('ko-KR') : ''}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {/* Reflection Input */}
-          <textarea
-            value={reflectionNote}
-            onChange={(e) => canWrite && setReflectionNote(e.target.value)}
-            disabled={!canWrite}
-            placeholder={canWrite 
-              ? "번역한 말씀을 삶에 적용해보세요..." 
-              : "로그인 후 작성할 수 있습니다."}
-            className="w-full h-24 p-3 text-sm leading-relaxed bg-emerald-50/30 border border-emerald-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 placeholder:text-stone-400 disabled:bg-stone-100"
-          />
-        </div>
-
-        {/* 6. 주석 (Commentary) - Admin Only */}
+        {/* 5. 주석 (Commentary) - Admin Only */}
         {isAdmin && selectedVerse && (
           <div className="border-t border-stone-200 pt-4 space-y-2">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-purple-700">

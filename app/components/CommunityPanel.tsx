@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SelectedVerse } from '@/app/types';
-import { Users, Save, Loader2, Clock } from 'lucide-react';
-import { addPublicReflection, getSupabase } from '@/app/lib/supabase';
+import { Users, Send, Loader2, Clock, MessageSquare, Pin, BookOpen, Hash } from 'lucide-react';
+import { addPublicReflection, getPublicReflections, getSupabase } from '@/app/lib/supabase';
 
 interface CommunityPanelProps {
   selectedVerse: SelectedVerse | null;
@@ -12,127 +12,148 @@ interface CommunityPanelProps {
   userName: string;
 }
 
-interface ReflectionData {
-  user_nickname: string;
+interface Post {
+  id: string;
+  content: string;
+  user_id: string;
   verse_ref: string;
   book: string;
   chapter: number;
   verse: number;
+  category?: string;
+  is_public?: boolean;
+  is_best?: boolean;
+  created_at: string;
+  updated_at?: string;
+  profiles?: {
+    nickname: string | null;
+    tier: string;
+    avatar_url?: string | null;
+    email?: string;
+  };
+  replies?: Post[];
+}
+
+interface Announcement {
+  id: string;
+  title: string;
   content: string;
-  updated_at: string;
+  created_at: string;
+  is_pinned: boolean;
 }
 
 export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }: CommunityPanelProps) {
   const canWrite = isLoggedIn;
-  const isAdmin = userRole === '⭐⭐⭐' || userRole === 'admin';
-  const isVIP2 = userRole === '⭐⭐' || userRole === 'vip' || isAdmin;
-  const [content, setContent] = useState('');
+  const isAdmin = userRole === '⭐⭐⭐' || userRole === 'admin' || userRole === 'ADMIN';
+  
+  // Post states
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [newPost, setNewPost] = useState('');
+  const [loadingPosts, setLoadingPosts] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [isChapterMode, setIsChapterMode] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
+  
+  // Announcements
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  
+  // Include verse reference in post
+  const [includeVerse, setIncludeVerse] = useState(false);
 
-  const verseRef = selectedVerse
-    ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`
-    : '';
-
-  // Load reflection when verse changes via direct Supabase query
+  // Load announcements (Admin notices)
   useEffect(() => {
-    if (selectedVerse === undefined) {
-      setContent('');
-      return;
-    }
-
-    async function loadReflection() {
-      setLoading(true);
+    async function loadAnnouncements() {
+      setLoadingAnnouncements(true);
       try {
         const supabase = getSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setContent('');
-          return;
-        }
-
-        // Use verse 0 for chapter-level reflection, or selected verse for verse-level
-        const verseNum = isChapterMode ? 0 : selectedVerse!.verse;
-        const verseRef = `${selectedVerse!.book} ${selectedVerse!.chapter}:${verseNum}`;
-        
-        // Query Supabase directly for user's reflection
         const { data, error } = await supabase
-          .from('reflections')
+          .from('announcements')
           .select('*')
-          .eq('user_id', user.id)
-          .eq('verse_ref', verseRef)
-          .eq('is_public', false)
+          .eq('is_pinned', true)
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
+          .limit(3);
+          
         if (error) {
-          console.error('Supabase error loading reflection:', error.message, error.details);
-          setContent('');
+          console.error('Error loading announcements:', error.message);
           return;
         }
-
-        if (data) {
-          setContent(data.content || '');
-          setLastSaved(new Date(data.updated_at));
-        } else {
-          setContent('');
-        }
+        
+        setAnnouncements(data || []);
       } catch (err: any) {
-        console.error('Error loading reflection:', err?.message || err);
-        setContent('');
+        console.error('Error loading announcements:', err?.message);
       } finally {
-        setLoading(false);
+        setLoadingAnnouncements(false);
       }
     }
+    
+    loadAnnouncements();
+  }, []);
 
-    loadReflection();
-  }, [selectedVerse, isChapterMode]);
+  // Load global posts (all public reflections)
+  const loadPosts = useCallback(async (pageNum: number = 1, append: boolean = false) => {
+    setLoadingPosts(true);
+    try {
+      const result = await getPublicReflections(undefined, pageNum, 20);
+      
+      if (append) {
+        setPosts(prev => [...prev, ...(result.data || [])]);
+      } else {
+        setPosts(result.data || []);
+      }
+      
+      setHasMore((result.data || []).length === 20);
+    } catch (err: any) {
+      console.error('Error loading posts:', err?.message);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, []);
 
-  // Save reflection via direct Supabase call
-  const handleSave = useCallback(async () => {
-    if (!selectedVerse || !canWrite) return;
+  // Initial load
+  useEffect(() => {
+    loadPosts(1, false);
+  }, [loadPosts]);
+
+  // Save new post
+  const handleSavePost = async () => {
+    if (!newPost.trim() || !canWrite) return;
 
     setSaving(true);
     try {
-      const verseNum = isChapterMode ? 0 : selectedVerse.verse;
-      const verseRefStr = isChapterMode 
-        ? `${selectedVerse.book} ${selectedVerse.chapter}장 (전체)`
-        : verseRef;
+      // If includeVerse is checked and there's a selected verse, include it
+      const verseRef = includeVerse && selectedVerse 
+        ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`
+        : null;
       
       await addPublicReflection(
-        verseRefStr,
-        selectedVerse.book,
-        selectedVerse.chapter,
-        verseNum,
-        content,
-        false, // isPublic = false (personal reflection)
-        isChapterMode && (userRole === '⭐⭐⭐' || userRole === 'admin') ? 'commentary' : 'reflection',
+        verseRef || '글로벌 게시판',
+        selectedVerse?.book || 'GLOBAL',
+        selectedVerse?.chapter || 0,
+        selectedVerse?.verse || 0,
+        newPost,
+        true, // isPublic
+        'general', // category
         null // parentId
       );
 
-      setLastSaved(new Date());
+      setNewPost('');
+      // Reload posts
+      await loadPosts(1, false);
     } catch (err: any) {
-      console.error('Error saving reflection:', err?.message || err, err?.details);
-      alert('묵상 저장 중 오류가 발생했습니다: ' + (err?.message || 'Unknown error'));
+      console.error('Error saving post:', err?.message, err?.details);
+      alert('게시글 저장 중 오류: ' + (err?.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
-  }, [selectedVerse, userName, verseRef, content, canWrite, isChapterMode, userRole]);
+  };
 
-  // Auto-save after 1 second of inactivity (debounce)
-  useEffect(() => {
-    if (selectedVerse === undefined) return;
-
-    const timer = setTimeout(() => {
-      handleSave();
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [content, selectedVerse, handleSave, isChapterMode]);
+  // Load more posts
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadPosts(nextPage, true);
+  };
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -149,105 +170,167 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
     return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
   };
 
-  if (selectedVerse === undefined) {
-    return (
-      <div className="h-full flex items-center justify-center p-8">
-        <div className="text-center text-stone-400">
-          <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p className="font-serif text-sm">
-            구절을 선택하여<br />묵상을 기록하세요
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full flex flex-col bg-stone-50">
       {/* Header */}
       <div className="px-4 py-3 bg-stone-100 border-b border-stone-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-stone-600" />
-            <h2 className="text-sm font-serif font-semibold text-stone-700">
-              묵상 기록
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
-            ) : lastSaved ? (
-              <span className="flex items-center gap-1 text-xs text-stone-400">
-                <Clock className="w-3 h-3" />
-                {formatTime(lastSaved.toISOString())}
-              </span>
-            ) : null}
-            <button
-              onClick={handleSave}
-              disabled={saving || !canWrite}
-              className="flex items-center gap-1 px-3 py-1.5 bg-stone-700 text-white text-xs rounded hover:bg-stone-600 disabled:opacity-50 transition-colors"
-            >
-              <Save className="w-3 h-3" />
-              저장
-            </button>
-          </div>
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-stone-600" />
+          <h2 className="text-sm font-serif font-semibold text-stone-700">
+            커뮤니티 게시판
+          </h2>
         </div>
-        <div className="mt-2 flex items-center justify-between">
-          <p className="text-xs text-stone-500">
-            {selectedVerse ? `${selectedVerse.bookName || selectedVerse.book} ${selectedVerse.chapter}:${isChapterMode ? '장 전체' : selectedVerse.verse}` : ''}
-          </p>
-          <button
-            onClick={() => setIsChapterMode(!isChapterMode)}
-            className={`text-xs px-3 py-1.5 rounded-md transition-colors font-medium ${
-              isChapterMode 
-                ? (isAdmin 
-                    ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-300' 
-                    : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-300')
-                : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
-            }`}
-          >
-            {isChapterMode 
-              ? (isAdmin ? '⭐⭐⭐ 장 전체 주석 (Admin)' : '⭐⭐ 장 전체 묵상/번역')
-              : '절 단위'}
-          </button>
-        </div>
+        <p className="text-xs text-stone-500 mt-1">
+          성경 묵상과 나눔의 공간
+        </p>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
+      <div className="flex-1 overflow-y-auto">
+        {/* Admin Announcements */}
+        {loadingAnnouncements ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
           </div>
-        ) : (
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
-              <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
-              {isChapterMode 
-                ? (isAdmin ? '장 전체 주석 (Admin Only)' : '장 전체 묵상/번역')
-                : '나의 묵상 (Reflection)'}
-              {!canWrite && <span className="text-xs text-amber-600">(로그인 필요)</span>}
-              {isChapterMode && isVIP2 && canWrite && (
-                <span className="text-xs text-blue-600">
-                  {isAdmin ? '⭐⭐⭐ Admin' : '⭐⭐ VIP'}
-                </span>
-              )}
-            </label>
-            <textarea
-              value={content}
-              onChange={(e) => canWrite && setContent(e.target.value)}
-              disabled={!canWrite}
-              placeholder={canWrite 
-                ? isChapterMode 
-                  ? (isAdmin 
-                      ? "이 장 전체에 대한 주석, 핵심 메시지, 신학적 해석, 적용점 등을 기록하세요... (1초 후 자동 저장)"
-                      : "이 장 전체에 대한 묵상, 주제, 핵심 메시지, 적용점 등을 기록하세요... (1초 후 자동 저장)")
-                  : "이 말씀을 묵상하며 느낀 점, 적용할 점, 기도 제목 등을 자유롭게 기록하세요... (1초 후 자동 저장)" 
-                : "로그인 후 묵상을 작성할 수 있습니다."}
-              className="w-full h-[calc(100vh-280px)] min-h-[300px] p-3 text-sm leading-relaxed bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 placeholder:text-stone-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
-            />
+        ) : announcements.length > 0 && (
+          <div className="p-3 space-y-2 border-b border-stone-200 bg-amber-50/30">
+            <div className="flex items-center gap-2 px-1">
+              <Pin className="w-3 h-3 text-amber-600" />
+              <span className="text-xs font-medium text-amber-700">공지사항</span>
+            </div>
+            {announcements.map((ann) => (
+              <div key={ann.id} className="bg-white rounded-lg p-3 border border-amber-200">
+                <h4 className="text-sm font-medium text-stone-800 mb-1">{ann.title}</h4>
+                <p className="text-xs text-stone-600 leading-relaxed break-words">{ann.content}</p>
+                <p className="text-xs text-stone-400 mt-2">{formatTime(ann.created_at)}</p>
+              </div>
+            ))}
           </div>
         )}
+
+        {/* New Post Input */}
+        {canWrite && (
+          <div className="p-3 border-b border-stone-200">
+            <div className="space-y-2">
+              <textarea
+                value={newPost}
+                onChange={(e) => setNewPost(e.target.value)}
+                placeholder="성경 묵상, 질문, 기도제목 등을 자유롭게 나눠보세요..."
+                className="w-full h-24 p-3 text-sm leading-relaxed bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 placeholder:text-stone-400"
+              />
+              
+              {/* Include verse reference toggle */}
+              {selectedVerse && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIncludeVerse(!includeVerse)}
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                      includeVerse 
+                        ? 'bg-amber-100 text-amber-700' 
+                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    }`}
+                  >
+                    <Hash className="w-3 h-3" />
+                    {includeVerse ? '성경 주소 포함됨' : '성경 주소 포함'}
+                    {includeVerse && (
+                      <span className="ml-1 font-medium">
+                        {selectedVerse.book} {selectedVerse.chapter}:{selectedVerse.verse}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+              
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSavePost}
+                  disabled={!newPost.trim() || saving}
+                  className="flex items-center gap-1 px-4 py-2 bg-stone-700 text-white text-sm rounded-lg hover:bg-stone-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {saving ? '저장 중...' : '게시하기'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Posts Feed */}
+        <div className="p-3 space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <Users className="w-3 h-3 text-stone-500" />
+            <span className="text-xs font-medium text-stone-600">전체 게시글</span>
+          </div>
+          
+          {loadingPosts && posts.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-8 text-stone-400">
+              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">아직 게시글이 없습니다.</p>
+              <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>
+            </div>
+          ) : (
+            <>
+              {posts.map((post) => (
+                <div key={post.id} className="bg-white rounded-lg p-4 border border-stone-200">
+                  {/* Post Header */}
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-stone-700">
+                        {post.profiles?.nickname || post.user_id.slice(0, 8)}
+                      </span>
+                      {post.profiles?.tier && (
+                        <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded">
+                          {post.profiles.tier}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-stone-400">
+                      {formatTime(post.created_at)}
+                    </span>
+                  </div>
+                  
+                  {/* Verse Reference Tag */}
+                  {post.verse_ref && post.verse_ref !== '글로벌 게시판' && (
+                    <div className="flex items-center gap-1 mb-2">
+                      <BookOpen className="w-3 h-3 text-amber-600" />
+                      <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                        {post.verse_ref}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Post Content */}
+                  <p className="text-sm text-stone-700 leading-relaxed break-words whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                </div>
+              ))}
+              
+              {/* Load More */}
+              {hasMore && (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingPosts}
+                  className="w-full py-2 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+                >
+                  {loadingPosts ? (
+                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                  ) : (
+                    '더 보기'
+                  )}
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
