@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   checkIsAdmin, 
   getAdminUserStats, 
@@ -10,10 +10,10 @@ import {
   getPublicReflections,
   getMyStudyNotes,
   StudioReflection,
-  signOut 
+  signOut,
+  getSupabase
 } from '@/app/lib/supabase';
-import { Crown, Loader2, LogOut, Users, BookOpen, ChevronDown, ArrowRightLeft } from 'lucide-react';
-import { useSBLGNT } from '@/app/hooks/useSBLGNT';
+import { Crown, Loader2, LogOut, Users, BookOpen, User, ArrowLeft, Calendar, BookMarked } from 'lucide-react';
 
 const books = [
   { id: 'Matt', name: '마태복음', chapters: 28 },
@@ -45,10 +45,22 @@ const books = [
   { id: 'Rev', name: '요한계시록', chapters: 22 },
 ];
 
-type Tab = 'users' | 'archive';
+type Tab = 'users' | 'book-archive' | 'user-archive';
 
-export default function AdminDashboard() {
+interface UserActivity {
+  reflections: StudioReflection[];
+  notes: any[];
+  bookStats: { [book: string]: number };
+  monthlyStats: { [month: string]: number };
+  totalReflections: number;
+  totalNotes: number;
+  favoriteBook: string;
+  mostActiveMonth: string;
+}
+
+function AdminDashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>('users');
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -58,12 +70,16 @@ export default function AdminDashboard() {
   const [userStats, setUserStats] = useState<AdminUserStats[]>([]);
   const [updatingTier, setUpdatingTier] = useState<string | null>(null);
   
-  // Archive
+  // Book Archive
   const [selectedBook, setSelectedBook] = useState('Matt');
-  const [selectedChapter, setSelectedChapter] = useState(1);
-  const [reflections, setReflections] = useState<StudioReflection[]>([]);
-  const [studyNotes, setStudyNotes] = useState<any[]>([]);
-  const [loadingArchive, setLoadingArchive] = useState(false);
+  const [bookData, setBookData] = useState<{ [chapter: number]: { reflections: StudioReflection[]; notes: any[] } }>({});
+  const [loadingBook, setLoadingBook] = useState(false);
+  
+  // User Archive
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUserStats | null>(null);
+  const [userActivity, setUserActivity] = useState<UserActivity | null>(null);
+  const [loadingUser, setLoadingUser] = useState(false);
 
   // Check admin access
   useEffect(() => {
@@ -88,12 +104,22 @@ export default function AdminDashboard() {
     }
   }, [isAdmin, activeTab]);
 
-  // Load archive data
+  // Load book archive
   useEffect(() => {
-    if (isAdmin && activeTab === 'archive') {
-      loadArchiveData();
+    if (isAdmin && activeTab === 'book-archive') {
+      loadBookArchive();
     }
-  }, [isAdmin, activeTab, selectedBook, selectedChapter]);
+  }, [isAdmin, activeTab, selectedBook]);
+
+  // Load user archive from URL param
+  useEffect(() => {
+    const userId = searchParams.get('user');
+    if (userId && isAdmin) {
+      setSelectedUserId(userId);
+      setActiveTab('user-archive');
+      loadUserArchive(userId);
+    }
+  }, [searchParams, isAdmin]);
 
   const loadUserStats = async () => {
     setLoading(true);
@@ -107,22 +133,110 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadArchiveData = async () => {
-    setLoadingArchive(true);
+  const loadBookArchive = async () => {
+    setLoadingBook(true);
+    const bookInfo = books.find(b => b.id === selectedBook);
+    if (!bookInfo) return;
+
     try {
-      // Load reflections for this book/chapter
-      const verseRef = `${selectedBook} ${selectedChapter}`;
-      const result = await getPublicReflections(verseRef, 1, 100);
-      setReflections(result.data);
+      const allData: { [chapter: number]: { reflections: StudioReflection[]; notes: any[] } } = {};
       
-      // Load study notes
-      const notes = await getMyStudyNotes(verseRef, 100);
-      setStudyNotes(notes);
+      // Load all chapters in parallel
+      const chapterPromises = Array.from({ length: bookInfo.chapters }, (_, i) => i + 1).map(async (chapter) => {
+        const verseRef = `${selectedBook} ${chapter}`;
+        const [reflectionsResult, notes] = await Promise.all([
+          getPublicReflections(verseRef, 1, 100),
+          getMyStudyNotes(verseRef, 100)
+        ]);
+        
+        allData[chapter] = {
+          reflections: reflectionsResult.data,
+          notes: notes
+        };
+      });
+      
+      await Promise.all(chapterPromises);
+      setBookData(allData);
     } catch (err) {
-      console.error('Error loading archive:', err);
+      console.error('Error loading book archive:', err);
     } finally {
-      setLoadingArchive(false);
+      setLoadingBook(false);
     }
+  };
+
+  const loadUserArchive = async (userId: string) => {
+    setLoadingUser(true);
+    try {
+      // Find user info
+      const user = userStats.find(u => u.id === userId) || await fetchUserInfo(userId);
+      setSelectedUser(user || null);
+      
+      // Fetch all reflections by this user
+      const supabase = getSupabase();
+      const { data: reflections, error: refError } = await supabase
+        .from('reflections')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (refError) throw refError;
+      
+      // Fetch all study notes by this user
+      const { data: notes, error: noteError } = await supabase
+        .from('study_notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (noteError) throw noteError;
+      
+      // Calculate stats
+      const bookStats: { [book: string]: number } = {};
+      const monthlyStats: { [month: string]: number } = {};
+      
+      [...(reflections || []), ...(notes || [])].forEach(item => {
+        const book = item.book || item.verse_ref?.split(' ')[0] || 'Unknown';
+        bookStats[book] = (bookStats[book] || 0) + 1;
+        
+        const month = item.created_at?.substring(0, 7) || 'Unknown';
+        monthlyStats[month] = (monthlyStats[month] || 0) + 1;
+      });
+      
+      const favoriteBook = Object.entries(bookStats).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+      const mostActiveMonth = Object.entries(monthlyStats).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+      
+      setUserActivity({
+        reflections: reflections || [],
+        notes: notes || [],
+        bookStats,
+        monthlyStats,
+        totalReflections: reflections?.length || 0,
+        totalNotes: notes?.length || 0,
+        favoriteBook,
+        mostActiveMonth
+      });
+    } catch (err) {
+      console.error('Error loading user archive:', err);
+    } finally {
+      setLoadingUser(false);
+    }
+  };
+
+  const fetchUserInfo = async (userId: string): Promise<AdminUserStats | null> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, nickname, tier, created_at')
+      .eq('id', userId)
+      .single();
+    
+    if (error || !data) return null;
+    
+    return {
+      ...data,
+      total_reflections: 0,
+      total_notes: 0
+    } as AdminUserStats;
   };
 
   const handleTierToggle = async (userId: string, currentTier: string) => {
@@ -139,145 +253,158 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleUserClick = (userId: string) => {
+    router.push(`/admin?user=${userId}`);
+  };
+
+  const handleBackToUsers = () => {
+    setActiveTab('users');
+    setSelectedUserId(null);
+    setSelectedUser(null);
+    setUserActivity(null);
+    router.push('/admin');
+  };
+
   const handleLogout = async () => {
     await signOut();
     router.push('/');
   };
 
   const selectedBookData = books.find(b => b.id === selectedBook);
-  const chapters = selectedBookData ? Array.from({ length: selectedBookData.chapters }, (_, i) => i + 1) : [];
 
   if (checkingAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50">
-        <Loader2 className="w-10 h-10 text-amber-600 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="w-10 h-10 text-stone-400 animate-spin" />
       </div>
     );
   }
 
   if (!isAdmin) {
-    return null; // Will redirect
+    return null;
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                <Crown className="w-6 h-6 text-amber-600" />
-              </div>
-              <div>
-                <h1 className="text-xl font-serif font-bold text-stone-800">관리자 대시보드</h1>
-                <p className="text-xs text-stone-500">GNT 성경 원어 연구소</p>
-              </div>
+      <header className="border-b border-stone-200 sticky top-0 z-10 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
+            <div className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-amber-600" />
+              <h1 className="text-lg font-semibold text-stone-800">관리자 대시보드</h1>
             </div>
             
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-stone-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                로그아웃
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-stone-500 hover:text-red-600 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              로그아웃
+            </button>
           </div>
         </div>
       </header>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-stone-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-1">
+      <div className="border-b border-stone-200 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex">
             <button
-              onClick={() => setActiveTab('users')}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+              onClick={() => { setActiveTab('users'); handleBackToUsers(); }}
+              className={`px-4 py-3 text-sm border-b-2 transition-colors ${
                 activeTab === 'users'
-                  ? 'border-amber-500 text-amber-700'
+                  ? 'border-stone-800 text-stone-800 font-medium'
                   : 'border-transparent text-stone-500 hover:text-stone-700'
               }`}
             >
-              <Users className="w-4 h-4" />
-              가입자 관리
+              <span className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                가입자 관리
+              </span>
             </button>
             <button
-              onClick={() => setActiveTab('archive')}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'archive'
-                  ? 'border-amber-500 text-amber-700'
+              onClick={() => setActiveTab('book-archive')}
+              className={`px-4 py-3 text-sm border-b-2 transition-colors ${
+                activeTab === 'book-archive'
+                  ? 'border-stone-800 text-stone-800 font-medium'
                   : 'border-transparent text-stone-500 hover:text-stone-700'
               }`}
             >
-              <BookOpen className="w-4 h-4" />
-              통합 연구 노트
+              <span className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                책별 통합 노트
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('user-archive')}
+              className={`px-4 py-3 text-sm border-b-2 transition-colors ${
+                activeTab === 'user-archive'
+                  ? 'border-stone-800 text-stone-800 font-medium'
+                  : 'border-transparent text-stone-500 hover:text-stone-700'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                가입자별 아카이브
+              </span>
             </button>
           </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Users Tab */}
         {activeTab === 'users' && (
           <div>
-            <h2 className="text-lg font-semibold text-stone-800 mb-4">가입자 목록</h2>
-            
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+                <Loader2 className="w-8 h-8 text-stone-300 animate-spin" />
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-stone-50">
+              <div className="border border-stone-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-stone-50 border-b border-stone-200">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">이메일</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">닉네임</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">등급</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-stone-500 uppercase">묵상 수</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-stone-500 uppercase">사역/주석 수</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">가입일</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-stone-500 uppercase">권한 변경</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">이메일</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">닉네임</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">등급</th>
+                      <th className="px-4 py-2 text-center text-xs font-medium text-stone-500">묵상</th>
+                      <th className="px-4 py-2 text-center text-xs font-medium text-stone-500">노트</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">가입일</th>
+                      <th className="px-4 py-2 text-center text-xs font-medium text-stone-500">권한</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {userStats.map((user) => (
-                      <tr key={user.id} className="hover:bg-stone-50">
-                        <td className="px-4 py-3 text-sm text-stone-800">{user.email}</td>
-                        <td className="px-4 py-3 text-sm text-stone-600">{user.nickname || '-'}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                            user.tier === 'Admin' ? 'bg-purple-100 text-purple-700' :
-                            user.tier === 'Hardworking' ? 'bg-blue-100 text-blue-700' :
-                            user.tier === 'Regular' ? 'bg-green-100 text-green-700' :
-                            'bg-stone-100 text-stone-600'
+                      <tr 
+                        key={user.id} 
+                        className="hover:bg-stone-50 cursor-pointer"
+                        onClick={() => handleUserClick(user.id)}
+                      >
+                        <td className="px-4 py-2 text-stone-800">{user.email}</td>
+                        <td className="px-4 py-2 text-stone-600">{user.nickname || '-'}</td>
+                        <td className="px-4 py-2">
+                          <span className={`text-xs ${
+                            user.tier === 'Admin' ? 'text-purple-600 font-medium' :
+                            user.tier === 'Hardworking' ? 'text-blue-600' :
+                            'text-stone-500'
                           }`}>
                             {user.tier}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-center text-stone-600">{user.total_reflections}</td>
-                        <td className="px-4 py-3 text-sm text-center text-stone-600">{user.total_notes}</td>
-                        <td className="px-4 py-3 text-sm text-stone-500">
+                        <td className="px-4 py-2 text-center text-stone-600">{user.total_reflections}</td>
+                        <td className="px-4 py-2 text-center text-stone-600">{user.total_notes}</td>
+                        <td className="px-4 py-2 text-stone-400 text-xs">
                           {new Date(user.created_at).toLocaleDateString('ko-KR')}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-2 text-center">
                           <button
-                            onClick={() => handleTierToggle(user.id, user.tier)}
+                            onClick={(e) => { e.stopPropagation(); handleTierToggle(user.id, user.tier); }}
                             disabled={updatingTier === user.id}
-                            className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                              user.tier === 'Admin'
-                                ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                            }`}
+                            className="text-xs text-stone-500 hover:text-stone-800 underline"
                           >
-                            {updatingTier === user.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <ArrowRightLeft className="w-3 h-3" />
-                            )}
-                            {user.tier === 'Admin' ? '일반으로' : '관리자로'}
+                            {updatingTier === user.id ? '처리중...' : (user.tier === 'Admin' ? '일반으로' : '관리자로')}
                           </button>
                         </td>
                       </tr>
@@ -289,107 +416,188 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Archive Tab */}
-        {activeTab === 'archive' && (
+        {/* Book Archive Tab */}
+        {activeTab === 'book-archive' && (
           <div>
-            <div className="flex items-center gap-4 mb-6">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-stone-700">성경:</label>
-                <select
-                  value={selectedBook}
-                  onChange={(e) => {
-                    setSelectedBook(e.target.value);
-                    setSelectedChapter(1);
-                  }}
-                  className="px-3 py-2 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-amber-500"
-                >
-                  {books.map(book => (
-                    <option key={book.id} value={book.id}>{book.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-stone-700">장:</label>
-                <select
-                  value={selectedChapter}
-                  onChange={(e) => setSelectedChapter(Number(e.target.value))}
-                  className="px-3 py-2 text-sm border border-stone-200 rounded-lg focus:ring-2 focus:ring-amber-500"
-                >
-                  {chapters.map(ch => (
-                    <option key={ch} value={ch}>{ch}장</option>
-                  ))}
-                </select>
-              </div>
+            <div className="flex items-center gap-3 mb-4">
+              <select
+                value={selectedBook}
+                onChange={(e) => setSelectedBook(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:border-stone-400"
+              >
+                {books.map(book => (
+                  <option key={book.id} value={book.id}>{book.name}</option>
+                ))}
+              </select>
+              <span className="text-sm text-stone-500">{selectedBookData?.chapters}장</span>
             </div>
 
-            {loadingArchive ? (
+            {loadingBook ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+                <Loader2 className="w-8 h-8 text-stone-300 animate-spin" />
               </div>
             ) : (
-              <div className="space-y-4">
-                {/* Generate verses 1-30 (or actual chapter verse count) */}
-                {Array.from({ length: 30 }, (_, i) => i + 1).map(verseNum => {
-                  const verseReflections = reflections.filter(r => r.verse === verseNum);
-                  const verseNotes = studyNotes.filter((n: any) => n.verse === verseNum);
-                  
-                  if (verseReflections.length === 0 && verseNotes.length === 0) return null;
-                  
+              <div className="space-y-6">
+                {Object.entries(bookData).map(([chapter, data]) => {
+                  const hasContent = data.reflections.length > 0 || data.notes.length > 0;
+                  if (!hasContent) return null;
+
                   return (
-                    <div key={verseNum} className="bg-white rounded-lg border border-stone-200 p-4">
-                      <h3 className="text-sm font-semibold text-stone-800 mb-3">
-                        {selectedBookData?.name} {selectedChapter}:{verseNum}
+                    <div key={chapter} className="border-l-2 border-stone-200 pl-4">
+                      <h3 className="text-lg font-semibold text-stone-800 mb-3">
+                        {selectedBookData?.name} {chapter}장
                       </h3>
                       
-                      {/* Reflections */}
-                      {verseReflections.length > 0 && (
-                        <div className="mb-4">
-                          <h4 className="text-xs font-medium text-amber-600 mb-2">동역자 묵상</h4>
-                          <div className="space-y-2">
-                            {verseReflections.map(reflection => (
-                              <div key={reflection.id} className="p-3 bg-amber-50 rounded text-sm">
-                                <p className="text-stone-700 whitespace-pre-wrap">{reflection.content}</p>
-                                <p className="text-xs text-stone-500 mt-1">
-                                  {reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명'} · {new Date(reflection.created_at).toLocaleDateString('ko-KR')}
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map(verseNum => {
+                        const verseReflections = data.reflections.filter((r: any) => r.verse === verseNum);
+                        const verseNotes = data.notes.filter((n: any) => n.verse === verseNum);
+                        
+                        if (verseReflections.length === 0 && verseNotes.length === 0) return null;
+
+                        return (
+                          <div key={verseNum} className="mb-4">
+                            <h4 className="text-sm font-medium text-stone-500 mb-2">
+                              {chapter}:{verseNum}
+                            </h4>
+                            
+                            {verseReflections.map((r: any) => (
+                              <div key={r.id} className="mb-2 pl-3 border-l border-amber-300">
+                                <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{r.content}</p>
+                                <p className="text-xs text-stone-400 mt-1">
+                                  묵상 · {new Date(r.created_at).toLocaleDateString('ko-KR')}
+                                </p>
+                              </div>
+                            ))}
+                            
+                            {verseNotes.map((n: any) => (
+                              <div key={n.id} className="mb-2 pl-3 border-l border-blue-300">
+                                <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{n.content}</p>
+                                <p className="text-xs text-stone-400 mt-1">
+                                  노트 · {new Date(n.created_at).toLocaleDateString('ko-KR')}
                                 </p>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-                      
-                      {/* Study Notes */}
-                      {verseNotes.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-medium text-blue-600 mb-2">사역/주석</h4>
-                          <div className="space-y-2">
-                            {verseNotes.map((note: any) => (
-                              <div key={note.id} className="p-3 bg-blue-50 rounded text-sm">
-                                <p className="text-stone-700 whitespace-pre-wrap">{note.content}</p>
-                                <p className="text-xs text-stone-500 mt-1">
-                                  {new Date(note.created_at).toLocaleDateString('ko-KR')}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
                   );
                 })}
                 
-                {reflections.length === 0 && studyNotes.length === 0 && (
-                  <div className="text-center py-12 text-stone-500">
-                    <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>이 장에 작성된 내용이 없습니다.</p>
+                {Object.keys(bookData).length === 0 && (
+                  <div className="text-center py-12 text-stone-400">
+                    <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">이 책에 작성된 내용이 없습니다.</p>
                   </div>
                 )}
               </div>
             )}
           </div>
         )}
+
+        {/* User Archive Tab */}
+        {activeTab === 'user-archive' && (
+          <div>
+            {selectedUserId ? (
+              <div>
+                {/* Back button */}
+                <button
+                  onClick={handleBackToUsers}
+                  className="flex items-center gap-1 text-sm text-stone-500 hover:text-stone-800 mb-4"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  가입자 목록으로 돌아가기
+                </button>
+
+                {loadingUser ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 text-stone-300 animate-spin" />
+                  </div>
+                ) : selectedUser && userActivity ? (
+                  <div>
+                    {/* User Info */}
+                    <div className="border-b border-stone-200 pb-4 mb-6">
+                      <h2 className="text-xl font-semibold text-stone-800 mb-1">{selectedUser.nickname || selectedUser.email}</h2>
+                      <p className="text-sm text-stone-500">{selectedUser.email}</p>
+                    </div>
+
+                    {/* Activity Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className="border border-stone-200 rounded p-3">
+                        <p className="text-xs text-stone-500">총 묵상</p>
+                        <p className="text-2xl font-semibold text-stone-800">{userActivity.totalReflections}</p>
+                      </div>
+                      <div className="border border-stone-200 rounded p-3">
+                        <p className="text-xs text-stone-500">총 노트</p>
+                        <p className="text-2xl font-semibold text-stone-800">{userActivity.totalNotes}</p>
+                      </div>
+                      <div className="border border-stone-200 rounded p-3">
+                        <p className="text-xs text-stone-500 flex items-center gap-1">
+                          <BookMarked className="w-3 h-3" />
+                          주요 성경
+                        </p>
+                        <p className="text-lg font-medium text-stone-800">{userActivity.favoriteBook}</p>
+                      </div>
+                      <div className="border border-stone-200 rounded p-3">
+                        <p className="text-xs text-stone-500 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          활동 최고월
+                        </p>
+                        <p className="text-lg font-medium text-stone-800">{userActivity.mostActiveMonth}</p>
+                      </div>
+                    </div>
+
+                    {/* All Content */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-medium text-stone-500 border-b border-stone-200 pb-2">
+                        전체 작성 내역
+                      </h3>
+                      
+                      {[...userActivity.reflections, ...userActivity.notes]
+                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .map((item: any) => {
+                          const isReflection = 'content' in item && !item.ministry_note && !item.commentary;
+                          const verseRef = item.verse_ref || `${item.book} ${item.chapter}:${item.verse}`;
+                          
+                          return (
+                            <div key={item.id} className="pl-3 border-l-2 ${isReflection ? 'border-amber-300' : 'border-blue-300'}">
+                              <p className="text-xs text-stone-400 mb-1">{verseRef}</p>
+                              <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{item.content || item.ministry_note || item.commentary}</p>
+                              <p className="text-xs text-stone-400 mt-1">
+                                {isReflection ? '묵상' : '노트'} · {new Date(item.created_at).toLocaleDateString('ko-KR')}
+                              </p>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-stone-400">
+                    <User className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>사용자 정보를 불러올 수 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-stone-400">
+                <p className="text-sm">가입자 관리 탭에서 사용자를 선택해주세요.</p>
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-stone-400">로딩중...</div>
+      </div>
+    }>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }
