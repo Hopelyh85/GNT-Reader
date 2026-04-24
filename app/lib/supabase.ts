@@ -294,9 +294,11 @@ export async function getAllStudyNotesForBook(
 ): Promise<any[]> {
   const supabase = getSupabase();
   
+  console.log('[getAllStudyNotesForBook] Querying book:', bookName, 'chapter:', chapter);
+  
   let query = supabase
     .from('study_notes')
-    .select('*, profiles(nickname, email)')
+    .select('*, profiles(nickname, email, tier)')
     .eq('book', bookName)
     .order('chapter', { ascending: true })
     .order('verse', { ascending: true });
@@ -307,9 +309,18 @@ export async function getAllStudyNotesForBook(
   
   const { data, error } = await query;
   if (error) {
-    console.error('Error fetching all study notes:', error);
+    console.error('[getAllStudyNotesForBook] Error fetching study notes:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      bookName,
+      chapter
+    });
     return [];
   }
+  
+  console.log('[getAllStudyNotesForBook] Success:', data?.length || 0, 'notes found');
   return data || [];
 }
 

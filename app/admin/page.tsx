@@ -136,13 +136,21 @@ function AdminDashboardContent() {
   const loadBookArchive = async () => {
     setLoadingBook(true);
     const bookInfo = books.find(b => b.id === selectedBook);
-    if (!bookInfo) return;
+    if (!bookInfo) {
+      console.error('[loadBookArchive] Book not found:', selectedBook);
+      setLoadingBook(false);
+      return;
+    }
+
+    console.log('[loadBookArchive] Loading book:', bookInfo.name, 'chapters:', bookInfo.chapters);
 
     try {
       const allData: { [chapter: number]: { reflections: StudioReflection[]; notes: any[] } } = {};
       
       // Load all study notes for this book at once (using Korean book name)
+      console.log('[loadBookArchive] Fetching study notes for book:', bookInfo.name);
       const allNotes = await getAllStudyNotesForBook(bookInfo.name);
+      console.log('[loadBookArchive] Retrieved', allNotes.length, 'study notes');
       
       // Load reflections per chapter (still need verse_ref pattern)
       const chapterPromises = Array.from({ length: bookInfo.chapters }, (_, i) => i + 1).map(async (chapter) => {
@@ -159,9 +167,10 @@ function AdminDashboardContent() {
       });
       
       await Promise.all(chapterPromises);
+      console.log('[loadBookArchive] Loaded data for', Object.keys(allData).length, 'chapters');
       setBookData(allData);
     } catch (err) {
-      console.error('Error loading book archive:', err);
+      console.error('[loadBookArchive] Error loading book archive:', err);
     } finally {
       setLoadingBook(false);
     }

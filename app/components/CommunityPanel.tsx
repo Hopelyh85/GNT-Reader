@@ -33,14 +33,18 @@ interface Post extends StudioReflection {
 export function CommunityPanel({ 
   selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse 
 }: CommunityPanelProps) {
-  const canWrite = isLoggedIn;
+  // Permission helpers based on tier
+  const isGeneral = userRole === '⭐' || userRole === 'General';
+  const isRegular = userRole === '⭐⭐' || userRole === 'Regular';
+  const isHardworking = userRole === '⭐⭐⭐' || userRole === 'Hardworking';
+  const isStaff = userRole === '⭐⭐⭐⭐' || userRole === 'Staff';
+  const isAdminTier = userRole === '⭐⭐⭐⭐⭐' || userRole === 'Admin';
   
-  // Permission helpers
+  const canWrite = isLoggedIn && !isGeneral; // ⭐ General cannot write
   const canLike = isLoggedIn; // ⭐ General and above can like
-  const canEdit = (tier: string) => {
-    // ⭐⭐⭐ Hardworking and above can edit
-    return tier === '⭐⭐⭐' || tier === '⭐⭐⭐⭐' || tier === '⭐⭐⭐⭐⭐' || tier === 'Hardworking' || tier === 'Staff' || tier === 'Admin';
-  };
+  const canEditPost = isHardworking || isStaff || isAdminTier; // ⭐⭐⭐+ can edit
+  const canDeleteImmediate = isStaff || isAdminTier; // Staff+ can delete immediately
+  const canRequestDelete = isLoggedIn && !canDeleteImmediate; // Others can request delete
   // Use RPC is_admin() function for accurate admin check
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -315,7 +319,7 @@ export function CommunityPanel({
   
   // Edit post (placeholder - ⭐⭐⭐ and above only)
   const handleEdit = (post: Post) => {
-    if (!canEdit(userRole)) {
+    if (!canEditPost) {
       alert('글 수정 권한은 ⭐⭐⭐(Hardworking) 등급 이상부터 가능합니다.');
       return;
     }
@@ -390,13 +394,20 @@ export function CommunityPanel({
 
   // Get display name from profile with fallback chain
   // 1. nickname → 2. username → 3. email.split('@')[0] → 4. '익명 연구원'
-  const getDisplayName = (profile: any) => {
-    if (!profile) return '익명 연구원';
+  const getDisplayName = (profile: any, userEmail?: string) => {
+    if (!profile) {
+      // Hard fallback: use provided email or anonymous
+      if (userEmail) {
+        return userEmail.split('@')[0];
+      }
+      return '익명 연구원';
+    }
     if (profile.nickname) return profile.nickname;
     if (profile.username) return profile.username;
-    if (profile.email) {
-      const emailPrefix = profile.email.split('@')[0];
-      return emailPrefix;
+    // Hardcoded email extraction from profile or passed email
+    const email = profile.email || userEmail;
+    if (email) {
+      return email.split('@')[0];
     }
     return '익명 연구원';
   };
@@ -564,8 +575,8 @@ export function CommunityPanel({
                 링크 복사
               </button>
               
-              {/* Edit Button - ⭐⭐⭐ and above only */}
-              {currentUserId === post.user_id && canEdit(userRole) && (
+              {/* Edit Button - ⭐⭐⭐ Hardworking and above only */}
+              {currentUserId === post.user_id && canEditPost && (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleEdit(post); }}
                   className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
@@ -577,15 +588,28 @@ export function CommunityPanel({
                 </button>
               )}
               
-              {/* Delete Button - Only for author or admin */}
-              {canDelete && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(post.id, post.user_id); }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  삭제
-                </button>
+              {/* Delete Button - Staff/Admin can delete immediately, others request delete */}
+              {currentUserId === post.user_id && (
+                canDeleteImmediate ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(post.id, post.user_id); }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    삭제
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      alert('삭제 요청이 접수되었습니다. 관리자 승인 후 처리됩니다.');
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    삭제 요청
+                  </button>
+                )
               )}
               
               {isAdmin && (
@@ -698,7 +722,24 @@ export function CommunityPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* New Post Input */}
+        {/* New Post Input - ⭐ General cannot write, show upgrade button instead */}
+        {isLoggedIn && isGeneral && (
+          <div className="p-3 border-b border-stone-200 bg-stone-50">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-stone-600">
+                ⭐ 등급은 읽기만 가능합니다. 글쓰기는 ⭐⭐ 이상부터 가능합니다.
+              </p>
+              <button
+                onClick={() => alert('등업 신청 페이지로 이동합니다. (준비중)')}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors"
+              >
+                <Crown className="w-3 h-3" />
+                등업 신청하기
+              </button>
+            </div>
+          </div>
+        )}
+        
         {canWrite && (
           <div className="p-3 border-b border-stone-200 bg-white">
             <div className="space-y-2">
