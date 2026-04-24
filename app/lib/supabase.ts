@@ -339,9 +339,10 @@ export interface StudioReflection {
   updated_at: string;
   profiles?: {
     nickname: string | null;
+    username: string | null;
+    email: string | null;
     tier: string;
     avatar_url: string | null;
-    email?: string;
   };
   replies?: StudioReflection[];
 }
@@ -355,7 +356,7 @@ export async function getPublicReflections(
   
   let query = supabase
     .from('reflections')
-    .select('*, profiles(nickname, tier, avatar_url)', { count: 'exact' })
+    .select('*, profiles(nickname, username, email, tier, avatar_url)', { count: 'exact' })
     .eq('is_public', true)
     .order('is_best', { ascending: false })
     .order('created_at', { ascending: false });
@@ -384,7 +385,7 @@ export async function getBestReflections(
   
   let query = supabase
     .from('reflections')
-    .select('*, profiles(nickname, tier, avatar_url)')
+    .select('*, profiles(nickname, username, email, tier, avatar_url)')
     .eq('is_public', true)
     .eq('is_best', true)
     .order('created_at', { ascending: false })
@@ -473,7 +474,7 @@ export async function getReplies(parentId: string): Promise<StudioReflection[]> 
   
   const { data, error } = await supabase
     .from('reflections')
-    .select('*, profiles(nickname, tier, avatar_url)')
+    .select('*, profiles(nickname, username, email, tier, avatar_url)')
     .eq('parent_id', parentId)
     .eq('is_public', true)
     .order('created_at', { ascending: true });
@@ -517,7 +518,7 @@ export async function getPinnedPosts(): Promise<StudioReflection[]> {
   
   const { data, error } = await supabase
     .from('reflections')
-    .select('*, profiles(nickname, tier, avatar_url)')
+    .select('*, profiles(nickname, username, email, tier, avatar_url)')
     .eq('is_public', true)
     .eq('is_pinned', true)
     .order('created_at', { ascending: false })

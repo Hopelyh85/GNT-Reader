@@ -312,10 +312,14 @@ export function CommunityPanel({
     return `${year}. ${month}. ${day}. ${hours}:${minutes}`;
   };
 
-  // Get display name from profile (check multiple possible fields)
-  const getDisplayName = (profile: any, userId: string) => {
-    if (!profile) return userId.slice(0, 8);
-    return profile.nickname || profile.username || profile.full_name || userId.slice(0, 8);
+  // Get display name from profile with fallback chain
+  // 1. nickname → 2. username → 3. email.split('@')[0] → 4. '익명 동역자'
+  const getDisplayName = (profile: any) => {
+    if (!profile) return '익명 동역자';
+    if (profile.nickname) return profile.nickname;
+    if (profile.username) return profile.username;
+    if (profile.email) return profile.email.split('@')[0];
+    return '익명 동역자';
   };
 
   // Avatar component
@@ -360,7 +364,7 @@ export function CommunityPanel({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-medium text-stone-800">
-                  {getDisplayName(post.profiles, post.user_id)}
+                  {getDisplayName(post.profiles)}
                 </span>
                 {post.profiles?.tier && !post.profiles.tier.toLowerCase().includes('admin') && (
                   <span className="text-xs bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded">
@@ -500,7 +504,7 @@ export function CommunityPanel({
                         <div className="flex items-center gap-2 mb-1">
                           <Avatar url={reply.profiles?.avatar_url} tier={reply.profiles?.tier} size="sm" />
                           <span className="text-xs font-medium text-stone-700">
-                            {getDisplayName(reply.profiles, reply.user_id)}
+                            {getDisplayName(reply.profiles)}
                           </span>
                           <span className="text-xs text-stone-400">{formatTime(reply.created_at)}</span>
                         </div>
