@@ -330,10 +330,6 @@ export function BiblePanel({
           overscrollBehavior: 'contain'
         }}
       >
-        {/* Mobile scroll hint */}
-        <div className="md:hidden sticky top-0 z-10 flex items-center justify-center gap-1 py-1 bg-stone-100 rounded-full mb-2 text-xs text-stone-400">
-          <span>← 옆으로 밀어서 보기 →</span>
-        </div>
         {books.map((book) => {
           const abbrev = getBookAbbrev(book.name);
           const isBookExpanded = expandedBook === book.name;
