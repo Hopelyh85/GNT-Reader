@@ -9,6 +9,7 @@ import {
   updateUserTier,
   getPublicReflections,
   getMyStudyNotes,
+  getAllStudyNotesForBook,
   StudioReflection,
   signOut,
   getSupabase
@@ -141,17 +142,20 @@ function AdminDashboardContent() {
     try {
       const allData: { [chapter: number]: { reflections: StudioReflection[]; notes: any[] } } = {};
       
-      // Load all chapters in parallel
+      // Load all study notes for this book at once (using Korean book name)
+      const allNotes = await getAllStudyNotesForBook(bookInfo.name);
+      
+      // Load reflections per chapter (still need verse_ref pattern)
       const chapterPromises = Array.from({ length: bookInfo.chapters }, (_, i) => i + 1).map(async (chapter) => {
         const verseRef = `${selectedBook} ${chapter}`;
-        const [reflectionsResult, notes] = await Promise.all([
-          getPublicReflections(verseRef, 1, 100),
-          getMyStudyNotes(verseRef, 100)
-        ]);
+        const reflectionsResult = await getPublicReflections(verseRef, 1, 100);
+        
+        // Filter notes for this chapter
+        const chapterNotes = allNotes.filter(note => note.chapter === chapter);
         
         allData[chapter] = {
           reflections: reflectionsResult.data,
-          notes: notes
+          notes: chapterNotes
         };
       });
       
@@ -239,17 +243,36 @@ function AdminDashboardContent() {
     } as AdminUserStats;
   };
 
-  const handleTierToggle = async (userId: string, currentTier: string) => {
-    const newTier = currentTier === 'Admin' ? 'General' : 'Admin';
+  const handleTierChange = async (userId: string, newTier: string) => {
     setUpdatingTier(userId);
     try {
       await updateUserTier(userId, newTier as any, true);
       await loadUserStats();
     } catch (err) {
       console.error('Error updating tier:', err);
-      alert('권한 변경 중 오류가 발생했습니다.');
+      alert('등급 변경 중 오류가 발생했습니다.');
     } finally {
       setUpdatingTier(null);
+    }
+  };
+
+const getTierLabel = (tier: string) => {
+    switch (tier) {
+      case 'Admin': return 'Admin(관리자)';
+      case '⭐⭐⭐': return '⭐⭐⭐(최우수)';
+      case '⭐⭐': return '⭐⭐(우수)';
+      case '⭐': return '⭐(정회원)';
+      default: return 'General(일반)';
+    }
+  };
+
+const getTierColor = (tier: string) => {
+    switch (tier) {
+      case 'Admin': return 'text-purple-600 font-medium';
+      case '⭐⭐⭐': return 'text-amber-600 font-medium';
+      case '⭐⭐': return 'text-blue-600';
+      case '⭐': return 'text-green-600';
+      default: return 'text-stone-500';
     }
   };
 
@@ -386,11 +409,9 @@ function AdminDashboardContent() {
                         <td className="px-4 py-2 text-stone-600">{user.nickname || '-'}</td>
                         <td className="px-4 py-2">
                           <span className={`text-xs ${
-                            user.tier === 'Admin' ? 'text-purple-600 font-medium' :
-                            user.tier === 'Hardworking' ? 'text-blue-600' :
-                            'text-stone-500'
+                            getTierColor(user.tier)
                           }`}>
-                            {user.tier}
+                            {getTierLabel(user.tier)}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-center text-stone-600">{user.total_reflections}</td>
@@ -398,14 +419,19 @@ function AdminDashboardContent() {
                         <td className="px-4 py-2 text-stone-400 text-xs">
                           {new Date(user.created_at).toLocaleDateString('ko-KR')}
                         </td>
-                        <td className="px-4 py-2 text-center">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleTierToggle(user.id, user.tier); }}
+                        <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={user.tier}
+                            onChange={(e) => handleTierChange(user.id, e.target.value)}
                             disabled={updatingTier === user.id}
-                            className="text-xs text-stone-500 hover:text-stone-800 underline"
+                            className="text-xs px-2 py-1 border border-stone-200 rounded focus:outline-none focus:border-stone-400"
                           >
-                            {updatingTier === user.id ? '처리중...' : (user.tier === 'Admin' ? '일반으로' : '관리자로')}
-                          </button>
+                            <option value="Admin">Admin(관리자)</option>
+                            <option value="⭐⭐⭐">⭐⭐⭐(최우수)</option>
+                            <option value="⭐⭐">⭐⭐(우수)</option>
+                            <option value="⭐">⭐(정회원)</option>
+                            <option value="General">General(일반)</option>
+                          </select>
                         </td>
                       </tr>
                     ))}

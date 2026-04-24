@@ -328,18 +328,16 @@ export function CommunityPanel({
   };
 
   // Get display name from profile with fallback chain
-  // 1. nickname → 2. username → 3. email.split('@')[0] → 4. '익명 동역자'
+  // 1. nickname → 2. username → 3. email.split('@')[0] → 4. '익명 연구원'
   const getDisplayName = (profile: any) => {
-    console.log('[getDisplayName] profile:', profile);
-    if (!profile) return '익명 동역자';
+    if (!profile) return '익명 연구원';
     if (profile.nickname) return profile.nickname;
     if (profile.username) return profile.username;
     if (profile.email) {
       const emailPrefix = profile.email.split('@')[0];
-      console.log('[getDisplayName] using email prefix:', emailPrefix);
       return emailPrefix;
     }
-    return '익명 동역자';
+    return '익명 연구원';
   };
 
   // Convert URLs in text to clickable links

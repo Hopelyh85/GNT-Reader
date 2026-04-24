@@ -287,6 +287,32 @@ export async function getMyStudyNotes(
   return data || [];
 }
 
+// Admin: Get all study notes for a specific book (all users)
+export async function getAllStudyNotesForBook(
+  bookName: string,
+  chapter?: number
+): Promise<any[]> {
+  const supabase = getSupabase();
+  
+  let query = supabase
+    .from('study_notes')
+    .select('*, profiles(nickname, email)')
+    .eq('book', bookName)
+    .order('chapter', { ascending: true })
+    .order('verse', { ascending: true });
+  
+  if (chapter) {
+    query = query.eq('chapter', chapter);
+  }
+  
+  const { data, error } = await query;
+  if (error) {
+    console.error('Error fetching all study notes:', error);
+    return [];
+  }
+  return data || [];
+}
+
 export async function saveMyStudyNote(
   verseRef: string,
   book: string,
