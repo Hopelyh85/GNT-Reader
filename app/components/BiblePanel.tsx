@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Book, GreekWord } from '@/app/types';
-import { ChevronDown, ChevronRight, BookOpen, Loader2, MessageCircle, Send, Sparkles, Info, Bell } from 'lucide-react';
+import { ChevronDown, ChevronRight, BookOpen, Loader2, MessageCircle, Send, Sparkles, Info, Bell, Coffee, Archive, ExternalLink, Pin, ArrowRight } from 'lucide-react';
 import { fallbackFixer, getSmartLemmaWithDatabase } from '../lib/greekMapping';
-import { getSupabase, addPublicReflection, getPublicReflections } from '../lib/supabase';
+import { getSupabase, addPublicReflection, getPublicReflections, getPinnedPosts } from '../lib/supabase';
 
 interface LexiconEntry {
   lemma?: string;
@@ -30,6 +30,7 @@ interface BiblePanelProps {
   userRole?: string;
   isLoggedIn?: boolean;
   userName?: string;
+  onFocusCommunity?: (postId?: string) => void;
 }
 
 interface Reflection {
@@ -130,6 +131,7 @@ export function BiblePanel({
   userRole,
   isLoggedIn,
   userName,
+  onFocusCommunity,
 }: BiblePanelProps) {
   const [expandedBook, setExpandedBook] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
@@ -142,9 +144,9 @@ export function BiblePanel({
   const [loadingReflections, setLoadingReflections] = useState(false);
   const [savingReflection, setSavingReflection] = useState(false);
   
-  // Notices for empty state
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loadingNotices, setLoadingNotices] = useState(false);
+  // Pinned posts for empty state dashboard
+  const [pinnedPosts, setPinnedPosts] = useState<any[]>([]);
+  const [loadingPinnedPosts, setLoadingPinnedPosts] = useState(false);
   
   // Load lexicon data
   const [lexicon, setLexicon] = useState<Record<string, LexiconEntry>>({});
@@ -190,34 +192,20 @@ export function BiblePanel({
     loadKRV();
   }, []);
   
-  // Load notices for empty state dashboard
+  // Load pinned posts for empty state dashboard
   useEffect(() => {
-    async function loadNotices() {
-      setLoadingNotices(true);
+    async function loadPinned() {
+      setLoadingPinnedPosts(true);
       try {
-        const supabase = getSupabase();
-        const { data, error } = await supabase
-          .from('announcements')
-          .select('*')
-          .order('is_pinned', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(5);
-          
-        if (error) {
-          console.error('Error loading notices:', error.message);
-          return;
-        }
-        
-        if (data) {
-          setNotices(data);
-        }
+        const data = await getPinnedPosts();
+        setPinnedPosts(data.slice(0, 3)); // 최신 3개만 표시
       } catch (err: any) {
-        console.error('Error loading notices:', err?.message);
+        console.error('Error loading pinned posts:', err?.message);
       } finally {
-        setLoadingNotices(false);
+        setLoadingPinnedPosts(false);
       }
     }
-    loadNotices();
+    loadPinned();
   }, []);
   
   // Symbol cleaning: strip SBLGNT critical symbols and punctuation (preserves apostrophes for elision)
@@ -695,90 +683,121 @@ export function BiblePanel({
         })}
       </div>
 
-      {/* Empty State Dashboard - Shows when no book is expanded */}
+      {/* Empty State Dashboard - Central Command Center */}
       {!expandedBook && (
         <div className="flex-1 overflow-y-auto p-4">
-          <div className="max-w-2xl mx-auto space-y-4">
-            {/* Welcome Card */}
+          <div className="max-w-2xl mx-auto space-y-5">
+            {/* GNT Introduction Card */}
             <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-200">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-amber-600" />
+                  <BookOpen className="w-5 h-5 text-amber-600" />
                 </div>
                 <h3 className="text-lg font-serif font-semibold text-stone-800">
-                  기독교 커뮤니티 성경 원어 연구소
+                  GNT 헬라어 신약 성경
                 </h3>
               </div>
-              <p className="text-sm text-stone-600 leading-relaxed">
-                SBLGNT 헬라어 신약 성경을 원어로 읽고, 사전을 통해 단어의 의미를 탐구하며,
-                묵상을 나누는 공간입니다. 왼쪽 패널에서 성경을 선택하여 시작하세요.
+              <p className="text-sm text-stone-600 leading-relaxed mb-3">
+                SBLGNT는 세계적인 성서학회(SBL)에서 편집한 현대 비평본 헬라어 신약 성경으로, 
+                원문의 정확성을 추구하는 현대 성서학의 표준 텍스트입니다. 본 앱은 이 원문을 바탕으로 연구와 묵상을 돕습니다.
+              </p>
+              <p className="text-xs text-stone-500">
+                왼쪽 패널에서 성경을 선택하여 원어 헬라어와 개역한글(KRV)을 함께 읽어보세요.
               </p>
             </div>
             
-            {/* Quick Guide */}
+            {/* Feature Cards - 3 Columns */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="bg-white rounded-lg p-4 border border-stone-200">
-                <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center mb-2">
-                  <BookOpen className="w-4 h-4 text-blue-600" />
+              {/* Community Cafe Card */}
+              <a 
+                href="https://naver.me/xXnPSav8" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-white rounded-lg p-4 border border-stone-200 hover:border-amber-300 hover:shadow-md transition-all group"
+              >
+                <div className="w-8 h-8 bg-amber-50 rounded-full flex items-center justify-center mb-2 group-hover:bg-amber-100">
+                  <Coffee className="w-4 h-4 text-amber-600" />
                 </div>
-                <h4 className="text-sm font-medium text-stone-700 mb-1">성경 읽기</h4>
-                <p className="text-xs text-stone-500">원어 헬라어와 개역한글(KRV)을 함께 읽어보세요.</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 border border-stone-200">
-                <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center mb-2">
-                  <Info className="w-4 h-4 text-green-600" />
+                <h4 className="text-sm font-medium text-stone-700 mb-1 flex items-center gap-1">
+                  기독교 커뮤니티 카페
+                  <ExternalLink className="w-3 h-3 text-stone-400" />
+                </h4>
+                <p className="text-xs text-stone-500">동역자들과 더 깊은 소통을 나누는 카페로 초대합니다.</p>
+              </a>
+              
+              {/* Sermon Archive Card */}
+              <a 
+                href="https://hopelyh.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-white rounded-lg p-4 border border-stone-200 hover:border-blue-300 hover:shadow-md transition-all group"
+              >
+                <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center mb-2 group-hover:bg-blue-100">
+                  <Archive className="w-4 h-4 text-blue-600" />
                 </div>
-                <h4 className="text-sm font-medium text-stone-700 mb-1">단어 탐구</h4>
-                <p className="text-xs text-stone-500">헬라어 단어를 클릭하여 사전 정의와 문법 정보를 확인하세요.</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 border border-stone-200">
-                <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center mb-2">
+                <h4 className="text-sm font-medium text-stone-700 mb-1 flex items-center gap-1">
+                  설교 아카이브
+                  <ExternalLink className="w-3 h-3 text-stone-400" />
+                </h4>
+                <p className="text-xs text-stone-500">저명한 설교자들의 강해 설교 번역본을 한곳에서 만나보세요.</p>
+              </a>
+              
+              {/* Community Board Card */}
+              <button 
+                onClick={() => onFocusCommunity?.()}
+                className="bg-white rounded-lg p-4 border border-stone-200 hover:border-purple-300 hover:shadow-md transition-all group text-left"
+              >
+                <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center mb-2 group-hover:bg-purple-100">
                   <MessageCircle className="w-4 h-4 text-purple-600" />
                 </div>
-                <h4 className="text-sm font-medium text-stone-700 mb-1">묵상 나눔</h4>
-                <p className="text-xs text-stone-500">구절을 클릭하면 묵상을 작성하고 다른 사람과 나눌 수 있습니다.</p>
-              </div>
+                <h4 className="text-sm font-medium text-stone-700 mb-1 flex items-center gap-1">
+                  커뮤니티 게시판
+                  <ArrowRight className="w-3 h-3 text-stone-400" />
+                </h4>
+                <p className="text-xs text-stone-500">전체 동역자들의 묵상과 나눔이 있는 글로벌 게시판으로 이동합니다.</p>
+              </button>
             </div>
             
-            {/* Notices */}
-            {loadingNotices ? (
+            {/* Pinned Posts / Announcements */}
+            {loadingPinnedPosts ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
               </div>
-            ) : notices.length > 0 ? (
+            ) : pinnedPosts.length > 0 ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-1">
-                  <Bell className="w-4 h-4 text-amber-600" />
+                  <Pin className="w-4 h-4 text-amber-600" />
                   <h4 className="text-sm font-medium text-stone-700">공지사항</h4>
                 </div>
-                {notices.map((notice) => (
-                  <div 
-                    key={notice.id} 
-                    className={`bg-white rounded-lg p-4 border ${notice.is_pinned ? 'border-amber-300 bg-amber-50/30' : 'border-stone-200'}`}
+                {pinnedPosts.map((post: any) => (
+                  <button 
+                    key={post.id}
+                    onClick={() => onFocusCommunity?.(post.id)}
+                    className="w-full text-left bg-white rounded-lg p-4 border border-amber-200 bg-amber-50/20 hover:bg-amber-50/40 transition-colors"
                   >
                     <div className="flex items-start gap-2">
-                      {notice.is_pinned && (
-                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-medium shrink-0">
-                          공지
-                        </span>
-                      )}
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-medium shrink-0">
+                        공지
+                      </span>
                       <div className="flex-1 min-w-0">
-                        <h5 className="text-sm font-medium text-stone-800 mb-1">{notice.title}</h5>
-                        <p className="text-xs text-stone-600 leading-relaxed break-words">{notice.content}</p>
-                        <p className="text-xs text-stone-400 mt-2">
-                          {new Date(notice.created_at).toLocaleDateString('ko-KR')}
-                        </p>
+                        <h5 className="text-sm font-medium text-stone-800 mb-1 line-clamp-1">{post.title || '제목 없음'}</h5>
+                        <p className="text-xs text-stone-500 leading-relaxed break-words line-clamp-2">{post.content}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs text-stone-400">
+                            {post.profiles?.nickname || post.profiles?.username || '익명 동역자'}
+                          </span>
+                          <span className="text-xs text-stone-300">·</span>
+                          <span className="text-xs text-stone-400">
+                            {new Date(post.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
                       </div>
+                      <ArrowRight className="w-4 h-4 text-amber-400 mt-1" />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
-            ) : (
-              <div className="bg-stone-50 rounded-lg p-6 text-center border border-stone-200">
-                <Bell className="w-8 h-8 text-stone-300 mx-auto mb-2" />
-                <p className="text-sm text-stone-500">새로운 공지사항이 없습니다.</p>
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}

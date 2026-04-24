@@ -22,6 +22,8 @@ export default function Home() {
   const [globalNotice, setGlobalNotice] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [initialPostId, setInitialPostId] = useState<string | null>(null);
+  const [activePanel, setActivePanel] = useState<'bible' | 'study' | 'community'>('bible');
+  const [focusPostId, setFocusPostId] = useState<string | null>(null);
   
   // Get post_id from URL for deep linking (client-side only)
   useEffect(() => {
@@ -205,6 +207,10 @@ export default function Home() {
             userRole={userRole}
             isLoggedIn={isLoggedIn}
             userName={userName}
+            onFocusCommunity={(postId) => {
+              setActivePanel('community');
+              if (postId) setFocusPostId(postId);
+            }}
           />
         </div>
 
