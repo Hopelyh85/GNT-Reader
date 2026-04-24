@@ -32,8 +32,11 @@ export function CommunityPanel({
   selectedVerse, isLoggedIn, userRole, userName, initialPostId 
 }: CommunityPanelProps) {
   const canWrite = isLoggedIn;
-  const isAdmin = userRole === '⭐⭐⭐' || userRole === 'admin' || userRole === 'ADMIN';
+  const isAdmin = userRole === '⭐⭐⭐' || userRole === 'admin' || userRole === 'ADMIN' || userRole === 'Admin';
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Debug admin status
+  console.log('[CommunityPanel] userRole:', userRole, 'isAdmin:', isAdmin);
   
   // New post states
   const [newTitle, setNewTitle] = useState('');
@@ -316,10 +319,15 @@ export function CommunityPanel({
   // Get display name from profile with fallback chain
   // 1. nickname → 2. username → 3. email.split('@')[0] → 4. '익명 동역자'
   const getDisplayName = (profile: any) => {
+    console.log('[getDisplayName] profile:', profile);
     if (!profile) return '익명 동역자';
     if (profile.nickname) return profile.nickname;
     if (profile.username) return profile.username;
-    if (profile.email) return profile.email.split('@')[0];
+    if (profile.email) {
+      const emailPrefix = profile.email.split('@')[0];
+      console.log('[getDisplayName] using email prefix:', emailPrefix);
+      return emailPrefix;
+    }
     return '익명 동역자';
   };
 
@@ -375,6 +383,8 @@ export function CommunityPanel({
   const renderPost = (post: Post, isPinned: boolean = false) => {
     const isExpanded = expandedPostId === post.id;
     const canDelete = currentUserId === post.user_id || isAdmin;
+    
+    console.log('[renderPost] post.id:', post.id, 'currentUserId:', currentUserId, 'post.user_id:', post.user_id, 'isAdmin:', isAdmin, 'canDelete:', canDelete);
     
     return (
       <div key={post.id} className={`bg-white rounded-lg border ${isPinned ? 'border-amber-300 bg-amber-50/20' : 'border-stone-200'} overflow-hidden`}>
