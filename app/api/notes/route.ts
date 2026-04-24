@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
-const NOTES_DIR = path.join(process.cwd(), 'data', 'notes');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// Ensure notes directory exists
-if (!fs.existsSync(NOTES_DIR)) {
-  fs.mkdirSync(NOTES_DIR, { recursive: true });
-}
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface NoteData {
   user_nickname: string;
@@ -19,11 +16,6 @@ interface NoteData {
   commentary: string;
   created_at: string;
   updated_at: string;
-}
-
-function getNoteFilePath(book: string, chapter: number, verse: number): string {
-  const safeBook = book.replace(/[^a-zA-Z0-9]/g, '');
-  return path.join(NOTES_DIR, `${safeBook}_${chapter}_${verse}.json`);
 }
 
 // GET /api/notes?book=MAT&chapter=1&verse=1&user=nickname
@@ -42,20 +34,40 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const filePath = getNoteFilePath(book, parseInt(chapter), parseInt(verse));
+    const verseRef = `${book} ${chapter}:${verse}`;
 
-    // Return null quietly if note doesn't exist (404 handled gracefully)
-    if (!fs.existsSync(filePath)) {
+    // Query Supabase for study note - match by verse_ref
+    const { data, error } = await supabase
+      .from('study_notes')
+      .select('*')
+      .eq('verse_ref', verseRef)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Supabase error fetching note:', error);
       return NextResponse.json({ data: null });
     }
 
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const data: NoteData = JSON.parse(content);
+    // Map to expected format
+    if (data) {
+      const noteData: NoteData = {
+        user_nickname: data.user_id?.slice(0, 8) || 'user',
+        verse_ref: data.verse_ref,
+        book: data.book,
+        chapter: data.chapter,
+        verse: data.verse,
+        ministry_note: data.content || '',
+        commentary: '',
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+      return NextResponse.json({ data: noteData });
+    }
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ data: null });
   } catch (error) {
     console.error('Error reading note:', error);
-    // Return null instead of error for 404-like cases
     return NextResponse.json({ data: null });
   }
 }
@@ -81,33 +93,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const filePath = getNoteFilePath(book, chapter, verse);
+    const verseRef = verse_ref || `${book} ${chapter}:${verse}`;
 
-    // Check if note already exists to preserve created_at
-    let existingCreatedAt: string | null = null;
-    if (fs.existsSync(filePath)) {
-      try {
-        const existing = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        existingCreatedAt = existing.created_at || null;
-      } catch (e) {
-        // ignore parse errors
-      }
+    // Insert into Supabase study_notes table
+    const { data, error } = await supabase
+      .from('study_notes')
+      .upsert({
+        verse_ref: verseRef,
+        book,
+        chapter,
+        verse,
+        content: ministry_note || commentary || '',
+        is_private: true,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,verse_ref'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase error saving note:', error);
+      return NextResponse.json(
+        { error: 'Failed to save note' },
+        { status: 500 }
+      );
     }
 
-    const now = new Date().toISOString();
     const noteData: NoteData = {
       user_nickname: user_nickname || 'guest',
-      verse_ref: verse_ref || `${book} ${chapter}:${verse}`,
-      book,
-      chapter,
-      verse,
-      ministry_note: ministry_note || '',
+      verse_ref: data.verse_ref,
+      book: data.book,
+      chapter: data.chapter,
+      verse: data.verse,
+      ministry_note: data.content || '',
       commentary: commentary || '',
-      created_at: existingCreatedAt || now,
-      updated_at: now,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
     };
-
-    fs.writeFileSync(filePath, JSON.stringify(noteData, null, 2), 'utf-8');
 
     return NextResponse.json({ data: noteData });
   } catch (error) {

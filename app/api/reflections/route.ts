@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
-const REFLECTIONS_DIR = path.join(process.cwd(), 'data', 'reflections');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// Ensure reflections directory exists
-if (!fs.existsSync(REFLECTIONS_DIR)) {
-  fs.mkdirSync(REFLECTIONS_DIR, { recursive: true });
-}
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface ReflectionData {
   user_nickname: string;
@@ -17,11 +14,6 @@ interface ReflectionData {
   verse: number;
   content: string;
   updated_at: string;
-}
-
-function getReflectionFilePath(book: string, chapter: number, verse: number): string {
-  const safeBook = book.replace(/[^a-zA-Z0-9]/g, '');
-  return path.join(REFLECTIONS_DIR, `${safeBook}_${chapter}_${verse}.json`);
 }
 
 // GET /api/reflections?book=MAT&chapter=1&verse=1&user=nickname
@@ -40,20 +32,39 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const filePath = getReflectionFilePath(book, parseInt(chapter), parseInt(verse));
+    const verseRef = `${book} ${chapter}:${verse}`;
 
-    // Return null quietly if reflection doesn't exist (404 handled gracefully)
-    if (!fs.existsSync(filePath)) {
+    // Query Supabase for reflection - try to match by verse_ref and user_nickname
+    const { data, error } = await supabase
+      .from('reflections')
+      .select('*')
+      .eq('verse_ref', verseRef)
+      .eq('is_public', false)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Supabase error fetching reflection:', error);
       return NextResponse.json({ data: null });
     }
 
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const data: ReflectionData = JSON.parse(content);
+    // Map to expected format
+    if (data) {
+      const reflectionData: ReflectionData = {
+        user_nickname: data.user_id?.slice(0, 8) || 'user',
+        verse_ref: data.verse_ref,
+        book: data.book,
+        chapter: data.chapter,
+        verse: data.verse,
+        content: data.content,
+        updated_at: data.updated_at,
+      };
+      return NextResponse.json({ data: reflectionData });
+    }
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ data: null });
   } catch (error) {
     console.error('Error reading reflection:', error);
-    // Return null instead of error for 404-like cases
     return NextResponse.json({ data: null });
   }
 }
@@ -78,19 +89,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const filePath = getReflectionFilePath(book, chapter, verse);
+    // Insert into Supabase reflections table
+    const { data, error } = await supabase
+      .from('reflections')
+      .upsert({
+        verse_ref: verse_ref || `${book} ${chapter}:${verse}`,
+        book,
+        chapter,
+        verse,
+        content: content || '',
+        is_public: false,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'verse_ref'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase error saving reflection:', error);
+      return NextResponse.json(
+        { error: 'Failed to save reflection' },
+        { status: 500 }
+      );
+    }
 
     const reflectionData: ReflectionData = {
       user_nickname: user_nickname || 'guest',
-      verse_ref: verse_ref || `${book} ${chapter}:${verse}`,
-      book,
-      chapter,
-      verse,
-      content: content || '',
-      updated_at: new Date().toISOString(),
+      verse_ref: data.verse_ref,
+      book: data.book,
+      chapter: data.chapter,
+      verse: data.verse,
+      content: data.content,
+      updated_at: data.updated_at,
     };
-
-    fs.writeFileSync(filePath, JSON.stringify(reflectionData, null, 2), 'utf-8');
 
     return NextResponse.json({ data: reflectionData });
   } catch (error) {

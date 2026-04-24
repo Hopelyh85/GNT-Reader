@@ -388,11 +388,10 @@ export function BiblePanel({
                           )}
                         </button>
 
-                        {/* Verses - FORCED WIDE SCROLL */}
+                        {/* Verses - Natural text wrapping */}
                         {isChapterExpanded && (
                           <div 
-                            className="mt-1 space-y-1 pl-2 bg-stone-50/30 rounded"
-                            style={{ minWidth: '1000px', display: 'block' }}
+                            className="mt-1 space-y-1 pl-2 bg-stone-50/30 rounded w-full min-w-0"
                           >
                             {/* Visible scrollbar indicator */}
                             <div className="md:hidden h-1 bg-gradient-to-r from-stone-300 via-amber-400 to-stone-300 rounded-full mb-2 opacity-60" />
@@ -415,16 +414,13 @@ export function BiblePanel({
                                       text: `${book.name} ${chapter.number}장 전체`
                                     });
                                   }}
-                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer flex-shrink-0 border-l-2 ${
+                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer min-w-0 border-l-2 ${
                                     isChapterSelected
                                       ? 'bg-purple-100 border-purple-500 text-purple-900'
                                       : 'bg-gradient-to-r from-stone-100 to-white hover:bg-stone-50 text-stone-700 border-stone-300'
                                   }`}
                                   style={{ 
-                                    whiteSpace: 'normal',
-                                    lineHeight: '1.8',
-                                    display: 'block',
-                                    width: '100%'
+                                    lineHeight: '1.8'
                                   }}
                                 >
                                   <span className="font-serif text-xs text-stone-500 mr-2 select-none">📖</span>
@@ -460,17 +456,12 @@ export function BiblePanel({
                                       verse
                                     )
                                   }
-                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer flex-shrink-0 min-w-0 ${
+                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer min-w-0 ${
                                     isSelected
                                       ? 'bg-amber-100 border-l-2 border-amber-500 text-stone-800'
                                       : 'bg-white hover:bg-stone-100 text-stone-600'
                                   }`}
-                                  style={{ 
-                                    whiteSpace: 'normal',
-                                    lineHeight: '1.8',
-                                    display: 'block',
-                                    width: '100%'
-                                  }}
+                                  style={{ lineHeight: '1.8' }}
                                 >
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
                                     {verseIdx + 1}
