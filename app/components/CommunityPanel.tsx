@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SelectedVerse } from '@/app/types';
 import { Users, Save, Loader2, Clock } from 'lucide-react';
+import { addPublicReflection, getSupabase } from '@/app/lib/supabase';
 
 interface CommunityPanelProps {
   selectedVerse: SelectedVerse | null;
@@ -35,7 +36,7 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
     ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`
     : '';
 
-  // Load reflection when verse changes via API
+  // Load reflection when verse changes via direct Supabase query
   useEffect(() => {
     if (selectedVerse === undefined) {
       setContent('');
@@ -45,30 +46,43 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
     async function loadReflection() {
       setLoading(true);
       try {
-        // Use verse 0 for chapter-level reflection, or selected verse for verse-level
-        const verseNum = isChapterMode ? 0 : selectedVerse!.verse;
-        const response = await fetch(
-          `/api/reflections?book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${verseNum}&user=${encodeURIComponent(userName)}`
-        );
-
-        if (!response.ok) {
-          // 404 or other errors - quietly return empty
+        const supabase = getSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
           setContent('');
           return;
         }
 
-        const result = await response.json();
+        // Use verse 0 for chapter-level reflection, or selected verse for verse-level
+        const verseNum = isChapterMode ? 0 : selectedVerse!.verse;
+        const verseRef = `${selectedVerse!.book} ${selectedVerse!.chapter}:${verseNum}`;
+        
+        // Query Supabase directly for user's reflection
+        const { data, error } = await supabase
+          .from('reflections')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('verse_ref', verseRef)
+          .eq('is_public', false)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        // Return empty quietly if no reflection exists
-        if (!result.data) {
+        if (error) {
+          console.error('Supabase error loading reflection:', error.message, error.details);
           setContent('');
-        } else {
-          setContent(result.data.content || '');
-          setLastSaved(new Date(result.data.updated_at));
+          return;
         }
-      } catch (err) {
-        // Quietly handle errors - just start with empty reflection
-        console.error('Error loading reflection:', err);
+
+        if (data) {
+          setContent(data.content || '');
+          setLastSaved(new Date(data.updated_at));
+        } else {
+          setContent('');
+        }
+      } catch (err: any) {
+        console.error('Error loading reflection:', err?.message || err);
         setContent('');
       } finally {
         setLoading(false);
@@ -76,42 +90,38 @@ export function CommunityPanel({ selectedVerse, isLoggedIn, userRole, userName }
     }
 
     loadReflection();
-  }, [selectedVerse, userName, isChapterMode]);
+  }, [selectedVerse, isChapterMode]);
 
-  // Save reflection via API
+  // Save reflection via direct Supabase call
   const handleSave = useCallback(async () => {
     if (!selectedVerse || !canWrite) return;
 
     setSaving(true);
     try {
-      const response = await fetch('/api/reflections', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_nickname: userName,
-          verse_ref: isChapterMode 
-            ? `${selectedVerse.book} ${selectedVerse.chapter}장 (전체)`
-            : verseRef,
-          book: selectedVerse.book,
-          chapter: selectedVerse.chapter,
-          verse: isChapterMode ? 0 : selectedVerse.verse,
-          content: content,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save reflection');
-      }
+      const verseNum = isChapterMode ? 0 : selectedVerse.verse;
+      const verseRefStr = isChapterMode 
+        ? `${selectedVerse.book} ${selectedVerse.chapter}장 (전체)`
+        : verseRef;
+      
+      await addPublicReflection(
+        verseRefStr,
+        selectedVerse.book,
+        selectedVerse.chapter,
+        verseNum,
+        content,
+        false, // isPublic = false (personal reflection)
+        isChapterMode && (userRole === '⭐⭐⭐' || userRole === 'admin') ? 'commentary' : 'reflection',
+        null // parentId
+      );
 
       setLastSaved(new Date());
-    } catch (err) {
-      console.error('Error saving reflection:', err);
+    } catch (err: any) {
+      console.error('Error saving reflection:', err?.message || err, err?.details);
+      alert('묵상 저장 중 오류가 발생했습니다: ' + (err?.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
-  }, [selectedVerse, userName, verseRef, content, canWrite]);
+  }, [selectedVerse, userName, verseRef, content, canWrite, isChapterMode, userRole]);
 
   // Auto-save after 1 second of inactivity (debounce)
   useEffect(() => {

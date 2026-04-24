@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
-import { getSupabase } from '../lib/supabase';
+import { getSupabase, saveMyStudyNote } from '../lib/supabase';
 import { fallbackFixer, getSmartLemmaWithDatabase } from '../lib/greekMapping';
 
 interface StudyPanelProps {
@@ -134,50 +134,62 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     
   }, [selectedVerse, translationsLoaded, krvData, netData, kjvData]);
 
-  // Load existing note when verse changes via API
+  // Load existing note when verse changes via direct Supabase query
   useEffect(() => {
     if (!selectedVerse) return;
 
     async function loadNote() {
       try {
-        const response = await fetch(
-          `/api/notes?book=${selectedVerse!.book}&chapter=${selectedVerse!.chapter}&verse=${selectedVerse!.verse}&user=${encodeURIComponent(userName)}`
-        );
+        const supabase = getSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
         
-        if (!response.ok) {
-          // 404 or other errors - quietly return empty
+        if (!user) {
           setMinistryNote('');
           setCommentary('');
           setError(null);
           return;
         }
 
-        const result = await response.json();
-        
-        // Return null/empty quietly if no note exists
-        if (!result.data) {
+        // Query Supabase directly for user's note
+        const { data, error } = await supabase
+          .from('study_notes')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('verse_ref', verseRef)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Supabase error loading note:', error.message, error.details);
           setMinistryNote('');
           setCommentary('');
           setNoteTimestamp(null);
+          setError('노트 로딩 중 오류: ' + error.message);
+          return;
+        }
+        
+        if (data) {
+          setMinistryNote(data.content || '');
+          setCommentary('');
+          setNoteTimestamp(data.created_at || data.updated_at || null);
         } else {
-          setMinistryNote(result.data.ministry_note || '');
-          setCommentary(result.data.commentary || '');
-          setNoteTimestamp(result.data.created_at || result.data.updated_at || null);
+          setMinistryNote('');
+          setCommentary('');
+          setNoteTimestamp(null);
         }
         setError(null);
-      } catch (err) {
-        // Quietly handle errors - just start with empty note
-        console.error('Error loading note:', err);
+      } catch (err: any) {
+        console.error('Error loading note:', err?.message || err);
         setMinistryNote('');
         setCommentary('');
-        setError(null);
+        setError('노트 로딩 중 오류: ' + (err?.message || 'Unknown error'));
       }
     }
 
     loadNote();
-  }, [selectedVerse, userName]);
+  }, [selectedVerse, verseRef]);
 
-  // Save note via API
+  // Save note via direct Supabase call
   const handleSave = useCallback(async () => {
     if (!selectedVerse || !canWrite) return;
 
@@ -185,44 +197,27 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     setError(null);
 
     try {
-      const response = await fetch('/api/notes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_nickname: userName,
-          verse_ref: verseRef,
-          book: selectedVerse.book,
-          chapter: selectedVerse.chapter,
-          verse: selectedVerse.verse,
-          ministry_note: ministryNote,
-          commentary: commentary,
-        }),
-      });
+      await saveMyStudyNote(
+        verseRef,
+        selectedVerse.book,
+        selectedVerse.chapter,
+        selectedVerse.verse,
+        ministryNote,
+        true // isPrivate
+      );
 
-      if (!response.ok) {
-        throw new Error('Failed to save note');
-      }
-
-      const result = await response.json();
       setLastSaved(new Date());
-      // Update timestamp from saved data
-      if (result.data) {
-        setNoteTimestamp(result.data.created_at || result.data.updated_at || null);
-      }
-    } catch (err) {
-      console.error('Error saving note:', err);
-      setError('저장 중 오류가 발생했습니다.');
+      setNoteTimestamp(new Date().toISOString());
+    } catch (err: any) {
+      console.error('Error saving note:', err?.message || err, err?.details);
+      setError('저장 중 오류가 발생했습니다: ' + (err?.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
   }, [
     selectedVerse,
-    userName,
     verseRef,
     ministryNote,
-    commentary,
     canWrite,
   ]);
 
