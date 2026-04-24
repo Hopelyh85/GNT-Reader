@@ -785,3 +785,59 @@ export async function getGlobalNotice(): Promise<string | null> {
   }
   return data?.value || null;
 }
+
+// NOTICES API - Real-time Announcements
+// ============================================
+
+export async function getNotice(): Promise<{ id: number; content: string; updated_at: string } | null> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase
+    .from('notices')
+    .select('id, content, updated_at')
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  
+  if (error) {
+    console.error('Error fetching notice:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function updateNotice(content: string): Promise<boolean> {
+  const supabase = getSupabase();
+  
+  // Check if notice exists
+  const { data: existing } = await supabase
+    .from('notices')
+    .select('id')
+    .limit(1)
+    .maybeSingle();
+  
+  if (existing) {
+    // Update existing notice
+    const { error } = await supabase
+      .from('notices')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    
+    if (error) {
+      console.error('Error updating notice:', error);
+      return false;
+    }
+  } else {
+    // Create new notice
+    const { error } = await supabase
+      .from('notices')
+      .insert({ content, updated_at: new Date().toISOString() });
+    
+    if (error) {
+      console.error('Error creating notice:', error);
+      return false;
+    }
+  }
+  
+  return true;
+}

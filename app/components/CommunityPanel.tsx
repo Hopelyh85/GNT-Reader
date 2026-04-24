@@ -5,13 +5,13 @@ import { SelectedVerse } from '@/app/types';
 import { 
   Users, Send, Loader2, MessageSquare, Pin, BookOpen, Hash, 
   ChevronDown, ChevronUp, Link2, Crown, MessageCircle, CornerDownRight,
-  Heart, Trash2
+  Heart, Trash2, Megaphone, Settings
 } from 'lucide-react';
 import { 
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
   addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection,
   addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser,
-  checkIsAdmin, getStudyNotesForVerse
+  checkIsAdmin, getStudyNotesForVerse, getNotice, updateNotice
 } from '@/app/lib/supabase';
 
 interface CommunityPanelProps {
@@ -86,6 +86,13 @@ export function CommunityPanel({
   // Ministry notes (pinned at top for selected verse)
   const [ministryNotes, setMinistryNotes] = useState<any[]>([]);
   const [loadingMinistry, setLoadingMinistry] = useState(false);
+  
+  // Notice state (real-time announcement at top)
+  const [notice, setNotice] = useState<{ id: number; content: string; updated_at: string } | null>(null);
+  const [loadingNotice, setLoadingNotice] = useState(false);
+  const [isEditingNotice, setIsEditingNotice] = useState(false);
+  const [noticeEditContent, setNoticeEditContent] = useState('');
+  const [savingNotice, setSavingNotice] = useState(false);
 
   // Get current user ID
   useEffect(() => {
@@ -206,6 +213,50 @@ export function CommunityPanel({
     
     loadMinistryNotes();
   }, [selectedVerse]);
+
+  // Load notice on mount
+  useEffect(() => {
+    const loadNotice = async () => {
+      setLoadingNotice(true);
+      try {
+        const data = await getNotice();
+        setNotice(data);
+        if (data) {
+          setNoticeEditContent(data.content);
+        }
+      } catch (err) {
+        console.error('Error loading notice:', err);
+      } finally {
+        setLoadingNotice(false);
+      }
+    };
+    
+    loadNotice();
+  }, []);
+
+  // Handle notice save
+  const handleSaveNotice = async () => {
+    if (!noticeEditContent.trim()) return;
+    
+    setSavingNotice(true);
+    try {
+      const success = await updateNotice(noticeEditContent);
+      if (success) {
+        // Reload notice
+        const data = await getNotice();
+        setNotice(data);
+        setIsEditingNotice(false);
+        alert('공지사항이 저장되었습니다.');
+      } else {
+        alert('공지사항 저장 중 오류가 발생했습니다.');
+      }
+    } catch (err) {
+      console.error('Error saving notice:', err);
+      alert('공지사항 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSavingNotice(false);
+    }
+  };
 
   const loadReplies = async (postId: string) => {
     setLoadingReplies(prev => ({ ...prev, [postId]: true }));
@@ -827,6 +878,80 @@ export function CommunityPanel({
                   {saving ? '저장 중...' : '게시하기'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 📢 Real-time Notice Panel - At the very top */}
+        {notice && !isEditingNotice && (
+          <div className="p-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="flex items-start gap-3">
+              <Megaphone className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">📢 연구소 공지사항</span>
+                  {isAdminTier && (
+                    <button
+                      onClick={() => setIsEditingNotice(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
+                      title="공지사항 수정"
+                    >
+                      <Settings className="w-3 h-3" />
+                      수정
+                    </button>
+                  )}
+                </div>
+                <div className="text-sm text-stone-800 whitespace-pre-wrap leading-relaxed">
+                  {notice.content}
+                </div>
+                <p className="text-xs text-stone-400 mt-2">
+                  업데이트: {new Date(notice.updated_at).toLocaleDateString('ko-KR')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Edit Mode for Notice */}
+        {isEditingNotice && isAdminTier && (
+          <div className="p-4 border-b-2 border-blue-200 bg-blue-50">
+            <div className="flex items-center gap-2 mb-3">
+              <Megaphone className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-bold text-blue-700">📢 공지사항 편집</span>
+            </div>
+            <textarea
+              value={noticeEditContent}
+              onChange={(e) => setNoticeEditContent(e.target.value)}
+              placeholder="공지사항 내용을 입력하세요..."
+              className="w-full h-32 p-3 text-sm bg-white border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 placeholder:text-stone-400 mb-3"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => {
+                  setIsEditingNotice(false);
+                  setNoticeEditContent(notice?.content || '');
+                }}
+                className="px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100 rounded transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSaveNotice}
+                disabled={!noticeEditContent.trim() || savingNotice}
+                className="flex items-center gap-1 px-4 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {savingNotice ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    저장 중...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3 h-3" />
+                    저장
+                  </>
+                )}
+              </button>
             </div>
           </div>
         )}
