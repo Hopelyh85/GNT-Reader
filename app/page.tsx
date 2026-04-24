@@ -25,6 +25,59 @@ export default function Home() {
   const [activePanel, setActivePanel] = useState<'bible' | 'study' | 'community'>('bible');
   const [focusPostId, setFocusPostId] = useState<string | null>(null);
   
+  // Navigate to verse from community post
+  const handleNavigateToVerse = (book: string, chapter: number, verse: number) => {
+    // Switch to bible panel (especially for mobile)
+    setActivePanel('bible');
+    
+    // Find book name from the books list
+    const bookData = books.find(b => {
+      const abbrev = b.name === '마태복음' ? 'Matt' :
+                    b.name === '마가복음' ? 'Mark' :
+                    b.name === '누가복음' ? 'Luke' :
+                    b.name === '요한복음' ? 'John' :
+                    b.name === '사도행전' ? 'Acts' :
+                    b.name === '로마서' ? 'Rom' :
+                    b.name === '고린도전서' ? '1Cor' :
+                    b.name === '고린도후서' ? '2Cor' :
+                    b.name === '갈라디아서' ? 'Gal' :
+                    b.name === '에베소서' ? 'Eph' :
+                    b.name === '빌립보서' ? 'Phil' :
+                    b.name === '골로새서' ? 'Col' :
+                    b.name === '데살로니가전서' ? '1Thess' :
+                    b.name === '데살로니가후서' ? '2Thess' :
+                    b.name === '디모데전서' ? '1Tim' :
+                    b.name === '디모데후서' ? '2Tim' :
+                    b.name === '디도서' ? 'Titus' :
+                    b.name === '빌레몬서' ? 'Phlm' :
+                    b.name === '히브리서' ? 'Heb' :
+                    b.name === '야고보서' ? 'Jas' :
+                    b.name === '베드로전서' ? '1Pet' :
+                    b.name === '베드로후서' ? '2Pet' :
+                    b.name === '요한일서' ? '1John' :
+                    b.name === '요한이서' ? '2John' :
+                    b.name === '요한삼서' ? '3John' :
+                    b.name === '유다서' ? 'Jude' :
+                    b.name === '요한계시록' ? 'Rev' : '';
+      return abbrev.toLowerCase() === book.toLowerCase();
+    });
+    
+    if (bookData) {
+      const chapterData = bookData.chapters.find(c => c.number === chapter);
+      const verseWords = chapterData?.verses[verse - 1]; // verses is 0-indexed array
+      
+      if (verseWords) {
+        setSelectedVerse({
+          book,
+          bookName: bookData.name,
+          chapter,
+          verse,
+          text: verseWords.map((w: any) => w.text).join(' ')
+        });
+      }
+    }
+  };
+  
   // Get post_id from URL for deep linking (client-side only)
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -250,6 +303,7 @@ export default function Home() {
             userRole={userRole}
             userName={userName}
             initialPostId={focusPostId || initialPostId}
+            onNavigateToVerse={handleNavigateToVerse}
           />
         </div>
 
@@ -274,6 +328,7 @@ export default function Home() {
                 userRole={userRole}
                 userName={userName}
                 initialPostId={focusPostId || initialPostId}
+                onNavigateToVerse={handleNavigateToVerse}
               />
             </div>
           </div>

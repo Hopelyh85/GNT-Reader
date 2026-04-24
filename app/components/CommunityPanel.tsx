@@ -20,6 +20,7 @@ interface CommunityPanelProps {
   userRole: string;
   userName: string;
   initialPostId?: string | null;
+  onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
 }
 
 interface Post extends StudioReflection {
@@ -30,9 +31,16 @@ interface Post extends StudioReflection {
 }
 
 export function CommunityPanel({ 
-  selectedVerse, isLoggedIn, userRole, userName, initialPostId 
+  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse 
 }: CommunityPanelProps) {
   const canWrite = isLoggedIn;
+  
+  // Permission helpers
+  const canLike = isLoggedIn; // ⭐ General and above can like
+  const canEdit = (tier: string) => {
+    // ⭐⭐⭐ Hardworking and above can edit
+    return tier === '⭐⭐⭐' || tier === '⭐⭐⭐⭐' || tier === '⭐⭐⭐⭐⭐' || tier === 'Hardworking' || tier === 'Staff' || tier === 'Admin';
+  };
   // Use RPC is_admin() function for accurate admin check
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -304,6 +312,28 @@ export function CommunityPanel({
       alert('삭제 중 오류: ' + (err?.message || 'Unknown error'));
     }
   };
+  
+  // Edit post (placeholder - ⭐⭐⭐ and above only)
+  const handleEdit = (post: Post) => {
+    if (!canEdit(userRole)) {
+      alert('글 수정 권한은 ⭐⭐⭐(Hardworking) 등급 이상부터 가능합니다.');
+      return;
+    }
+    // TODO: Implement edit modal or inline editing
+    alert('글 수정 기능은 준비중입니다.');
+  };
+  
+  // Navigate to verse when clicking on post title/verse_ref
+  const handleNavigateToVerse = (post: Post) => {
+    if (!onNavigateToVerse || !post.verse_ref || post.verse_ref === '글로벌 게시판') return;
+    
+    // Parse verse_ref like "Matt 1:1" or "MAT 1:1"
+    const match = post.verse_ref.match(/^([A-Za-z0-9]+)\s+(\d+):(\d+)$/);
+    if (match) {
+      const [, book, chapter, verse] = match;
+      onNavigateToVerse(book, parseInt(chapter), parseInt(verse));
+    }
+  };
 
   // Toggle pin
   const handleTogglePin = async (postId: string, currentPin: boolean) => {
@@ -474,7 +504,11 @@ export function CommunityPanel({
               <div className="flex items-center gap-3 text-xs text-stone-500">
                 <span>{formatTime(post.created_at)}</span>
                 {post.verse_ref && post.verse_ref !== '글로벌 게시판' && (
-                  <span className="flex items-center gap-1 text-amber-600">
+                  <span 
+                    className="flex items-center gap-1 text-amber-600 hover:text-amber-700 hover:underline cursor-pointer transition-colors"
+                    onClick={(e) => { e.stopPropagation(); handleNavigateToVerse(post); }}
+                    title="본문으로 이동"
+                  >
                     <BookOpen className="w-3 h-3" />
                     {post.verse_ref}
                   </span>
@@ -529,6 +563,19 @@ export function CommunityPanel({
                 <Link2 className="w-3 h-3" />
                 링크 복사
               </button>
+              
+              {/* Edit Button - ⭐⭐⭐ and above only */}
+              {currentUserId === post.user_id && canEdit(userRole) && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleEdit(post); }}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  수정
+                </button>
+              )}
               
               {/* Delete Button - Only for author or admin */}
               {canDelete && (
