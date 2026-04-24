@@ -475,7 +475,7 @@ export function BiblePanel({
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
                                     {verseIdx + 1}
                                   </span>
-                                  <span className="font-greek text-stone-700 flex-wrap break-words" style={{ whiteSpace: 'normal', lineHeight: '1.8' }}>
+                                  <span className="font-greek text-stone-700 flex-wrap break-words overflow-hidden" style={{ whiteSpace: 'normal', lineHeight: '1.8', wordBreak: 'break-word' }}>
                                     {verse.map((word, wordIdx) => (
                                       <span key={`word-${wordIdx}`} className="inline-block">
                                         <span

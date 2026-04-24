@@ -380,7 +380,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
           </div>
           
           {/* Content */}
-          <p className="text-stone-700 text-sm leading-relaxed mb-3">{r.content}</p>
+          <p className="text-stone-700 text-sm leading-relaxed mb-3 break-words overflow-hidden">{r.content}</p>
           
           {/* Actions */}
           <div className="flex items-center gap-4 flex-wrap">
