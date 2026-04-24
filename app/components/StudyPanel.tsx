@@ -682,14 +682,14 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
 
         {/* 3. 본문 대조 (GNT / KRV / NET / KJV) - Only show when verse selected (NOT in Chapter Mode) */}
         {selectedVerse && !isChapterMode && (
-        <div className="border-t border-stone-200 pt-4 space-y-2">
+        <div className="border-t border-stone-200 pt-4 space-y-2 min-w-0">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700 mb-2">
             <span className="w-1.5 h-1.5 bg-stone-500 rounded-full" />
             본문 대조 (Comparative Study)
           </label>
           <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
             <p className="text-xs font-semibold text-amber-700 mb-1">📜 GNT 원문</p>
-            <p className="text-sm text-stone-700 font-greek leading-relaxed break-words overflow-hidden">{String(selectedVerse?.text || '')}</p>
+            <p className="text-sm text-stone-700 font-greek leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(selectedVerse?.text || '')}</p>
           </div>
           
           <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
@@ -697,7 +697,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             {!translationsLoaded ? (
               <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
             ) : koreanTranslation ? (
-              <p className="text-sm text-stone-700 leading-relaxed break-words overflow-hidden">{String(koreanTranslation)}</p>
+              <p className="text-sm text-stone-700 leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(koreanTranslation)}</p>
             ) : (
               <p className="text-sm text-amber-600">⚠️ 해당 절의 개역한글 번역 데이터가 없습니다</p>
             )}
@@ -708,7 +708,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             {!translationsLoaded ? (
               <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
             ) : netTranslation ? (
-              <p className="text-sm text-stone-700 leading-relaxed break-words overflow-hidden">{String(netTranslation)}</p>
+              <p className="text-sm text-stone-700 leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(netTranslation)}</p>
             ) : (
               <p className="text-sm text-amber-600">⚠️ 해당 절의 NET 영어 번역 데이터가 없습니다</p>
             )}
@@ -719,7 +719,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             {!translationsLoaded ? (
               <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
             ) : kjvTranslation ? (
-              <p className="text-sm text-stone-700 leading-relaxed break-words overflow-hidden">{String(kjvTranslation)}</p>
+              <p className="text-sm text-stone-700 leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(kjvTranslation)}</p>
             ) : (
               <p className="text-sm text-amber-600">⚠️ 해당 절의 KJV 영어 번역 데이터가 없습니다</p>
             )}
@@ -735,7 +735,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             📜 GNT 원문 (Chapter Text)
           </label>
           <div className="p-3 bg-amber-50 rounded border-l-4 border-amber-500">
-            <p className="text-sm text-stone-700 font-greek leading-relaxed break-words overflow-hidden">{String(selectedVerse?.text || '')}</p>
+            <p className="text-sm text-stone-700 font-greek leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(selectedVerse?.text || '')}</p>
           </div>
         </div>
         )}
@@ -775,7 +775,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {reflections.map((reflection) => (
                 <div key={reflection?.id || 'unknown'} className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-lg">
-                  <p className="text-sm text-stone-700 leading-relaxed break-words overflow-hidden">{String(reflection?.content || '')}</p>
+                  <p className="text-sm text-stone-700 leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(reflection?.content || '')}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-xs text-stone-400">{String(reflection?.user_name || '')}</span>
                     <span className="text-xs text-stone-400">

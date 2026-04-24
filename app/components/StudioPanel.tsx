@@ -347,9 +347,9 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
     return (
       <div 
         ref={(el) => { reflectionRefs.current[r.id] = el; }}
-        className={`${depth > 0 ? 'ml-8 border-l-2 border-stone-200 pl-4' : ''}`}
+        className={`min-w-0 ${depth > 0 ? 'ml-8 border-l-2 border-stone-200 pl-4' : ''}`}
       >
-        <div className={`p-4 ${isBest ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200' : 'bg-stone-50 border border-stone-200'} rounded-lg`}>
+        <div className={`p-4 min-w-0 ${isBest ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200' : 'bg-stone-50 border border-stone-200'} rounded-lg`}>
           {/* Header */}
           <div className="flex items-start justify-between mb-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -380,7 +380,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
           </div>
           
           {/* Content */}
-          <p className="text-stone-700 text-sm leading-relaxed mb-3 break-words overflow-hidden">{r.content}</p>
+          <p className="text-stone-700 text-sm leading-relaxed mb-3 break-all whitespace-pre-wrap w-full overflow-hidden">{r.content}</p>
           
           {/* Actions */}
           <div className="flex items-center gap-4 flex-wrap">
@@ -497,7 +497,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
   }
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden min-w-0">
       {/* Tabs */}
       <div className="flex border-b border-stone-200">
         <button
@@ -609,7 +609,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
 
       {/* Reflections Tab */}
       {activeTab === 'reflections' && (
-        <div className="p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+        <div className="p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto min-w-0">
           {/* Best Reflections */}
           {bestReflections.length > 0 && (
             <div className="mb-6">

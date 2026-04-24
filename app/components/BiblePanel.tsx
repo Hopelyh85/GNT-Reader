@@ -460,7 +460,7 @@ export function BiblePanel({
                                       verse
                                     )
                                   }
-                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer flex-shrink-0 ${
+                                  className={`text-left p-3 rounded transition-all text-sm cursor-pointer flex-shrink-0 min-w-0 ${
                                     isSelected
                                       ? 'bg-amber-100 border-l-2 border-amber-500 text-stone-800'
                                       : 'bg-white hover:bg-stone-100 text-stone-600'
@@ -475,7 +475,7 @@ export function BiblePanel({
                                   <span className="font-serif text-xs text-stone-400 mr-2 select-none">
                                     {verseIdx + 1}
                                   </span>
-                                  <span className="font-greek text-stone-700 flex-wrap break-words overflow-hidden" style={{ whiteSpace: 'normal', lineHeight: '1.8', wordBreak: 'break-word' }}>
+                                  <span className="font-greek text-stone-700 break-all whitespace-pre-wrap w-full overflow-hidden" style={{ lineHeight: '1.8' }}>
                                     {verse.map((word, wordIdx) => (
                                       <span key={`word-${wordIdx}`} className="inline-block">
                                         <span
@@ -499,7 +499,7 @@ export function BiblePanel({
                                   </span>
                                   {/* KRV Translation */}
                                   {krvText && (
-                                    <p className="mt-2 text-sm text-stone-600 font-serif border-t border-stone-200 pt-2">
+                                    <p className="mt-2 text-sm text-stone-600 font-serif border-t border-stone-200 pt-2 break-all whitespace-pre-wrap w-full overflow-hidden">
                                       {krvText}
                                     </p>
                                   )}
