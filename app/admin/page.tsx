@@ -6,7 +6,6 @@ import {
   checkIsAdmin, 
   getAdminUserStats, 
   AdminUserStats, 
-  updateUserTier,
   getPublicReflections,
   getMyStudyNotes,
   getAllStudyNotesForBook,
@@ -246,7 +245,18 @@ function AdminDashboardContent() {
   const handleTierChange = async (userId: string, newTier: string) => {
     setUpdatingTier(userId);
     try {
-      await updateUserTier(userId, newTier as any, true);
+      const supabase = getSupabase();
+      const { error } = await supabase.rpc('admin_update_tier', {
+        target_id: userId,
+        new_tier: newTier
+      });
+      
+      if (error) {
+        console.error('RPC error:', error);
+        alert('등급 변경 실패: ' + error.message);
+        return;
+      }
+      
       await loadUserStats();
     } catch (err) {
       console.error('Error updating tier:', err);
