@@ -11,7 +11,7 @@ import {
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
   addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection,
   addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser,
-  checkIsAdmin
+  checkIsAdmin, getStudyNotesForVerse
 } from '@/app/lib/supabase';
 
 interface CommunityPanelProps {
@@ -70,6 +70,10 @@ export function CommunityPanel({
   const [loadingReplies, setLoadingReplies] = useState<Record<string, boolean>>({});
   const [newReply, setNewReply] = useState<Record<string, string>>({});
   const [savingReply, setSavingReply] = useState<Record<string, boolean>>({});
+  
+  // Ministry notes (pinned at top for selected verse)
+  const [ministryNotes, setMinistryNotes] = useState<any[]>([]);
+  const [loadingMinistry, setLoadingMinistry] = useState(false);
 
   // Get current user ID
   useEffect(() => {
@@ -163,6 +167,33 @@ export function CommunityPanel({
       loadReplies(expandedPostId);
     }
   }, [expandedPostId]);
+
+  // Load ministry notes for selected verse (⭐⭐⭐⭐⭐ admin pinned)
+  useEffect(() => {
+    const loadMinistryNotes = async () => {
+      if (!selectedVerse) {
+        setMinistryNotes([]);
+        return;
+      }
+      
+      setLoadingMinistry(true);
+      try {
+        const verseRef = `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`;
+        const notes = await getStudyNotesForVerse(verseRef);
+        // Filter only ⭐⭐⭐⭐⭐ admin notes
+        const adminNotes = notes.filter((note: any) => 
+          note.profiles?.tier === '⭐⭐⭐⭐⭐' || note.profiles?.tier === 'Admin'
+        );
+        setMinistryNotes(adminNotes);
+      } catch (err) {
+        console.error('Error loading ministry notes:', err);
+      } finally {
+        setLoadingMinistry(false);
+      }
+    };
+    
+    loadMinistryNotes();
+  }, [selectedVerse]);
 
   const loadReplies = async (postId: string) => {
     setLoadingReplies(prev => ({ ...prev, [postId]: true }));
@@ -686,6 +717,30 @@ export function CommunityPanel({
               <span className="text-xs font-medium text-amber-700">공지사항</span>
             </div>
             {pinnedPosts.map(post => renderPost(post, true))}
+          </div>
+        )}
+
+        {/* Ministry Notes (⭐⭐⭐⭐⭐ Admin Pinned) */}
+        {ministryNotes.length > 0 && (
+          <div className="p-3 space-y-2 border-b border-stone-200 bg-purple-50/30">
+            <div className="flex items-center gap-2 px-1">
+              <Crown className="w-3 h-3 text-purple-600" />
+              <span className="text-xs font-medium text-purple-700">소장님 사역/주석</span>
+              {selectedVerse && (
+                <span className="text-xs text-purple-500">
+                  · {selectedVerse.book} {selectedVerse.chapter}:{selectedVerse.verse}
+                </span>
+              )}
+            </div>
+            {ministryNotes.map((note: any) => (
+              <div key={note.id} className="bg-white rounded-lg border border-purple-200 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-purple-700">{getDisplayName(note.profiles)}</span>
+                  <span className="text-xs text-stone-400">· {new Date(note.created_at).toLocaleDateString('ko-KR')}</span>
+                </div>
+                <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{note.content}</p>
+              </div>
+            ))}
           </div>
         )}
 

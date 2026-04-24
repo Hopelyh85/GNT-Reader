@@ -258,20 +258,20 @@ function AdminDashboardContent() {
 
 const getTierLabel = (tier: string) => {
     switch (tier) {
-      case 'Admin': return 'Admin(관리자)';
-      case '⭐⭐⭐': return '⭐⭐⭐(최우수)';
-      case '⭐⭐': return '⭐⭐(우수)';
-      case '⭐': return '⭐(정회원)';
-      default: return 'General(일반)';
+      case '⭐⭐⭐⭐⭐': return '⭐⭐⭐⭐⭐(Admin - 모든 권한)';
+      case '⭐⭐⭐⭐': return '⭐⭐⭐⭐(Staff - 타인 글 삭제, 번역 가능)';
+      case '⭐⭐⭐': return '⭐⭐⭐(Hardworking - 번역 가능)';
+      case '⭐⭐': return '⭐⭐(Regular - 묵상/댓글 가능)';
+      default: return '⭐(General - 읽기 전용)';
     }
   };
 
 const getTierColor = (tier: string) => {
     switch (tier) {
-      case 'Admin': return 'text-purple-600 font-medium';
+      case '⭐⭐⭐⭐⭐': return 'text-purple-600 font-medium';
+      case '⭐⭐⭐⭐': return 'text-blue-600 font-medium';
       case '⭐⭐⭐': return 'text-amber-600 font-medium';
-      case '⭐⭐': return 'text-blue-600';
-      case '⭐': return 'text-green-600';
+      case '⭐⭐': return 'text-green-600';
       default: return 'text-stone-500';
     }
   };
@@ -426,11 +426,11 @@ const getTierColor = (tier: string) => {
                             disabled={updatingTier === user.id}
                             className="text-xs px-2 py-1 border border-stone-200 rounded focus:outline-none focus:border-stone-400"
                           >
-                            <option value="Admin">Admin(관리자)</option>
-                            <option value="⭐⭐⭐">⭐⭐⭐(최우수)</option>
-                            <option value="⭐⭐">⭐⭐(우수)</option>
-                            <option value="⭐">⭐(정회원)</option>
-                            <option value="General">General(일반)</option>
+                            <option value="⭐⭐⭐⭐⭐">⭐⭐⭐⭐⭐(Admin)</option>
+                            <option value="⭐⭐⭐⭐">⭐⭐⭐⭐(Staff)</option>
+                            <option value="⭐⭐⭐">⭐⭐⭐(Hardworking)</option>
+                            <option value="⭐⭐">⭐⭐(Regular)</option>
+                            <option value="⭐">⭐(General)</option>
                           </select>
                         </td>
                       </tr>

@@ -313,6 +313,23 @@ export async function getAllStudyNotesForBook(
   return data || [];
 }
 
+// Get study notes for a specific verse (for ministry pin feature)
+export async function getStudyNotesForVerse(verseRef: string): Promise<any[]> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase
+    .from('study_notes')
+    .select('*, profiles(nickname, email, tier)')
+    .eq('verse_ref', verseRef)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching study notes for verse:', error);
+    return [];
+  }
+  return data || [];
+}
+
 export async function saveMyStudyNote(
   verseRef: string,
   book: string,

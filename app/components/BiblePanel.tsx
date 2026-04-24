@@ -244,6 +244,21 @@ export function BiblePanel({
     return bookAbbrevMap[bookName] || bookName.slice(0, 3).toUpperCase();
   };
 
+  const bookNameMap: Record<string, string> = useMemo(() => {
+    const map: Record<string, string> = {
+      'MAT': '마태복음', 'MRK': '마가복음', 'LUK': '누가복음', 'JHN': '요한복음',
+      'ACT': '사도행전', 'ROM': '로마서', '1CO': '고린도전서', '2CO': '고린도후서',
+      'GAL': '갈라디아서', 'EPH': '에베소서', 'PHP': '빌립보서', 'COL': '골로새서',
+      '1TH': '데살로니가전서', '2TH': '데살로니가후서', '1TM': '디모데전서', '2TM': '디모데후서',
+      'TIT': '디도서', 'PHM': '빌레몬서', 'HEB': '히브리서', 'JAS': '야고보서',
+      '1PE': '베드로전서', '2PE': '베드로후서', '1JN': '요한일서', '2JN': '요한이서',
+      '3JN': '요한삼서', 'JUD': '유다서', 'REV': '요한계시록',
+      'Matt': '마태복음', 'Mark': '마가복음', 'Luke': '누가복음', 'John': '요한복음',
+      'Acts': '사도행전', 'Rom': '로마서', '1Cor': '고린도전서', '2Cor': '고린도후서',
+    };
+    return map;
+  }, []);
+
   const handleBookClick = (bookName: string) => {
     setExpandedBook(expandedBook === bookName ? null : bookName);
     setExpandedChapter(null);
@@ -380,6 +395,9 @@ export function BiblePanel({
     setSavingReflection(true);
     try {
       const verseRef = `${book} ${chapter}:${verse}`;
+      const bookName = bookNameMap[book] || book;
+      const autoTitle = `[${bookName} ${chapter}장 ${verse}절] 묵상 나눔`;
+      
       await addPublicReflection(
         verseRef,
         book,
@@ -388,7 +406,8 @@ export function BiblePanel({
         newReflection,
         true, // isPublic
         'reflection',
-        null // parentId
+        null, // parentId
+        autoTitle
       );
       
       setNewReflection('');
