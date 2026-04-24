@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getMyProfile, Profile } from './supabase';
 
 // User tiers
-export type UserTier = 'Admin' | 'Hardworking' | 'Regular' | 'General';
+export type UserTier = 'Admin' | 'Staff' | 'Hardworking' | 'Regular' | 'General';
 
 // Extended session user type
 export interface SessionUser {

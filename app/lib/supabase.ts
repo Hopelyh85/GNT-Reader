@@ -155,7 +155,7 @@ export interface Profile {
   id: string;
   email: string;
   nickname: string | null;
-  tier: 'Admin' | 'Hardworking' | 'Regular' | 'General';
+  tier: 'Admin' | 'Staff' | 'Hardworking' | 'Regular' | 'General';
   avatar_url: string | null;
   bio: string | null;
   is_approved: boolean;
@@ -336,13 +336,17 @@ export interface StudioReflection {
   is_public: boolean;
   is_best: boolean;
   likes_count: number;
+  category?: 'ministry' | 'commentary' | 'reflection';
+  parent_id?: string | null;
   created_at: string;
   updated_at: string;
   profiles?: {
     nickname: string | null;
     tier: string;
     avatar_url: string | null;
+    email?: string;
   };
+  replies?: StudioReflection[];
 }
 
 export async function getPublicReflections(
@@ -408,7 +412,9 @@ export async function addPublicReflection(
   chapter: number,
   verse: number,
   content: string,
-  isPublic: boolean = true
+  isPublic: boolean = true,
+  category: 'ministry' | 'commentary' | 'reflection' = 'reflection',
+  parentId: string | null = null
 ): Promise<void> {
   const supabase = getSupabase();
   const user = await getCurrentUser();
@@ -422,7 +428,42 @@ export async function addPublicReflection(
     verse,
     content,
     is_public: isPublic,
+    category,
+    parent_id: parentId,
   });
+  
+  if (error) throw error;
+}
+
+export async function deleteReflection(reflectionId: string): Promise<void> {
+  const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+  
+  // Check if user owns the reflection or has admin/staff role
+  const { data: reflection } = await supabase
+    .from('reflections')
+    .select('user_id')
+    .eq('id', reflectionId)
+    .single();
+    
+  if (!reflection) throw new Error('Reflection not found');
+  
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('tier')
+    .eq('id', user.id)
+    .single();
+    
+  const canDelete = reflection.user_id === user.id || 
+    ['Admin', 'Staff'].includes(profile?.tier);
+    
+  if (!canDelete) throw new Error('Not authorized to delete');
+  
+  const { error } = await supabase
+    .from('reflections')
+    .delete()
+    .eq('id', reflectionId);
   
   if (error) throw error;
 }
@@ -509,4 +550,24 @@ export async function exportMyStudyNotes(): Promise<any[]> {
     return [];
   }
   return data || [];
+}
+
+// ============================================
+// STUDIO API - Global Notice
+// ============================================
+
+export async function getGlobalNotice(): Promise<string | null> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase
+    .from('settings')
+    .select('value')
+    .eq('key', 'global_notice')
+    .maybeSingle();
+  
+  if (error) {
+    console.error('Error fetching global notice:', error);
+    return null;
+  }
+  return data?.value || null;
 }

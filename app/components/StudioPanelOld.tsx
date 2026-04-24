@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   getMyProfile, 
   getMyStudyNotes, 
@@ -13,7 +13,6 @@ import {
   hasUserLiked,
   markReflectionAsBest,
   exportMyStudyNotes,
-  deleteReflection,
   Profile,
   StudioReflection 
 } from '@/app/lib/supabase';
@@ -30,11 +29,7 @@ import {
   Download,
   Share2,
   Check,
-  Trash2,
-  MessageSquare,
-  Star,
-  Mail,
-  X
+  Copy
 } from 'lucide-react';
 
 interface StudioPanelProps {
@@ -44,62 +39,6 @@ interface StudioPanelProps {
   verse: number;
 }
 
-// Star rating display based on tier
-const TierStars = ({ tier }: { tier: string }) => {
-  const starCount = {
-    'Admin': 5,
-    'Staff': 4,
-    'Hardworking': 3,
-    'Regular': 2,
-    'General': 1
-  }[tier] || 1;
-  
-  return (
-    <span className="text-amber-500 text-xs tracking-tight">
-      {'⭐'.repeat(starCount)}
-    </span>
-  );
-};
-
-// Category badge
-const CategoryBadge = ({ category }: { category: string }) => {
-  const styles: Record<string, string> = {
-    'ministry': 'bg-purple-100 text-purple-700',
-    'commentary': 'bg-blue-100 text-blue-700',
-    'reflection': 'bg-green-100 text-green-700'
-  };
-  const labels: Record<string, string> = {
-    'ministry': '사역',
-    'commentary': '주석',
-    'reflection': '묵상'
-  };
-  
-  return (
-    <span className={`text-xs px-1.5 py-0.5 rounded ${styles[category] || styles.reflection}`}>
-      {labels[category] || '묵상'}
-    </span>
-  );
-};
-
-// Format timestamp
-const formatTime = (date: string) => {
-  const d = new Date(date);
-  const year = d.getFullYear().toString().slice(2);
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const day = d.getDate().toString().padStart(2, '0');
-  const hours = d.getHours().toString().padStart(2, '0');
-  const minutes = d.getMinutes().toString().padStart(2, '0');
-  return `${year}.${month}.${day} ${hours}:${minutes}`;
-};
-
-// Check if user can delete
-const canDelete = (profile: Profile | null, reflectionUserId: string) => {
-  if (!profile) return false;
-  if (profile.id === reflectionUserId) return true;
-  if (['Admin', 'Staff'].includes(profile.tier)) return true;
-  return false;
-};
-
 export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPanelProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [activeTab, setActiveTab] = useState<'notes' | 'reflections'>('notes');
@@ -107,51 +46,30 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
   // Ministry Notes state
   const [myNote, setMyNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
-  const [exporting, setExporting] = useState(false);
   
   // Reflections state
   const [reflections, setReflections] = useState<StudioReflection[]>([]);
   const [bestReflections, setBestReflections] = useState<StudioReflection[]>([]);
   const [newReflection, setNewReflection] = useState('');
-  const [reflectionCategory, setReflectionCategory] = useState<'ministry' | 'commentary' | 'reflection'>('reflection');
   const [submittingReflection, setSubmittingReflection] = useState(false);
   const [reflectionPage, setReflectionPage] = useState(1);
   const [reflectionCount, setReflectionCount] = useState(0);
   const [likedReflections, setLikedReflections] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [replyTo, setReplyTo] = useState<string | null>(null);
-  const [replyContent, setReplyContent] = useState('');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  
-  // Share states
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [verseCopied, setVerseCopied] = useState(false);
-
-  // Refs for scrolling
-  const reflectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     loadData();
   }, [verseRef]);
 
-  // Handle deep link scroll
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const reflectionId = urlParams.get('reflection');
-    if (reflectionId && reflectionRefs.current[reflectionId]) {
-      setTimeout(() => {
-        reflectionRefs.current[reflectionId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 500);
-    }
-  }, [reflections]);
-
   const loadData = async () => {
     try {
       setLoading(true);
       
+      // Load profile
       const profileData = await getMyProfile();
       setProfile(profileData);
       
+      // Load my note for this verse
       if (profileData) {
         const notes = await getMyStudyNotes(verseRef, 1);
         if (notes.length > 0) {
@@ -159,13 +77,16 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
         }
       }
       
+      // Load best reflections
       const best = await getBestReflections(verseRef, 5);
       setBestReflections(best);
       
+      // Load public reflections
       const { data, count } = await getPublicReflections(verseRef, 1, 20);
       setReflections(data);
       setReflectionCount(count || 0);
       
+      // Check which reflections user has liked
       if (profileData) {
         const likedSet = new Set<string>();
         for (const r of data) {
@@ -182,7 +103,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
   };
 
   const handleSaveNote = async () => {
-    if (!profile || !['Admin', 'Hardworking'].includes(profile.tier)) return;
+    if (!profile || profile.tier === 'General') return;
     
     try {
       setSavingNote(true);
@@ -199,11 +120,10 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
     
     try {
       setSubmittingReflection(true);
-      await addPublicReflection(verseRef, book, chapter, verse, newReflection, true, reflectionCategory, replyTo);
+      await addPublicReflection(verseRef, book, chapter, verse, newReflection, true);
       setNewReflection('');
-      setReplyTo(null);
-      setReplyContent('');
       
+      // Refresh reflections
       const { data, count } = await getPublicReflections(verseRef, 1, 20);
       setReflections(data);
       setReflectionCount(count || 0);
@@ -232,6 +152,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
         setLikedReflections(prev => new Set(prev).add(reflectionId));
       }
       
+      // Refresh reflections to update counts
       const { data } = await getPublicReflections(verseRef, reflectionPage, 20);
       setReflections(data);
     } catch (err) {
@@ -245,9 +166,11 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
     try {
       await markReflectionAsBest(reflectionId, isBest);
       
+      // Refresh best reflections
       const best = await getBestReflections(verseRef, 5);
       setBestReflections(best);
       
+      // Refresh public reflections
       const { data, count } = await getPublicReflections(verseRef, reflectionPage, 20);
       setReflections(data);
       setReflectionCount(count || 0);
@@ -256,23 +179,8 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
     }
   };
 
-  const handleDelete = async (reflectionId: string) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
-    
-    try {
-      setDeletingId(reflectionId);
-      await deleteReflection(reflectionId);
-      
-      const { data, count } = await getPublicReflections(verseRef, 1, 20);
-      setReflections(data);
-      setReflectionCount(count || 0);
-    } catch (err) {
-      console.error('Error deleting reflection:', err);
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
+  // Export study notes as Markdown
+  const [exporting, setExporting] = useState(false);
   const handleExportNotes = async () => {
     if (!profile) return;
     
@@ -285,6 +193,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
         return;
       }
       
+      // Generate Markdown content
       const date = new Date().toISOString().split('T')[0];
       let mdContent = `# K-GNT 위키 스튜디오 - 내 사역 노트\n\n`;
       mdContent += `**생성일:** ${date}\n`;
@@ -294,11 +203,12 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
       notes.forEach((note, index) => {
         mdContent += `## ${index + 1}. ${note.verse_ref}\n\n`;
         mdContent += `**성경:** ${note.book} ${note.chapter}:${note.verse}\n\n`;
-        mdContent += `**작성일:** ${formatTime(note.created_at)}\n\n`;
+        mdContent += `**작성일:** ${new Date(note.created_at).toLocaleDateString('ko-KR')}\n\n`;
         mdContent += `### 내용\n\n${note.content}\n\n`;
         mdContent += `---\n\n`;
       });
       
+      // Create and download file
       const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
@@ -316,7 +226,10 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
     }
   };
 
+  // Share reflection link
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const handleShareReflection = (reflection: StudioReflection) => {
+    // Generate shareable URL with reflection context
     const shareUrl = `${window.location.origin}/?book=${reflection.book}&chapter=${reflection.chapter}&verse=${reflection.verse}&reflection=${reflection.id}`;
     
     navigator.clipboard.writeText(shareUrl).then(() => {
@@ -327,6 +240,8 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
     });
   };
 
+  // Share verse link
+  const [verseCopied, setVerseCopied] = useState(false);
   const handleShareVerse = () => {
     const shareUrl = `${window.location.origin}/?book=${book}&chapter=${chapter}&verse=${verse}`;
     
@@ -338,155 +253,8 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
     });
   };
 
-  // Reflection Card Component
-  const ReflectionCard = ({ r, isBest = false, depth = 0 }: { r: StudioReflection, isBest?: boolean, depth?: number }) => {
-    const isLiked = likedReflections.has(r.id);
-    const showDelete = canDelete(profile, r.user_id);
-    const isReplying = replyTo === r.id;
-    
-    return (
-      <div 
-        ref={(el) => { reflectionRefs.current[r.id] = el; }}
-        className={`${depth > 0 ? 'ml-8 border-l-2 border-stone-200 pl-4' : ''}`}
-      >
-        <div className={`p-4 ${isBest ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200' : 'bg-stone-50 border border-stone-200'} rounded-lg`}>
-          {/* Header */}
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-stone-800 text-sm">
-                {r.profiles?.nickname || r.user_id.slice(0, 8)}
-              </span>
-              <TierStars tier={r.profiles?.tier || 'General'} />
-              <CategoryBadge category={r.category || 'reflection'} />
-              {isBest && (
-                <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                  ✨ 베스트
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-400">
-                {formatTime(r.created_at)}
-              </span>
-              {profile?.tier === 'Admin' && (
-                <button
-                  onClick={() => handleMarkBest(r.id, !isBest)}
-                  className="text-xs text-amber-600 hover:text-amber-700 underline"
-                >
-                  {isBest ? '해제' : '선정'}
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Content */}
-          <p className="text-stone-700 text-sm leading-relaxed mb-3">{r.content}</p>
-          
-          {/* Actions */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <button
-              onClick={() => handleLike(r.id)}
-              disabled={!profile}
-              className={`flex items-center gap-1 text-sm ${
-                isLiked ? 'text-red-500' : 'text-stone-400 hover:text-red-500'
-              }`}
-            >
-              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-              {r.likes_count}
-            </button>
-            
-            <button
-              onClick={() => handleShareReflection(r)}
-              className={`flex items-center gap-1 text-sm text-stone-400 hover:text-amber-600 transition-colors ${
-                copiedId === r.id ? 'text-green-500' : ''
-              }`}
-            >
-              {copiedId === r.id ? (
-                <><Check className="w-4 h-4" /><span>복사됨</span></>
-              ) : (
-                <><Share2 className="w-4 h-4" /><span>공유</span></>
-              )}
-            </button>
-            
-            {profile && (
-              <button
-                onClick={() => setReplyTo(replyTo === r.id ? null : r.id)}
-                className="flex items-center gap-1 text-sm text-stone-400 hover:text-blue-600"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>답글</span>
-              </button>
-            )}
-            
-            {/* Email contact */}
-            {r.profiles?.email && (
-              <a
-                href={`mailto:${r.profiles.email}`}
-                className="flex items-center gap-1 text-sm text-stone-400 hover:text-blue-600"
-                title={`${r.profiles.email}에게 메일 보내기`}
-              >
-                <Mail className="w-4 h-4" />
-              </a>
-            )}
-            
-            {showDelete && (
-              <button
-                onClick={() => handleDelete(r.id)}
-                disabled={deletingId === r.id}
-                className="flex items-center gap-1 text-sm text-stone-400 hover:text-red-600 ml-auto"
-              >
-                {deletingId === r.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <><Trash2 className="w-4 h-4" /><span>삭제</span></>
-                )}
-              </button>
-            )}
-          </div>
-          
-          {/* Reply Input */}
-          {isReplying && (
-            <div className="mt-3 pt-3 border-t border-stone-200">
-              <div className="flex gap-2 mb-2">
-                <textarea
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  placeholder={`${r.profiles?.nickname || '묵상자'}님에게 답글 작성...`}
-                  className="flex-1 h-20 p-2 border border-stone-200 rounded-lg resize-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setReplyTo(null)}
-                  className="px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100 rounded-lg"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    setNewReflection(replyContent);
-                    handleSubmitReflection().then(() => setReplyContent(''));
-                  }}
-                  disabled={!replyContent.trim()}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-sm rounded-lg hover:bg-amber-600 disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4" />
-                  답글 등록
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        {/* Replies */}
-        {r.replies?.map(reply => (
-          <div key={reply.id} className="mt-2">
-            <ReflectionCard r={reply} depth={depth + 1} />
-          </div>
-        ))}
-      </div>
-    );
-  };
+  const canWriteNotes = profile && ['Admin', 'Hardworking'].includes(profile.tier);
+  const isAdmin = profile?.tier === 'Admin';
 
   if (loading) {
     return (
@@ -510,11 +278,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
         >
           <PenLine className="w-4 h-4" />
           사역 노트
-          {profile && (
-            <span className="flex items-center gap-1 text-xs opacity-70">
-              <TierStars tier={profile.tier} />
-            </span>
-          )}
+          {profile && <span className="text-xs opacity-70">({profile.tier})</span>}
         </button>
         <button
           onClick={() => setActiveTab('reflections')}
@@ -542,14 +306,15 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
                 사역 노트를 작성하려면 <a href="/login" className="text-amber-600 hover:underline">로그인</a>이 필요합니다.
               </p>
             </div>
-          ) : !['Admin', 'Hardworking'].includes(profile.tier) ? (
+          ) : !canWriteNotes ? (
             <div className="text-center py-8">
               <Lock className="w-12 h-12 mx-auto mb-3 text-stone-300" />
               <p className="text-stone-500 text-sm mb-2">
-                현재 등급 <TierStars tier={profile.tier} />으로는 사역 노트 작성이 제한됩니다.
+                현재 등급 <span className="font-medium text-stone-700">{profile.tier}</span>으로는 
+                사역 노트 작성이 제한됩니다.
               </p>
               <p className="text-xs text-stone-400">
-                Admin(⭐⭐⭐⭐⭐) 또는 Hardworking(⭐⭐⭐) 등급에서 작성 가능합니다.
+                Admin 또는 Hardworking 등급에서 작성 가능합니다.
               </p>
             </div>
           ) : (
@@ -587,9 +352,15 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
                     className="flex items-center gap-1.5 px-3 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
                   >
                     {verseCopied ? (
-                      <><Check className="w-4 h-4 text-green-500" /><span className="text-green-600">복사됨</span></>
+                      <>
+                        <Check className="w-4 h-4 text-green-500" />
+                        <span className="text-green-600">복사됨</span>
+                      </>
                     ) : (
-                      <><Share2 className="w-4 h-4" />공유하기</>
+                      <>
+                        <Share2 className="w-4 h-4" />
+                        공유하기
+                      </>
                     )}
                   </button>
                   <button
@@ -597,7 +368,11 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
                     disabled={savingNote}
                     className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white text-sm rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
                   >
-                    {savingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenLine className="w-4 h-4" />}
+                    {savingNote ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <PenLine className="w-4 h-4" />
+                    )}
                     저장하기
                   </button>
                 </div>
@@ -609,8 +384,8 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
 
       {/* Reflections Tab */}
       {activeTab === 'reflections' && (
-        <div className="p-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-          {/* Best Reflections */}
+        <div className="p-4 space-y-4">
+          {/* Best Reflections Section */}
           {bestReflections.length > 0 && (
             <div className="mb-6">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-amber-700 mb-3">
@@ -618,8 +393,68 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
                 ✨ 베스트 묵상
               </h3>
               <div className="space-y-3">
-                {bestReflections.map(r => (
-                  <ReflectionCard key={r.id} r={r} isBest={true} />
+                {bestReflections.map((r) => (
+                  <div key={r.id} className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-stone-800 text-sm">
+                          {r.profiles?.nickname || '묵상자'}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          r.profiles?.tier === 'Admin' ? 'bg-purple-100 text-purple-700' :
+                          r.profiles?.tier === 'Hardworking' ? 'bg-blue-100 text-blue-700' :
+                          r.profiles?.tier === 'Regular' ? 'bg-green-100 text-green-700' :
+                          'bg-stone-100 text-stone-600'
+                        }`}>
+                          {r.profiles?.tier}
+                        </span>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleMarkBest(r.id, false)}
+                            className="text-xs text-amber-600 hover:text-amber-700 underline"
+                          >
+                            베스트 해제
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-xs text-stone-400">
+                        {new Date(r.created_at).toLocaleDateString('ko-KR')}
+                      </span>
+                    </div>
+                    <p className="text-stone-700 text-sm leading-relaxed">{r.content}</p>
+                    <div className="mt-3 flex items-center gap-4">
+                      <button
+                        onClick={() => handleLike(r.id)}
+                        disabled={!profile}
+                        className={`flex items-center gap-1 text-sm ${
+                          likedReflections.has(r.id) 
+                            ? 'text-red-500' 
+                            : 'text-stone-400 hover:text-red-500'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${likedReflections.has(r.id) ? 'fill-current' : ''}`} />
+                        {r.likes_count}
+                      </button>
+                      <button
+                        onClick={() => handleShareReflection(r)}
+                        className={`flex items-center gap-1 text-sm text-stone-400 hover:text-amber-600 transition-colors ${
+                          copiedId === r.id ? 'text-green-500' : ''
+                        }`}
+                      >
+                        {copiedId === r.id ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            <span>복사됨</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-4 h-4" />
+                            <span>공유하기</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -627,26 +462,11 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
 
           {/* Write Reflection */}
           {profile && (
-            <div className="mb-4 p-4 bg-stone-50 border border-stone-200 rounded-lg">
-              <div className="flex gap-2 mb-2">
-                {(['reflection', 'ministry', 'commentary'] as const).map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setReflectionCategory(cat)}
-                    className={`px-2 py-1 text-xs rounded ${
-                      reflectionCategory === cat 
-                        ? 'bg-amber-500 text-white' 
-                        : 'bg-white text-stone-600 border border-stone-200'
-                    }`}
-                  >
-                    {cat === 'reflection' ? '묵상' : cat === 'ministry' ? '사역' : '주석'}
-                  </button>
-                ))}
-              </div>
+            <div className="mb-4">
               <textarea
                 value={newReflection}
                 onChange={(e) => setNewReflection(e.target.value)}
-                placeholder={`${reflectionCategory === 'reflection' ? '묵상' : reflectionCategory === 'ministry' ? '사역' : '주석'}을 작성하세요...`}
+                placeholder="이 구절에 대한 묵상을 공유하세요..."
                 className="w-full h-24 p-3 border border-stone-200 rounded-lg resize-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
               />
               <div className="mt-2 flex justify-end">
@@ -655,8 +475,12 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
                   disabled={submittingReflection || !newReflection.trim()}
                   className="flex items-center gap-2 px-4 py-2 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-900 transition-colors disabled:opacity-50"
                 >
-                  {submittingReflection ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  등록하기
+                  {submittingReflection ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  묵상 등록
                 </button>
               </div>
             </div>
@@ -668,8 +492,68 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
               전체 묵상 ({reflectionCount}개)
             </h3>
             <div className="space-y-3">
-              {reflections.filter(r => !r.is_best).map(r => (
-                <ReflectionCard key={r.id} r={r} />
+              {reflections.filter(r => !r.is_best).map((r) => (
+                <div key={r.id} className="p-4 bg-stone-50 border border-stone-200 rounded-lg">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-stone-800 text-sm">
+                        {r.profiles?.nickname || '묵상자'}
+                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        r.profiles?.tier === 'Admin' ? 'bg-purple-100 text-purple-700' :
+                        r.profiles?.tier === 'Hardworking' ? 'bg-blue-100 text-blue-700' :
+                        r.profiles?.tier === 'Regular' ? 'bg-green-100 text-green-700' :
+                        'bg-stone-100 text-stone-600'
+                      }`}>
+                        {r.profiles?.tier}
+                      </span>
+                      {isAdmin && !r.is_best && (
+                        <button
+                          onClick={() => handleMarkBest(r.id, true)}
+                          className="text-xs text-amber-600 hover:text-amber-700 underline"
+                        >
+                          베스트 선정
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-xs text-stone-400">
+                      {new Date(r.created_at).toLocaleDateString('ko-KR')}
+                    </span>
+                  </div>
+                  <p className="text-stone-700 text-sm leading-relaxed">{r.content}</p>
+                  <div className="mt-3 flex items-center gap-4">
+                    <button
+                      onClick={() => handleLike(r.id)}
+                      disabled={!profile}
+                      className={`flex items-center gap-1 text-sm ${
+                        likedReflections.has(r.id) 
+                          ? 'text-red-500' 
+                          : 'text-stone-400 hover:text-red-500'
+                      }`}
+                    >
+                      <Heart className={`w-4 h-4 ${likedReflections.has(r.id) ? 'fill-current' : ''}`} />
+                      {r.likes_count}
+                    </button>
+                    <button
+                      onClick={() => handleShareReflection(r)}
+                      className={`flex items-center gap-1 text-sm text-stone-400 hover:text-amber-600 transition-colors ${
+                        copiedId === r.id ? 'text-green-500' : ''
+                      }`}
+                    >
+                      {copiedId === r.id ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>복사됨</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-4 h-4" />
+                          <span>공유하기</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
 
