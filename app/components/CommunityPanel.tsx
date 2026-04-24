@@ -600,9 +600,25 @@ export function CommunityPanel({
                   </button>
                 ) : (
                   <button
-                    onClick={(e) => { 
+                    onClick={async (e) => { 
                       e.stopPropagation(); 
-                      alert('삭제 요청이 접수되었습니다. 관리자 승인 후 처리됩니다.');
+                      try {
+                        const supabase = getSupabase();
+                        const { error } = await supabase
+                          .from('reflections')
+                          .update({ delete_requested: true })
+                          .eq('id', post.id);
+                        
+                        if (error) {
+                          console.error('Delete request error:', error);
+                          alert('삭제 요청 중 오류가 발생했습니다.');
+                          return;
+                        }
+                        alert('삭제 요청이 접수되었습니다. 관리자 승인 후 처리됩니다.');
+                      } catch (err) {
+                        console.error('Delete request failed:', err);
+                        alert('삭제 요청 중 오류가 발생했습니다.');
+                      }
                     }}
                     className="flex items-center gap-1 px-2 py-1 text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors"
                   >
@@ -730,7 +746,25 @@ export function CommunityPanel({
                 ⭐ 등급은 읽기만 가능합니다. 글쓰기는 ⭐⭐ 이상부터 가능합니다.
               </p>
               <button
-                onClick={() => alert('등업 신청 페이지로 이동합니다. (준비중)')}
+                onClick={async () => {
+                  try {
+                    const supabase = getSupabase();
+                    const { error } = await supabase
+                      .from('profiles')
+                      .update({ upgrade_requested: true })
+                      .eq('id', currentUserId);
+                    
+                    if (error) {
+                      console.error('Upgrade request error:', error);
+                      alert('등업 신청 중 오류가 발생했습니다.');
+                      return;
+                    }
+                    alert('등업 신청이 완료되었습니다. 관리자 승인 후 등급이 상승됩니다.');
+                  } catch (err) {
+                    console.error('Upgrade request failed:', err);
+                    alert('등업 신청 중 오류가 발생했습니다.');
+                  }
+                }}
                 className="flex items-center gap-1 px-3 py-1.5 text-xs bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors"
               >
                 <Crown className="w-3 h-3" />

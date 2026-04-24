@@ -45,7 +45,7 @@ const books = [
   { id: 'Rev', name: '요한계시록', chapters: 22 },
 ];
 
-type Tab = 'users' | 'book-archive' | 'user-archive';
+type Tab = 'users' | 'book-archive' | 'user-archive' | 'upgrade-requests' | 'delete-requests';
 
 interface UserActivity {
   reflections: StudioReflection[];
@@ -65,6 +65,11 @@ function AdminDashboardContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
+  
+  // Approval states
+  const [upgradeRequests, setUpgradeRequests] = useState<any[]>([]);
+  const [deleteRequests, setDeleteRequests] = useState<any[]>([]);
+  const [loadingApprovals, setLoadingApprovals] = useState(false);
   
   // User Management
   const [userStats, setUserStats] = useState<AdminUserStats[]>([]);
@@ -110,6 +115,20 @@ function AdminDashboardContent() {
       loadBookArchive();
     }
   }, [isAdmin, activeTab, selectedBook]);
+  
+  // Load upgrade requests
+  useEffect(() => {
+    if (isAdmin && activeTab === 'upgrade-requests') {
+      loadUpgradeRequests();
+    }
+  }, [isAdmin, activeTab]);
+  
+  // Load delete requests
+  useEffect(() => {
+    if (isAdmin && activeTab === 'delete-requests') {
+      loadDeleteRequests();
+    }
+  }, [isAdmin, activeTab]);
 
   // Load user archive from URL param
   useEffect(() => {
@@ -173,6 +192,119 @@ function AdminDashboardContent() {
       console.error('[loadBookArchive] Error loading book archive:', err);
     } finally {
       setLoadingBook(false);
+    }
+  };
+
+  // Load upgrade requests
+  const loadUpgradeRequests = async () => {
+    setLoadingApprovals(true);
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, nickname, username, tier, upgrade_requested, created_at')
+        .eq('upgrade_requested', true);
+      
+      if (error) {
+        console.error('Error loading upgrade requests:', error);
+        return;
+      }
+      setUpgradeRequests(data || []);
+    } catch (err) {
+      console.error('Error loading upgrade requests:', err);
+    } finally {
+      setLoadingApprovals(false);
+    }
+  };
+
+  // Load delete requests
+  const loadDeleteRequests = async () => {
+    setLoadingApprovals(true);
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('reflections')
+        .select('*, profiles(nickname, email)')
+        .eq('delete_requested', true);
+      
+      if (error) {
+        console.error('Error loading delete requests:', error);
+        return;
+      }
+      setDeleteRequests(data || []);
+    } catch (err) {
+      console.error('Error loading delete requests:', err);
+    } finally {
+      setLoadingApprovals(false);
+    }
+  };
+
+  // Approve upgrade request
+  const handleApproveUpgrade = async (userId: string) => {
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase.rpc('admin_update_tier', {
+        target_id: userId,
+        new_tier: '⭐⭐'
+      });
+      
+      if (error) {
+        console.error('Error approving upgrade:', error);
+        alert('등업 승인 중 오류가 발생했습니다.');
+        return;
+      }
+      
+      // Also reset upgrade_requested flag
+      await supabase.from('profiles').update({ upgrade_requested: false }).eq('id', userId);
+      
+      alert('등업이 승인되었습니다. 사용자 등급이 ⭐⭐(Regular)로 변경되었습니다.');
+      await loadUpgradeRequests();
+    } catch (err) {
+      console.error('Error approving upgrade:', err);
+      alert('등업 승인 중 오류가 발생했습니다.');
+    }
+  };
+
+  // Approve delete request
+  const handleApproveDelete = async (postId: string) => {
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase.from('reflections').delete().eq('id', postId);
+      
+      if (error) {
+        console.error('Error deleting post:', error);
+        alert('삭제 승인 중 오류가 발생했습니다.');
+        return;
+      }
+      
+      alert('글이 삭제되었습니다.');
+      await loadDeleteRequests();
+    } catch (err) {
+      console.error('Error approving delete:', err);
+      alert('삭제 승인 중 오류가 발생했습니다.');
+    }
+  };
+
+  // Reject delete request
+  const handleRejectDelete = async (postId: string) => {
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('reflections')
+        .update({ delete_requested: false })
+        .eq('id', postId);
+      
+      if (error) {
+        console.error('Error rejecting delete:', error);
+        alert('반려 처리 중 오류가 발생했습니다.');
+        return;
+      }
+      
+      alert('삭제 요청이 반려되었습니다.');
+      await loadDeleteRequests();
+    } catch (err) {
+      console.error('Error rejecting delete:', err);
+      alert('반려 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -389,6 +521,44 @@ const getTierColor = (tier: string) => {
               <span className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 가입자별 아카이브
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('upgrade-requests')}
+              className={`px-4 py-3 text-sm border-b-2 transition-colors ${
+                activeTab === 'upgrade-requests'
+                  ? 'border-amber-600 text-amber-600 font-medium'
+                  : 'border-transparent text-stone-500 hover:text-amber-600'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Crown className="w-4 h-4" />
+                등업 신청 관리
+                {upgradeRequests.length > 0 && (
+                  <span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full">
+                    {upgradeRequests.length}
+                  </span>
+                )}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('delete-requests')}
+              className={`px-4 py-3 text-sm border-b-2 transition-colors ${
+                activeTab === 'delete-requests'
+                  ? 'border-red-600 text-red-600 font-medium'
+                  : 'border-transparent text-stone-500 hover:text-red-600'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                삭제 요청 관리
+                {deleteRequests.length > 0 && (
+                  <span className="bg-red-100 text-red-700 text-xs px-1.5 py-0.5 rounded-full">
+                    {deleteRequests.length}
+                  </span>
+                )}
               </span>
             </button>
           </div>
@@ -626,6 +796,121 @@ const getTierColor = (tier: string) => {
             ) : (
               <div className="text-center py-12 text-stone-400">
                 <p className="text-sm">가입자 관리 탭에서 사용자를 선택해주세요.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Upgrade Requests Tab */}
+        {activeTab === 'upgrade-requests' && (
+          <div>
+            <h2 className="text-lg font-semibold text-stone-800 mb-4">등업 신청 관리</h2>
+            {loadingApprovals ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-stone-300 animate-spin" />
+              </div>
+            ) : upgradeRequests.length === 0 ? (
+              <div className="text-center py-12 text-stone-400">
+                <Crown className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">현재 등업 신청이 없습니다.</p>
+              </div>
+            ) : (
+              <div className="border border-stone-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-stone-50 border-b border-stone-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-stone-500">이메일</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-stone-500">닉네임</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-stone-500">현재 등급</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-stone-500">가입일</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-stone-500">승인</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {upgradeRequests.map((user) => (
+                      <tr key={user.id} className="hover:bg-stone-50">
+                        <td className="px-4 py-3 text-stone-700">{user.email}</td>
+                        <td className="px-4 py-3 text-stone-700">{user.nickname || user.username || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs bg-stone-100 text-stone-600 px-2 py-1 rounded">
+                            {user.tier || '⭐'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-stone-500 text-xs">
+                          {new Date(user.created_at).toLocaleDateString('ko-KR')}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleApproveUpgrade(user.id)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200 transition-colors mx-auto"
+                          >
+                            <Crown className="w-3 h-3" />
+                            등업 승인
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Delete Requests Tab */}
+        {activeTab === 'delete-requests' && (
+          <div>
+            <h2 className="text-lg font-semibold text-stone-800 mb-4">삭제 요청 관리</h2>
+            {loadingApprovals ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-stone-300 animate-spin" />
+              </div>
+            ) : deleteRequests.length === 0 ? (
+              <div className="text-center py-12 text-stone-400">
+                <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <p className="text-sm">현재 삭제 요청이 없습니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {deleteRequests.map((post) => (
+                  <div key={post.id} className="border border-stone-200 rounded-lg p-4 bg-white">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-medium text-stone-800">
+                          {post.profiles?.nickname || post.profiles?.email?.split('@')[0] || '익명'}
+                        </p>
+                        <p className="text-xs text-stone-500">
+                          {post.verse_ref} · {new Date(post.created_at).toLocaleDateString('ko-KR')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRejectDelete(post.id)}
+                          className="px-3 py-1.5 text-xs bg-stone-100 text-stone-600 rounded hover:bg-stone-200 transition-colors"
+                        >
+                          반려
+                        </button>
+                        <button
+                          onClick={() => handleApproveDelete(post.id)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          삭제 승인
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-stone-50 rounded p-3">
+                      <p className="text-sm text-stone-700 whitespace-pre-wrap line-clamp-3">{post.content}</p>
+                    </div>
+                    {post.title && (
+                      <p className="text-xs text-stone-500 mt-2">제목: {post.title}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
