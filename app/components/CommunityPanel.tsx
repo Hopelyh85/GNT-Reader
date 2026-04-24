@@ -322,6 +322,30 @@ export function CommunityPanel({
     return '익명 동역자';
   };
 
+  // Convert URLs in text to clickable links
+  const renderContentWithLinks = (content: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = content.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 underline break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   // Avatar component
   const Avatar = ({ url, tier, size = 'md' }: { url?: string | null; tier?: string; size?: 'sm' | 'md' }) => {
     const isAdminUser = tier?.toLowerCase().includes('admin');
@@ -416,7 +440,7 @@ export function CommunityPanel({
             {/* Post Content */}
             <div className="p-4 pt-3">
               <p className="text-sm text-stone-700 leading-relaxed break-words whitespace-pre-wrap">
-                {post.content}
+                {renderContentWithLinks(post.content)}
               </p>
             </div>
             
