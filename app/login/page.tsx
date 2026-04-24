@@ -29,7 +29,7 @@ export default function LoginPage() {
             <BookOpen className="w-10 h-10 text-white" />
           </div>
           <h1 className="text-2xl font-serif font-bold text-stone-800 mb-2">
-            K-GNT 위키 스튜디오
+            기독교 커뮤니티 성경 원어 연구소
           </h1>
           <p className="text-stone-500 text-sm">
             헬라어 원문 연구와 묵상 공유의 공간
