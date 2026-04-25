@@ -1902,7 +1902,7 @@ export function CommunityPanel({
                             <span className="font-medium text-stone-700 truncate">{post.verse_ref}</span>
                             <span className="ml-auto text-stone-400">{getDisplayName(post.profiles)}</span>
                           </div>
-                          <p className="text-stone-600 line-clamp-2">{post.content}</p>
+                          <p className="text-stone-600 line-clamp-2 whitespace-pre-wrap">{post.content}</p>
                           {expandedPostId === post.id && (
                             <div className="mt-2 pt-2 border-t border-stone-100">
                               <p className="text-stone-700 whitespace-pre-wrap">{post.content}</p>
@@ -2314,7 +2314,7 @@ export function CommunityPanel({
                                 <span className="text-xs font-medium text-stone-700">{getDisplayName(post.profiles)}</span>
                                 <span className="text-xs text-stone-400">{formatTime(post.created_at)}</span>
                               </div>
-                              <p className="text-sm text-stone-800 line-clamp-2">{post.content}</p>
+                              <p className="text-sm text-stone-800 line-clamp-2 whitespace-pre-wrap">{post.content}</p>
                               {post.title && (
                                 <p className="text-xs text-stone-500 mt-1">제목: {post.title}</p>
                               )}

@@ -163,7 +163,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         
         if (data) {
           setMinistryNote(data.content || '');
-          setCommentary('');
+          setCommentary(data.commentary || '');
           setNoteTimestamp(data.created_at || data.updated_at || null);
         } else {
           setMinistryNote('');
@@ -197,7 +197,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         selectedVerse.chapter,
         selectedVerse.verse,
         ministryNote,
-        true // isPrivate
+        true, // isPrivate
+        commentary // 관리자 주석도 함께 저장
       );
 
       setLastSaved(new Date());
@@ -212,6 +213,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     selectedVerse,
     verseRef,
     ministryNote,
+    commentary,
     canWrite,
   ]);
 
@@ -242,6 +244,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const autoSave = useCallback(async () => {
     const currentVerse = selectedVerseRef.current;
     const currentMinistryNote = ministryNoteRef.current;
+    const currentCommentary = commentaryRef.current;
     
     if (!currentVerse || !canWrite || savingRef.current) return;
 
@@ -258,7 +261,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         currentVerse.chapter,
         currentVerse.verse,
         currentMinistryNote,
-        true
+        true,
+        currentCommentary // 관리자 주석도 함께 저장
       );
 
       setLastSaved(new Date());

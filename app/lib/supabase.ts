@@ -541,7 +541,8 @@ export async function saveMyStudyNote(
   chapter: number,
   verse: number,
   content: string,
-  isPrivate: boolean = true
+  isPrivate: boolean = true,
+  commentary?: string
 ): Promise<void> {
   const supabase = getSupabase();
   const user = await getCurrentUser();
@@ -555,6 +556,7 @@ export async function saveMyStudyNote(
       chapter,
       verse,
       content,
+      commentary: commentary || null,
       is_private: isPrivate,
       updated_at: new Date().toISOString(),
     },
