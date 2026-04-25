@@ -48,10 +48,10 @@ function HomeContent() {
 
   // Portal menu items
   const portalItems = [
-    { id: 'read', title: '말씀 나눔터(한글)', subtitle: '말씀 나눔터(한글)', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
-    { id: 'study', title: '성경 원어 연구소(신약)', subtitle: '성경 원어 연구소(신약)', href: '/study', icon: Search, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
-    { id: 'community', title: '커뮤니티 게시판', subtitle: '커뮤니티 게시판', href: '/community', icon: Users, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
-    { id: 'sermon', title: '설교 아카이브', subtitle: '설교 아카이브', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
+    { id: 'read', title: '말씀 나눔터(한글)', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
+    { id: 'study', title: '성경 원어 연구소(신약)', subtitle: '헬라어 원문 성경을 깊이 연구하고 주석을 작성합니다', href: '/study', icon: Search, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
+    { id: 'community', title: '커뮤니티 게시판', subtitle: '자유롭게 나누고 기도하며 함께 성장하는 공간', href: '/community', icon: Users, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
+    { id: 'sermon', title: '설교 아카이브', subtitle: '과거 설교를 다시 듣고 은혜를 되새깁니다', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
   ];
 
   // Navigation items
@@ -229,7 +229,7 @@ function HomeContent() {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm md:text-base">{item.title}</h3>
-                    <p className="text-xs opacity-70 mt-0.5 hidden md:block">{item.subtitle}</p>
+                    <p className="text-xs opacity-70 mt-0.5">{item.subtitle}</p>
                   </div>
                 </div>
                 {item.external && (

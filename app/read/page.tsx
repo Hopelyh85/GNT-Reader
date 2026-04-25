@@ -80,7 +80,10 @@ function ReadContent() {
   // Community panel state
   const [selectedVerseNum, setSelectedVerseNum] = useState<number | null>(null);
   const [showCommunity, setShowCommunity] = useState(false);
-  const [reflections, setReflections] = useState<any[]>([]);
+  // Unified verse content from reflections table
+  const [verseTranslations, setVerseTranslations] = useState<any[]>([]);
+  const [verseReflections, setVerseReflections] = useState<any[]>([]);
+  // Commentary from study_notes (admin commentary only)
   const [studyNotes, setStudyNotes] = useState<any[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [newReflection, setNewReflection] = useState('');
@@ -194,11 +197,13 @@ function ReadContent() {
       const bookInfo = books.find(b => b.id === selectedBook);
       const koreanBookName = bookInfo?.name || bookNameMapReverse[selectedBook] || selectedBook;
       
+      // Load reflections from reflections table (translations + reflections)
       let reflectionsQuery = supabase
         .from('reflections')
         .select('*, profiles(nickname, email, tier, church_name, job_position, show_church, show_job)')
         .eq('is_public', true);
       
+      // Load commentary from study_notes (admin commentary only)
       let notesQuery = supabase
         .from('study_notes')
         .select('*, profiles(nickname, email, tier, church_name, job_position, show_church, show_job)');
@@ -231,7 +236,13 @@ function ReadContent() {
       
       if (notesError) console.error('Notes error:', notesError);
       
-      setReflections(reflectionsData || []);
+      // Separate translations and reflections
+      const allReflections = reflectionsData || [];
+      const translations = allReflections.filter((r: any) => r.category === 'translation');
+      const reflections = allReflections.filter((r: any) => r.category !== 'translation');
+      
+      setVerseTranslations(translations);
+      setVerseReflections(reflections);
       setStudyNotes(notesData || []);
     } catch (err) {
       console.error('Error loading community:', err);
@@ -335,7 +346,7 @@ function ReadContent() {
           </a>
           <div>
             <h1 className="text-lg font-serif font-bold text-stone-800">
-              한글 성경 나눔터
+              말씀 나눔터(한글)
             </h1>
             <p className="text-xs text-stone-500">
               개역한글(KRV) 성경 읽기와 묵상
@@ -701,8 +712,37 @@ function ReadContent() {
                     </div>
                   ))}
                   
+                  {/* Translations (Blue - Sticky at top) */}
+                  {verseTranslations.length > 0 && (
+                    <div className="sticky top-0 z-10 bg-white border-b border-stone-200 -mx-4 px-4 py-3 mb-4">
+                      <label className="flex items-center gap-2 text-xs font-bold text-blue-700 mb-2">
+                        <Pin className="w-3 h-3" />
+                        개인 번역 (Translations)
+                      </label>
+                      {verseTranslations.map((trans: any) => (
+                        <div key={trans.id} className={`p-3 bg-blue-50 border rounded-lg transition-all ${
+                          highlightedPostId === trans.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-blue-200'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold text-blue-700">📝 개인 번역</span>
+                            <span className="text-xs text-stone-500">{getDisplayName(trans.profiles)}</span>
+                            <span className="text-xs text-stone-400">
+                              {new Date(trans.created_at).toLocaleDateString('ko-KR')}
+                            </span>
+                            {viewMode === 'chapter' && trans.verse > 0 && (
+                              <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">
+                                {trans.verse}절
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-stone-800">{trans.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   {/* Reflections (Beige) */}
-                  {reflections.map((ref: any) => (
+                  {verseReflections.map((ref: any) => (
                     <div key={ref.id} className={`p-3 bg-stone-50 border rounded-lg transition-all ${
                       highlightedPostId === ref.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-stone-200'
                     }`}>
@@ -728,7 +768,7 @@ function ReadContent() {
                     </div>
                   )}
                   
-                  {!loadingCommunity && reflections.length === 0 && studyNotes.length === 0 && (
+                  {!loadingCommunity && verseReflections.length === 0 && verseTranslations.length === 0 && studyNotes.filter((n: any) => n.profiles?.tier === '관리자').length === 0 && (
                     <div className="text-center py-8 text-stone-400">
                       <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">
