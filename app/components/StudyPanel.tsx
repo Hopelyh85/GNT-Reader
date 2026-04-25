@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
-import { getSupabase, saveMyStudyNote } from '../lib/supabase';
+import { getSupabase, saveMyStudyNote, bookNameMap } from '../lib/supabase';
 import { fallbackFixer, getSmartLemmaWithDatabase } from '../lib/greekMapping';
 
 interface StudyPanelProps {
@@ -64,8 +64,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const [kjvData, setKjvData] = useState<Record<string, string>>({});
   const [translationsLoaded, setTranslationsLoaded] = useState(false);
 
+  // Use Korean book name for verseRef consistency
+  const koreanBookName = selectedVerse ? (bookNameMap[selectedVerse.book] || selectedVerse.book) : '';
   const verseRef = selectedVerse
-    ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`
+    ? `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`
     : '';
   
   // Load local translation JSON files on mount
@@ -188,9 +190,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     setError(null);
 
     try {
+      // Save with Korean book name for DB consistency
       await saveMyStudyNote(
         verseRef,
-        selectedVerse.book,
+        koreanBookName,  // Korean book name for consistency
         selectedVerse.chapter,
         selectedVerse.verse,
         ministryNote,

@@ -121,7 +121,10 @@ export default function ReadPage() {
     setLoadingCommunity(true);
     try {
       const supabase = getSupabase();
-      const verseRef = `${selectedBook} ${selectedChapter}:${verseNum}`;
+      // Use Korean book name for verseRef consistency with DB
+      const bookInfo = books.find(b => b.id === selectedBook);
+      const koreanBookName = bookInfo?.name || bookNameMapReverse[selectedBook] || selectedBook;
+      const verseRef = `${koreanBookName} ${selectedChapter}:${verseNum}`;
       
       // Load reflections
       const { data: reflectionsData, error: refError } = await supabase
@@ -165,12 +168,16 @@ export default function ReadPage() {
     setSavingReflection(true);
     try {
       const supabase = getSupabase();
-      const verseRef = `${selectedBook} ${selectedChapter}:${selectedVerse}`;
+      
+      // Convert book abbreviation to Korean name for DB consistency
+      const bookInfo = books.find(b => b.id === selectedBook);
+      const koreanBookName = bookInfo?.name || bookNameMapReverse[selectedBook] || selectedBook;
+      const verseRef = `${koreanBookName} ${selectedChapter}:${selectedVerse}`;
       
       const { error } = await supabase.from('reflections').insert({
         user_id: user.id,
         verse_ref: verseRef,
-        book: selectedBook,
+        book: koreanBookName,
         chapter: selectedChapter,
         verse: selectedVerse,
         content: newReflection,

@@ -394,13 +394,14 @@ export function BiblePanel({
     
     setSavingReflection(true);
     try {
-      const verseRef = `${book} ${chapter}:${verse}`;
-      const bookName = bookNameMap[book] || book;
-      const autoTitle = `[${bookName} ${chapter}장 ${verse}절] 묵상 나눔`;
+      // Use Korean book name for DB consistency
+      const koreanBookName = bookNameMap[book] || book;
+      const verseRef = `${koreanBookName} ${chapter}:${verse}`;
+      const autoTitle = `[${koreanBookName} ${chapter}장 ${verse}절] 묵상 나눔`;
       
       await addPublicReflection(
         verseRef,
-        book,
+        koreanBookName,  // Store Korean name in DB
         chapter,
         verse,
         newReflection,

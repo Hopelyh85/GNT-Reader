@@ -206,11 +206,11 @@ export function CommunityPanel({
       const supabase = getSupabase();
       const bookName = bookNameMap[bookId] || bookId;
       
-      // Load all reflections for this chapter
+      // Load all reflections for this chapter (use Korean book name for DB query)
       const { data: reflections, error: refError } = await supabase
         .from('reflections')
         .select('*, profiles(nickname, email, tier)')
-        .eq('book', bookId)
+        .eq('book', bookName)  // Korean book name
         .eq('chapter', chapter)
         .eq('is_public', true)
         .order('verse', { ascending: true })
@@ -220,11 +220,11 @@ export function CommunityPanel({
         console.error('Error loading reflections:', refError);
       }
       
-      // Load all study notes for this chapter
+      // Load all study notes for this chapter (use Korean book name for DB query)
       const { data: notes, error: notesError } = await supabase
         .from('study_notes')
         .select('*, profiles(nickname, email, tier)')
-        .eq('book', bookId)
+        .eq('book', bookName)  // Korean book name
         .eq('chapter', chapter)
         .order('verse', { ascending: true })
         .order('created_at', { ascending: false });
@@ -326,7 +326,9 @@ export function CommunityPanel({
       
       setLoadingMinistry(true);
       try {
-        const verseRef = `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`;
+        // Use Korean book name for verseRef consistency
+        const koreanBookName = bookNameMap[selectedVerse.book] || selectedVerse.book;
+        const verseRef = `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`;
         const notes = await getStudyNotesForVerse(verseRef);
         // Filter only ⭐⭐⭐⭐⭐ admin notes
         const adminNotes = notes.filter((note: any) => 
@@ -405,13 +407,15 @@ export function CommunityPanel({
 
     setSaving(true);
     try {
+      // Use Korean book name for DB consistency
+      const koreanBookName = selectedVerse ? (bookNameMap[selectedVerse.book] || selectedVerse.book) : '글로벌';
       const verseRef = includeVerse && selectedVerse 
-        ? `${selectedVerse.book} ${selectedVerse.chapter}:${selectedVerse.verse}`
+        ? `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`
         : '글로벌 게시판';
       
       await addPublicReflection(
         verseRef,
-        selectedVerse?.book || 'GLOBAL',
+        koreanBookName,  // Korean book name for consistency
         selectedVerse?.chapter || 0,
         selectedVerse?.verse || 0,
         newContent,
