@@ -1084,7 +1084,13 @@ export function CommunityPanel({
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-2">
-                    <span className="text-sm text-stone-400 font-normal">{post.post_number || '#'}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleShare(post.id); }}
+                      className="text-xs font-bold text-stone-500 hover:text-amber-600 hover:bg-amber-50 px-2 py-0.5 rounded transition-colors"
+                      title="게시글 링크 복사"
+                    >
+                      #{post.post_number || post.id.slice(0, 6)}
+                    </button>
                     {post.title || '제목 없음'}
                   </span>
                 )}
@@ -1194,7 +1200,37 @@ export function CommunityPanel({
                     <Trash2 className="w-3 h-3" />
                     삭제
                   </button>
+                ) : (post as any).delete_requested ? (
+                  /* Cancel Delete Request */
+                  <button
+                    onClick={async (e) => { 
+                      e.stopPropagation(); 
+                      try {
+                        const supabase = getSupabase();
+                        const { error } = await supabase
+                          .from('reflections')
+                          .update({ delete_requested: false })
+                          .eq('id', post.id);
+                        
+                        if (error) {
+                          console.error('Cancel delete request error:', error);
+                          alert('삭제 요청 취소 중 오류가 발생했습니다.');
+                          return;
+                        }
+                        // Refresh posts to show updated state
+                        await loadPosts(1, false);
+                        alert('삭제 요청이 취소되었습니다.');
+                      } catch (err) {
+                        console.error('Cancel delete request failed:', err);
+                        alert('삭제 요청 취소 중 오류가 발생했습니다.');
+                      }
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                  >
+                    ↩️ 삭제 요청 취소
+                  </button>
                 ) : (
+                  /* Request Delete */
                   <button
                     onClick={async (e) => { 
                       e.stopPropagation(); 
@@ -1210,6 +1246,8 @@ export function CommunityPanel({
                           alert('삭제 요청 중 오류가 발생했습니다.');
                           return;
                         }
+                        // Refresh posts to show updated state
+                        await loadPosts(1, false);
                         alert('삭제 요청이 접수되었습니다. 관리자 승인 후 처리됩니다.');
                       } catch (err) {
                         console.error('Delete request failed:', err);
