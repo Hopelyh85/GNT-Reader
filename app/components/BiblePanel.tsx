@@ -208,6 +208,35 @@ export function BiblePanel({
     loadPinned();
   }, []);
   
+  // Sync with selectedVerse from community navigation - expand book/chapter and scroll to verse
+  useEffect(() => {
+    if (!selectedVerse) return;
+    
+    // Find the book name from the abbreviation
+    const bookName = bookNameMap[selectedVerse.book.toUpperCase()] || 
+      books.find(b => {
+        const abbrev = getBookAbbrev(b.name);
+        return abbrev.toLowerCase() === selectedVerse.book.toLowerCase();
+      })?.name;
+    
+    if (bookName) {
+      // Expand the book
+      setExpandedBook(bookName);
+      
+      // Expand the chapter
+      const chapterKey = `${bookName}-${selectedVerse.chapter}`;
+      setExpandedChapter(chapterKey);
+      
+      // Scroll to verse after a short delay to allow rendering
+      setTimeout(() => {
+        const verseElement = document.getElementById(`verse-${selectedVerse.book}-${selectedVerse.chapter}-${selectedVerse.verse}`);
+        if (verseElement) {
+          verseElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    }
+  }, [selectedVerse?.book, selectedVerse?.chapter, selectedVerse?.verse]);
+  
   // Symbol cleaning: strip SBLGNT critical symbols and punctuation (preserves apostrophes for elision)
   const cleanSymbols = (text: string): string => {
     return text.replace(/[.,;··⸀⸁⸂⸃⸄⸅\(\)]/g, '').trim();
@@ -575,7 +604,7 @@ export function BiblePanel({
                               const krvText = getKRVText(abbrev, chapter.number, verseIdx + 1);
 
                               return (
-                                <div key={verseIdx} className="space-y-1">
+                                <div key={verseIdx} id={`verse-${abbrev}-${chapter.number}-${verseIdx + 1}`} className="space-y-1">
                                   {/* Verse Content */}
                                   <div
                                     onClick={() =>

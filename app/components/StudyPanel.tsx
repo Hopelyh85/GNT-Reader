@@ -121,16 +121,24 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
       return;
     }
     
+    // Set loading state when verse changes
+    setTranslationLoading(true);
+    
     const key = `${selectedVerse.book}_${selectedVerse.chapter}_${selectedVerse.verse}`;
     
-    // Get KRV translation
-    setKoreanTranslation(krvData[key] || '');
-    
-    // Get NET translation
-    setNetTranslation(netData[key] || '');
-    
-    // Get KJV translation
-    setKjvTranslation(kjvData[key] || '');
+    // Small delay to simulate loading and prevent flash
+    setTimeout(() => {
+      // Get KRV translation
+      setKoreanTranslation(krvData[key] || '');
+      
+      // Get NET translation
+      setNetTranslation(netData[key] || '');
+      
+      // Get KJV translation
+      setKjvTranslation(kjvData[key] || '');
+      
+      setTranslationLoading(false);
+    }, 100);
     
   }, [selectedVerse, translationsLoaded, krvData, netData, kjvData]);
 
@@ -771,7 +779,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           
           <div className="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
             <p className="text-xs font-semibold text-blue-700 mb-1">🇰🇷 개역한글 (KRV)</p>
-            {!translationsLoaded ? (
+            {!translationsLoaded || translationLoading ? (
               <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
             ) : koreanTranslation ? (
               <p className="text-sm text-stone-700 leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(koreanTranslation)}</p>
@@ -781,9 +789,9 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
           
           <div className="p-3 bg-green-50 rounded border-l-4 border-green-500">
-            <p className="text-xs font-semibold text-green-700 mb-1">🌐 NET English</p>
-            {!translationsLoaded ? (
-              <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
+            <p className="text-xs font-semibold text-green-700 mb-1">🌐 NET (New English Translation)</p>
+            {!translationsLoaded || translationLoading ? (
+              <p className="text-sm text-stone-500">📖 Loading NET translation...</p>
             ) : netTranslation ? (
               <p className="text-sm text-stone-700 leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(netTranslation)}</p>
             ) : (
@@ -791,10 +799,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             )}
           </div>
           
-          <div className="p-3 bg-red-50 rounded border-l-4 border-red-500">
-            <p className="text-xs font-semibold text-red-700 mb-1">📖 KJV (King James Version)</p>
-            {!translationsLoaded ? (
-              <p className="text-sm text-stone-500">📖 성경 데이터 로딩 중...</p>
+          <div className="p-3 bg-indigo-50 rounded border-l-4 border-indigo-500">
+            <p className="text-xs font-semibold text-indigo-700 mb-1">📜 KJV (King James Version)</p>
+            {!translationsLoaded || translationLoading ? (
+              <p className="text-sm text-stone-500">📖 Loading KJV translation...</p>
             ) : kjvTranslation ? (
               <p className="text-sm text-stone-700 leading-relaxed break-all whitespace-pre-wrap w-full overflow-hidden">{String(kjvTranslation)}</p>
             ) : (
