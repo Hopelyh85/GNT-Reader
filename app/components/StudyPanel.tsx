@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
-import { getSupabase, saveMyStudyNote, bookNameMap, getPublicReflections } from '../lib/supabase';
+import { getSupabase, saveMyStudyNote, bookNameMap, getPublicReflections, saveTranslation, getUserTranslation } from '../lib/supabase';
 import { fallbackFixer, getSmartLemmaWithDatabase } from '../lib/greekMapping';
 
 interface StudyPanelProps {
@@ -48,9 +48,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const [noteTimestamp, setNoteTimestamp] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  // Community reflections state
-  const [communityReflections, setCommunityReflections] = useState<any[]>([]);
-  const [loadingReflections, setLoadingReflections] = useState(false);
+  // Unified verse content state (translations + reflections from reflections table)
+  const [verseTranslations, setVerseTranslations] = useState<any[]>([]);
+  const [verseReflections, setVerseReflections] = useState<any[]>([]);
+  const [loadingVerseContent, setLoadingVerseContent] = useState(false);
   
   // Dictionary state
   const [lexicon, setLexicon] = useState<Record<string, LexiconEntry>>({});
@@ -197,27 +198,38 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     loadNote();
   }, [selectedVerse, verseRef]);
 
-  // Load community reflections for current verse
+  // Load unified verse content (translations + reflections) for current verse
   useEffect(() => {
     if (!selectedVerse) {
-      setCommunityReflections([]);
+      setVerseTranslations([]);
+      setVerseReflections([]);
       return;
     }
 
-    async function loadReflections() {
-      setLoadingReflections(true);
+    async function loadVerseContent() {
+      setLoadingVerseContent(true);
       try {
-        // Load public reflections for current verse_ref
+        // Load user's own translation
+        const userTranslation = await getUserTranslation(verseRef);
+        if (userTranslation) {
+          setVerseTranslations([{ content: userTranslation, isMine: true }]);
+        } else {
+          setVerseTranslations([]);
+        }
+        
+        // Load community reflections
         const result = await getPublicReflections(verseRef, 1, 10);
-        setCommunityReflections(result.data || []);
+        // Filter out translations (we handle them separately)
+        const reflections = (result.data || []).filter((r: any) => r.category !== 'translation');
+        setVerseReflections(reflections);
       } catch (err: any) {
-        console.error('Error loading community reflections:', err?.message);
+        console.error('Error loading verse content:', err?.message);
       } finally {
-        setLoadingReflections(false);
+        setLoadingVerseContent(false);
       }
     }
 
-    loadReflections();
+    loadVerseContent();
   }, [selectedVerse, verseRef]);
 
   // Save note via direct Supabase call
@@ -228,7 +240,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     setError(null);
 
     try {
-      // Save with Korean book name for DB consistency
+      // Save study note (for commentary/admin notes)
       await saveMyStudyNote(
         verseRef,
         koreanBookName,  // Korean book name for consistency
@@ -238,6 +250,17 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         true, // isPrivate
         commentary // 관리자 주석도 함께 저장
       );
+      
+      // Also save translation to reflections table (unified data structure)
+      if (ministryNote.trim()) {
+        await saveTranslation(
+          verseRef,
+          koreanBookName,
+          selectedVerse.chapter,
+          selectedVerse.verse,
+          ministryNote
+        );
+      }
 
       setLastSaved(new Date());
       setNoteTimestamp(new Date().toISOString());
@@ -250,6 +273,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   }, [
     selectedVerse,
     verseRef,
+    koreanBookName,
     ministryNote,
     commentary,
     canWrite,
@@ -862,25 +886,25 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
         )}
 
-        {/* 6. 커뮤니티 묵상 (Community Reflections) */}
+        {/* 6. 커뮤니티 묵상 (Community Reflections from reflections table) */}
         {selectedVerse && (
           <div className="border-t border-stone-200 pt-4 space-y-3">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
               <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-              커뮤니티 묵상 ({communityReflections.length})
+              커뮤니티 묵상 ({verseReflections.length})
             </label>
             
-            {loadingReflections ? (
+            {loadingVerseContent ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
               </div>
-            ) : communityReflections.length === 0 ? (
+            ) : verseReflections.length === 0 ? (
               <div className="text-center py-4 text-stone-400 text-xs">
                 <p>아직 이 구절에 대한 커뮤니티 묵상이 없습니다.</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {communityReflections.map((reflection) => (
+                {verseReflections.map((reflection: any) => (
                   <div key={reflection.id} className="p-2 bg-stone-50 rounded border border-stone-200">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-medium text-stone-700">

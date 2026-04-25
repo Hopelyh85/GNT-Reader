@@ -719,6 +719,110 @@ export async function addPublicReflection(
   if (error) throw error;
 }
 
+// Save translation to reflections table (migrated from study_notes)
+export async function saveTranslation(
+  verseRef: string,
+  book: string,
+  chapter: number,
+  verse: number,
+  content: string
+): Promise<void> {
+  const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+  
+  // Check if translation already exists for this user and verse
+  const { data: existing } = await supabase
+    .from('reflections')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('verse_ref', verseRef)
+    .eq('category', 'translation')
+    .maybeSingle();
+  
+  if (existing) {
+    // Update existing translation
+    const { error } = await supabase
+      .from('reflections')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    // Insert new translation
+    const { error } = await supabase.from('reflections').insert({
+      user_id: user.id,
+      verse_ref: verseRef,
+      book,
+      chapter,
+      verse,
+      content,
+      is_public: true,
+      category: 'translation',
+      is_admin_approved: true,
+    });
+    if (error) throw error;
+  }
+}
+
+// Get user's translation for a specific verse
+export async function getUserTranslation(verseRef: string): Promise<string | null> {
+  const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) return null;
+  
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('content')
+    .eq('user_id', user.id)
+    .eq('verse_ref', verseRef)
+    .eq('category', 'translation')
+    .maybeSingle();
+  
+  if (error) {
+    console.error('Error loading translation:', error);
+    return null;
+  }
+  
+  return data?.content || null;
+}
+
+// Get all verse content (translations + reflections) from reflections table only
+export async function getVerseContent(
+  verseRef: string,
+  includeTranslations: boolean = true,
+  includeReflections: boolean = true
+): Promise<{ translations: any[]; reflections: any[] }> {
+  const supabase = getSupabase();
+  
+  let query = supabase
+    .from('reflections')
+    .select('*, profiles(nickname, email, tier, avatar_url)')
+    .eq('verse_ref', verseRef)
+    .order('created_at', { ascending: false });
+  
+  // Filter by categories
+  const categories: string[] = [];
+  if (includeTranslations) categories.push('translation');
+  if (includeReflections) categories.push('reflection', 'ministry');
+  
+  if (categories.length > 0) {
+    query = query.in('category', categories);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('Error loading verse content:', error);
+    return { translations: [], reflections: [] };
+  }
+  
+  // Separate translations and reflections
+  const translations = (data || []).filter((item: any) => item.category === 'translation');
+  const reflections = (data || []).filter((item: any) => item.category === 'reflection' || item.category === 'ministry');
+  
+  return { translations, reflections };
+}
+
 // Check if user has written a prayer in last 24 hours
 export async function hasPrayerInLast24Hours(userId: string): Promise<boolean> {
   const supabase = getSupabase();
