@@ -132,13 +132,8 @@ export function CommunityPanel({
   const [noticeEditContent, setNoticeEditContent] = useState('');
   const [savingNotice, setSavingNotice] = useState(false);
   
-  // All Posts by Chapter view state
-  const [viewMode, setViewMode] = useState<'feed' | 'all-posts'>('feed');
-  const [selectedBookForView, setSelectedBookForView] = useState('Matt');
-  const [selectedChapterForView, setSelectedChapterForView] = useState(1);
-  const [allPostsByChapter, setAllPostsByChapter] = useState<{[verse: number]: (Post | any)[]}>({});
-  const [loadingAllPosts, setLoadingAllPosts] = useState(false);
-  const [expandedVerses, setExpandedVerses] = useState<Set<number>>(new Set());
+  // View state - only feed mode (3-column layout)
+  const [viewMode] = useState<'feed'>('feed');
   
   // Hashtag filter state
   const [hashtagFilter, setHashtagFilter] = useState<string | null>(null);
@@ -303,85 +298,6 @@ export function CommunityPanel({
     }
   }, [pinnedPosts, isAdmin]);
 
-  // Load all posts (reflections + study_notes) for a specific chapter
-  const loadAllPostsByChapter = useCallback(async (bookId: string, chapter: number) => {
-    setLoadingAllPosts(true);
-    try {
-      const supabase = getSupabase();
-      const bookName = bookNameMap[bookId] || bookId;
-      
-      // Load all reflections for this chapter (use Korean book name for DB query)
-      const { data: reflections, error: refError } = await supabase
-        .from('reflections')
-        .select('*, profiles(nickname, email, tier)')
-        .eq('book', bookName)  // Korean book name
-        .eq('chapter', chapter)
-        .eq('is_public', true)
-        .order('verse', { ascending: true })
-        .order('created_at', { ascending: false });
-      
-      if (refError) {
-        console.error('Error loading reflections:', refError);
-      }
-      
-      // Load all study notes for this chapter (use Korean book name for DB query)
-      const { data: notes, error: notesError } = await supabase
-        .from('study_notes')
-        .select('*, profiles(nickname, email, tier)')
-        .eq('book', bookName)  // Korean book name
-        .eq('chapter', chapter)
-        .order('verse', { ascending: true })
-        .order('created_at', { ascending: false });
-      
-      if (notesError) {
-        console.error('Error loading study notes:', notesError);
-      }
-      
-      // Group by verse
-      const postsByVerse: {[verse: number]: any[]} = {};
-      
-      // Add reflections
-      (reflections || []).forEach((post: any) => {
-        const verse = post.verse || 0;
-        if (!postsByVerse[verse]) postsByVerse[verse] = [];
-        postsByVerse[verse].push({ ...post, postType: 'reflection' });
-      });
-      
-      // Add study notes
-      (notes || []).forEach((note: any) => {
-        const verse = note.verse || 0;
-        if (!postsByVerse[verse]) postsByVerse[verse] = [];
-        // Check if admin note
-        const isAdminNote = note.profiles?.tier === '관리자' || note.profiles?.tier === 'Admin' || note.profiles?.tier?.includes('⭐⭐⭐⭐⭐');
-        postsByVerse[verse].push({ ...note, postType: isAdminNote ? 'admin_note' : 'study_note' });
-      });
-      
-      setAllPostsByChapter(postsByVerse);
-      
-      // Auto-expand first verse with posts
-      const versesWithPosts = Object.keys(postsByVerse).map(Number).sort((a, b) => a - b);
-      if (versesWithPosts.length > 0) {
-        setExpandedVerses(new Set([versesWithPosts[0]]));
-      }
-    } catch (err) {
-      console.error('Error loading all posts:', err);
-    } finally {
-      setLoadingAllPosts(false);
-    }
-  }, []);
-
-  // Toggle verse expansion
-  const toggleVerseExpansion = (verse: number) => {
-    setExpandedVerses(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(verse)) {
-        newSet.delete(verse);
-      } else {
-        newSet.add(verse);
-      }
-      return newSet;
-    });
-  };
 
   // Load reply counts
   const loadReplyCounts = useCallback(async () => {
@@ -540,12 +456,16 @@ export function CommunityPanel({
     }
   };
 
-  // Save new post
-  const handleSavePost = async () => {
+  // Save new post with explicit target parameters (State Collision Fix)
+  const handleSavePost = async (
+    targetCategory: 'general' | 'prayer_general' | 'prayer_world',
+    targetPrayerType?: string,
+    targetPrayerSubType?: 'world' | 'nation' | 'church' | 'personal'
+  ) => {
     if (!newContent.trim() || !canWrite) return;
 
-    // Check 24h prayer limit for normal prayers
-    if (postCategory === 'prayer' && prayerTypeOld === 'normal') {
+    // Check 24h prayer limit for normal prayers (only for prayer_general)
+    if (targetCategory === 'prayer_general' && targetPrayerType === 'normal') {
       const canPost = await checkPrayerLimit();
       if (!canPost) return;
     }
@@ -558,17 +478,7 @@ export function CommunityPanel({
         ? `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`
         : '글로벌 게시판';
       
-      // Determine category based on post type
-      let category: 'general' | 'prayer_general' | 'prayer_world' = 'general';
-      let isWorldPrayer = false;
-      if (postCategory === 'prayer') {
-        if (prayerTypeOld === 'world') {
-          category = 'prayer_world';
-          isWorldPrayer = true;
-        } else {
-          category = 'prayer_general';
-        }
-      }
+      const isWorldPrayer = targetCategory === 'prayer_world';
       
       await addPublicReflection(
         verseRef,
@@ -577,11 +487,15 @@ export function CommunityPanel({
         selectedVerse?.verse || 0,
         newContent,
         true,
-        category,
+        targetCategory,
         null,
         newTitle.trim() || null,
         false, // isUrgent - only admins can set this
-        isWorldPrayer
+        isWorldPrayer,
+        undefined, // tags
+        targetPrayerSubType || targetPrayerType, // prayer_type
+        linkedPrayerId, // linked_prayer_id
+        'wait' // prayer_status
       );
 
       // Show message for world prayers
@@ -591,8 +505,7 @@ export function CommunityPanel({
 
       setNewTitle('');
       setNewContent('');
-      setPostCategory('reflection');
-      setPrayerTypeOld('normal');
+      setLinkedPrayerId(null); // Clear linked prayer
       await loadPosts(1, false);
       await loadPinnedPosts();
     } catch (err: any) {
@@ -904,7 +817,6 @@ export function CommunityPanel({
             onClick={(e) => {
               e.stopPropagation();
               setHashtagFilter(part);
-              setViewMode('feed');
             }}
             className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
           >
@@ -1168,7 +1080,6 @@ export function CommunityPanel({
                       onClick={(e) => {
                         e.stopPropagation();
                         setHashtagFilter(tag);
-                        setViewMode('feed');
                       }}
                       className="text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-0.5 rounded-full transition-colors"
                     >
@@ -1545,123 +1456,6 @@ export function CommunityPanel({
           </div>
         )}
         
-        {canWrite && (
-          <div className="p-3 border-b border-stone-200 bg-white">
-            <div className="space-y-2">
-              {/* Post Category Tabs */}
-              <div className="flex gap-1 p-1 bg-stone-100 rounded-lg">
-                <button
-                  onClick={() => { setPostCategory('reflection'); setPrayerTypeOld('normal'); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    postCategory === 'reflection' 
-                      ? 'bg-white text-stone-800 shadow-sm font-medium' 
-                      : 'text-stone-600 hover:text-stone-800'
-                  }`}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  묵상/나눔
-                </button>
-                <button
-                  onClick={() => setPostCategory('prayer')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    postCategory === 'prayer' 
-                      ? 'bg-white text-stone-800 shadow-sm font-medium' 
-                      : 'text-stone-600 hover:text-stone-800'
-                  }`}
-                >
-                  <Heart className="w-4 h-4" />
-                  기도제목
-                </button>
-              </div>
-              
-              {/* Prayer Type Selection (only when prayer category selected) */}
-              {postCategory === 'prayer' && showPrayerTabs && (
-                <div className="flex gap-2 p-2 bg-amber-50 rounded-lg border border-amber-100">
-                  <button
-                    onClick={() => setPrayerTypeOld('normal')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-                      prayerTypeOld === 'normal' 
-                        ? 'bg-white text-amber-700 shadow-sm border border-amber-200' 
-                        : 'text-amber-600 hover:bg-amber-100'
-                    }`}
-                  >
-                    <Clock className="w-3 h-3" />
-                    일반 기도
-                    <span className="text-[10px] opacity-70">(24시간 1회)</span>
-                  </button>
-                  <button
-                    onClick={() => setPrayerTypeOld('world')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-                      prayerTypeOld === 'world' 
-                        ? 'bg-white text-blue-700 shadow-sm border border-blue-200' 
-                        : 'text-blue-600 hover:bg-blue-100'
-                    }`}
-                  >
-                    <Globe className="w-3 h-3" />
-                    세계 기도
-                    <span className="text-[10px] opacity-70">(관리자 승인)</span>
-                  </button>
-                </div>
-              )}
-              
-              <input
-                type="text"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder={postCategory === 'prayer' ? '기도 제목을 입력하세요 (선택사항)' : '제목을 입력하세요 (선택사항)'}
-                className="w-full px-3 py-2 text-sm font-medium bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-200 placeholder:text-stone-400"
-              />
-              <textarea
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                placeholder={postCategory === 'prayer' 
-                  ? (prayerTypeOld === 'world' 
-                    ? '세계를 위한 기도제목을 작성해 주세요. 관리자 승인 후 게시됩니다.' 
-                    : '기도제목을 작성해 주세요. 24시간에 1회만 작성 가능합니다.')
-                  : '성경 묵상, 질문, 나눔 등을 자유롭게 작성해 보세요...'}
-                className="w-full h-24 p-3 text-sm leading-relaxed bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 placeholder:text-stone-400"
-              />
-              
-              {/* Include verse reference toggle */}
-              {selectedVerse && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIncludeVerse(!includeVerse)}
-                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
-                      includeVerse 
-                        ? 'bg-amber-100 text-amber-700' 
-                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                    }`}
-                  >
-                    <Hash className="w-3 h-3" />
-                    {includeVerse ? '성경 주소 포함됨' : '성경 주소 포함'}
-                    {includeVerse && (
-                      <span className="ml-1 font-medium">
-                        {selectedVerse.book} {selectedVerse.chapter}:{selectedVerse.verse}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              )}
-              
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSavePost}
-                  disabled={!newContent.trim() || saving}
-                  className="flex items-center gap-1 px-4 py-2 bg-stone-700 text-white text-sm rounded-lg hover:bg-stone-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {saving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                  {saving ? '저장 중...' : '게시하기'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* 📢 Real-time Notice Panel - At the very top */}
         {notice && !isEditingNotice && (
           <div className="p-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -1947,7 +1741,7 @@ export function CommunityPanel({
                     />
                     <div className="flex justify-end mt-2">
                       <button
-                        onClick={handleSavePost}
+                        onClick={() => handleSavePost('general')}
                         disabled={!newContent.trim() || saving}
                         className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                       >
@@ -2071,7 +1865,11 @@ export function CommunityPanel({
                     />
                     <div className="flex justify-end mt-2">
                       <button
-                        onClick={handleSavePost}
+                        onClick={() => handleSavePost(
+                          prayerType === 'world' ? 'prayer_world' : 'prayer_general',
+                          prayerType === 'world' ? 'world' : 'normal',
+                          prayerType
+                        )}
                         disabled={!newContent.trim() || saving}
                         className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50"
                       >
@@ -2203,131 +2001,6 @@ export function CommunityPanel({
           </div>
         )}
 
-        {/* All Posts by Chapter View */}
-        {viewMode === 'all-posts' && (
-          <div className="p-3 space-y-3">
-            {/* Book/Chapter Selector */}
-            <div className="flex items-center gap-2 mb-4">
-              <select
-                value={selectedBookForView}
-                onChange={(e) => {
-                  setSelectedBookForView(e.target.value);
-                  loadAllPostsByChapter(e.target.value, selectedChapterForView);
-                }}
-                className="px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-200"
-              >
-                {books.map(book => (
-                  <option key={book.id} value={book.id}>{book.name}</option>
-                ))}
-              </select>
-              <select
-                value={selectedChapterForView}
-                onChange={(e) => {
-                  const chapter = parseInt(e.target.value);
-                  setSelectedChapterForView(chapter);
-                  loadAllPostsByChapter(selectedBookForView, chapter);
-                }}
-                className="px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-200"
-              >
-                {Array.from({ length: books.find(b => b.id === selectedBookForView)?.chapters || 28 }, (_, i) => i + 1).map(ch => (
-                  <option key={ch} value={ch}>{ch}장</option>
-                ))}
-              </select>
-              <button
-                onClick={() => loadAllPostsByChapter(selectedBookForView, selectedChapterForView)}
-                className="px-3 py-1.5 text-sm bg-stone-100 text-stone-600 rounded-lg hover:bg-stone-200 transition-colors"
-              >
-                <Loader2 className={`w-4 h-4 ${loadingAllPosts ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-
-            {/* Legend */}
-            <div className="flex flex-wrap gap-2 text-xs mb-3">
-              <span className="flex items-center gap-1 px-2 py-1 bg-stone-100 rounded">
-                <span className="w-2 h-2 rounded-full bg-stone-400"></span>
-                일반 묵상
-              </span>
-              <span className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded">
-                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                동역자 사역
-              </span>
-              <span className="flex items-center gap-1 px-2 py-1 bg-purple-50 rounded">
-                <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-                공식 주석
-              </span>
-            </div>
-
-            {/* Accordion by Verse */}
-            {loadingAllPosts ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
-              </div>
-            ) : Object.keys(allPostsByChapter).length === 0 ? (
-              <div className="text-center py-8 text-stone-400">
-                <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">이 장에는 아직 게시글이 없습니다.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {Object.entries(allPostsByChapter)
-                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                  .map(([verse, versePosts]) => (
-                    <div key={verse} className="border border-stone-200 rounded-lg overflow-hidden">
-                      {/* Verse Header */}
-                      <button
-                        onClick={() => toggleVerseExpansion(parseInt(verse))}
-                        className="w-full px-3 py-2 bg-stone-50 flex items-center justify-between hover:bg-stone-100 transition-colors"
-                      >
-                        <span className="text-sm font-medium text-stone-700">
-                          {bookNameMap[selectedBookForView] || selectedBookForView} {selectedChapterForView}:{verse}
-                          <span className="ml-2 text-xs text-stone-500">({versePosts.length}개)</span>
-                        </span>
-                        {expandedVerses.has(parseInt(verse)) ? (
-                          <ChevronUp className="w-4 h-4 text-stone-400" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-stone-400" />
-                        )}
-                      </button>
-                      
-                      {/* Verse Posts */}
-                      {expandedVerses.has(parseInt(verse)) && (
-                        <div className="p-2 space-y-2">
-                          {versePosts.map((post: any) => (
-                            <div
-                              key={post.id}
-                              className={`p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-shadow ${
-                                post.postType === 'admin_note' || post.profiles?.tier === '관리자' || post.profiles?.tier === 'Admin' || post.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
-                                  ? 'bg-purple-50 border-purple-200' 
-                                  : post.postType === 'study_note'
-                                    ? 'bg-blue-50 border-blue-200'
-                                    : 'bg-stone-50 border-stone-200'
-                              }`}
-                              onClick={() => {
-                                // Navigate to verse
-                                if (onNavigateToVerse) {
-                                  onNavigateToVerse(selectedBookForView, selectedChapterForView, parseInt(verse));
-                                }
-                              }}
-                            >
-                              <div className="flex items-center gap-2 mb-1">
-                                {getPostBadge(post.postType, post.profiles?.tier)}
-                                <span className="text-xs font-medium text-stone-700">{getDisplayName(post.profiles)}</span>
-                                <span className="text-xs text-stone-400">{formatTime(post.created_at)}</span>
-                              </div>
-                              <p className="text-sm text-stone-800 line-clamp-2 whitespace-pre-wrap">{post.content}</p>
-                              {post.title && (
-                                <p className="text-xs text-stone-500 mt-1">제목: {post.title}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
       
       {/* Prayer Status Modal */}
