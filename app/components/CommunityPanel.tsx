@@ -648,11 +648,21 @@ export function CommunityPanel({
   const handleNavigateToVerse = (post: Post) => {
     if (!onNavigateToVerse || !post.verse_ref || post.verse_ref === '글로벌 게시판') return;
     
-    // Parse verse_ref like "Matt 1:1", "마태복음 1:1", or "마태 1:1"
-    const match = post.verse_ref.match(/^([가-힣A-Za-z0-9\s]+)\s+(\d+):(\d+)$/);
-    if (match) {
-      const [, book, chapter, verse] = match;
+    // Parse verse_ref like "Matt 1:1", "마태복음 1:1", "마태 1:1", or "마태복음 1장 전체"
+    // Try chapter:verse format first
+    const verseMatch = post.verse_ref.match(/^([가-힣A-Za-z0-9\s]+)\s+(\d+):(\d+)$/);
+    if (verseMatch) {
+      const [, book, chapter, verse] = verseMatch;
       onNavigateToVerse(book.trim(), parseInt(chapter), parseInt(verse));
+      return;
+    }
+    
+    // Try chapter-level format "마태복음 1장 전체"
+    const chapterMatch = post.verse_ref.match(/^([가-힣A-Za-z0-9\s]+)\s+(\d+)장\s+전체$/);
+    if (chapterMatch) {
+      const [, book, chapter] = chapterMatch;
+      // Navigate to verse 1 of the chapter as default
+      onNavigateToVerse(book.trim(), parseInt(chapter), 1);
     }
   };
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
-import { getSupabase, saveMyStudyNote, bookNameMap } from '../lib/supabase';
+import { getSupabase, saveMyStudyNote, bookNameMap, getPublicReflections } from '../lib/supabase';
 import { fallbackFixer, getSmartLemmaWithDatabase } from '../lib/greekMapping';
 
 interface StudyPanelProps {
@@ -48,6 +48,10 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   const [noteTimestamp, setNoteTimestamp] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // Community reflections state
+  const [communityReflections, setCommunityReflections] = useState<any[]>([]);
+  const [loadingReflections, setLoadingReflections] = useState(false);
+  
   // Dictionary state
   const [lexicon, setLexicon] = useState<Record<string, LexiconEntry>>({});
   const [lexiconLoading, setLexiconLoading] = useState(false);
@@ -66,8 +70,11 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
 
   // Use Korean book name for verseRef consistency
   const koreanBookName = selectedVerse ? (bookNameMap[selectedVerse.book] || selectedVerse.book) : '';
+  // Chapter mode: verse is 0, use "장 전체" format
   const verseRef = selectedVerse
-    ? `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`
+    ? isChapterMode 
+      ? `${koreanBookName} ${selectedVerse.chapter}장 전체`
+      : `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`
     : '';
   
   // Load local translation JSON files on mount
@@ -180,6 +187,29 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     }
 
     loadNote();
+  }, [selectedVerse, verseRef]);
+
+  // Load community reflections for current verse
+  useEffect(() => {
+    if (!selectedVerse) {
+      setCommunityReflections([]);
+      return;
+    }
+
+    async function loadReflections() {
+      setLoadingReflections(true);
+      try {
+        // Load public reflections for current verse_ref
+        const result = await getPublicReflections(verseRef, 1, 10);
+        setCommunityReflections(result.data || []);
+      } catch (err: any) {
+        console.error('Error loading community reflections:', err?.message);
+      } finally {
+        setLoadingReflections(false);
+      }
+    }
+
+    loadReflections();
   }, [selectedVerse, verseRef]);
 
   // Save note via direct Supabase call
@@ -787,12 +817,11 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
         )}
 
-        {/* 4. 나의 번역 (Translation) - Hidden in Chapter Mode */}
-        {!isChapterMode && (
+        {/* 4. 개인 번역 (Translation) - Available in both Verse and Chapter Mode */}
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-blue-700">
             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-            나의 번역 (Translation)
+            {isChapterMode ? '장 전체 묵상/번역' : '개인 번역 (Translation)'}
             {!canWrite && <span className="text-xs text-blue-600">(로그인 필요)</span>}
           </label>
           <textarea
@@ -800,12 +829,13 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             onChange={(e) => canWrite && setMinistryNote(e.target.value)}
             disabled={!canWrite}
             placeholder={canWrite 
-              ? "성경 본문을 직접 번역해보세요..." 
+              ? isChapterMode 
+                ? "이 장 전체에 대한 묵상이나 번역을 작성해보세요..." 
+                : "성경 본문을 직접 번역해보세요..." 
               : "로그인 후 작성할 수 있습니다."}
             className="w-full h-32 p-3 text-sm leading-relaxed bg-blue-50/30 border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 placeholder:text-stone-400 disabled:bg-stone-100"
           />
         </div>
-        )}
 
         {/* 5. 주석 (Commentary) - Admin Only */}
         {isAdmin && selectedVerse && (
@@ -821,6 +851,44 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
               placeholder="관리자용 주석을 입력하세요... (Public Commentary)"
               className="w-full h-32 p-3 text-sm leading-relaxed bg-purple-50/30 border border-purple-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-200 placeholder:text-stone-400"
             />
+          </div>
+        )}
+
+        {/* 6. 커뮤니티 묵상 (Community Reflections) */}
+        {selectedVerse && (
+          <div className="border-t border-stone-200 pt-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
+              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+              커뮤니티 묵상 ({communityReflections.length})
+            </label>
+            
+            {loadingReflections ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
+              </div>
+            ) : communityReflections.length === 0 ? (
+              <div className="text-center py-4 text-stone-400 text-xs">
+                <p>아직 이 구절에 대한 커뮤니티 묵상이 없습니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {communityReflections.map((reflection) => (
+                  <div key={reflection.id} className="p-2 bg-stone-50 rounded border border-stone-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-stone-700">
+                        {reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명'}
+                      </span>
+                      <span className="text-xs text-stone-400">
+                        {new Date(reflection.created_at).toLocaleDateString('ko-KR')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 whitespace-pre-wrap line-clamp-3">
+                      {reflection.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
