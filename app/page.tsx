@@ -48,10 +48,10 @@ function HomeContent() {
 
   // Portal menu items
   const portalItems = [
-    { id: 'read', title: '한글 성경', subtitle: '원어 말씀 읽기', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
-    { id: 'study', title: '원어 연구소', subtitle: '그리스어/히브리어', href: '/study', icon: Search, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
-    { id: 'community', title: 'GNT 커뮤니티', subtitle: '내부 게시판', href: '/community', icon: Users, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
-    { id: 'sermon', title: '설교 아카이브', subtitle: '말씀 아카이브', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
+    { id: 'read', title: '말씀 나눔터(한글)', subtitle: '말씀 나눔터(한글)', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
+    { id: 'study', title: '성경 원어 연구소(신약)', subtitle: '성경 원어 연구소(신약)', href: '/study', icon: Search, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
+    { id: 'community', title: '커뮤니티 게시판', subtitle: '커뮤니티 게시판', href: '/community', icon: Users, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
+    { id: 'sermon', title: '설교 아카이브', subtitle: '설교 아카이브', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
   ];
 
   // Navigation items
@@ -198,7 +198,7 @@ function HomeContent() {
           {/* Hero Section */}
           <div className="text-center mb-10 md:mb-14">
             <h1 className="font-serif text-3xl md:text-4xl font-bold text-stone-800 mb-3">
-              원어로 읽는 <span className="text-amber-600">성경</span>
+              기독교 커뮤니티 성경 연구소
             </h1>
             <p className="text-stone-500 text-sm md:text-base max-w-md mx-auto">
               헬라어·히브리어 원어를 통해 하나님의 말씀을 깊이 묵상하는 공간
@@ -237,8 +237,7 @@ function HomeContent() {
             <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                 <Megaphone className="w-4 h-4 text-amber-600" />
-                <h3 className="font-bold text-sm text-amber-800">연구소 소식</h3>
-                <span className="ml-auto text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">공지</span>
+                <h3 className="font-bold text-sm text-amber-800">공지사항</h3>
               </div>
               <div className="p-4">
                 {loading ? (
@@ -329,7 +328,7 @@ function HomeContent() {
 
           {/* Footer Info */}
           <footer className="mt-12 text-center text-xs text-stone-400">
-            <p>© 2025 GNT Reader. 원어로 읽고, 원어로 묵상하며, 원어로 선포합니다.</p>
+            <p>© 2026 기독교 커뮤니티 성경 원어 연구소</p>
           </footer>
         </div>
       </main>
