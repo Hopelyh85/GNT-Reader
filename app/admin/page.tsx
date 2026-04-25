@@ -84,6 +84,7 @@ function AdminDashboardContent() {
   
   // Book Archive
   const [selectedBook, setSelectedBook] = useState('Matt');
+  const [selectedChapterFilter, setSelectedChapterFilter] = useState<number | 'all'>('all');
   const [bookData, setBookData] = useState<{ [chapter: number]: { reflections: StudioReflection[]; notes: any[] } }>({});
   const [loadingBook, setLoadingBook] = useState(false);
   
@@ -121,7 +122,7 @@ function AdminDashboardContent() {
     if (isAdmin && activeTab === 'book-archive') {
       loadBookArchive();
     }
-  }, [isAdmin, activeTab, selectedBook]);
+  }, [isAdmin, activeTab, selectedBook, selectedChapterFilter]);
   
   // Load upgrade requests
   useEffect(() => {
@@ -394,21 +395,38 @@ function AdminDashboardContent() {
     setUpdatingTier(userId);
     try {
       const supabase = getSupabase();
-      const { error } = await supabase.rpc('admin_update_tier', {
+      
+      // First try RPC function
+      const { error: rpcError } = await supabase.rpc('admin_update_tier', {
         target_id: userId,
         new_tier: newTier
       });
       
-      if (error) {
-        console.error('RPC error:', error);
-        alert('등급 변경 실패: ' + error.message);
-        return;
+      // If RPC fails, try direct update
+      if (rpcError) {
+        console.log('RPC failed, trying direct update:', rpcError.message);
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ tier: newTier, updated_at: new Date().toISOString() })
+          .eq('id', userId);
+        
+        if (updateError) {
+          console.error('Direct update error:', updateError);
+          alert('등급 변경 실패: ' + updateError.message);
+          return;
+        }
       }
       
+      // Update local state immediately
+      setUserStats(prev => prev.map(u => 
+        u.id === userId ? { ...u, tier: newTier } : u
+      ));
+      
       await loadUserStats();
-    } catch (err) {
+      console.log('Tier updated successfully to:', newTier);
+    } catch (err: any) {
       console.error('Error updating tier:', err);
-      alert('등급 변경 중 오류가 발생했습니다.');
+      alert('등급 변경 중 오류가 발생했습니다: ' + (err?.message || 'Unknown error'));
     } finally {
       setUpdatingTier(null);
     }
@@ -664,14 +682,27 @@ const getTierColor = (tier: string) => {
             <div className="flex items-center gap-3 mb-4">
               <select
                 value={selectedBook}
-                onChange={(e) => setSelectedBook(e.target.value)}
+                onChange={(e) => {
+                  setSelectedBook(e.target.value);
+                  setSelectedChapterFilter('all'); // Reset chapter filter when book changes
+                }}
                 className="px-3 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:border-stone-400"
               >
                 {books.map(book => (
                   <option key={book.id} value={book.id}>{book.name}</option>
                 ))}
               </select>
-              <span className="text-sm text-stone-500">{selectedBookData?.chapters}장</span>
+              <select
+                value={selectedChapterFilter}
+                onChange={(e) => setSelectedChapterFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                className="px-3 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:border-stone-400"
+              >
+                <option value="all">전체 장</option>
+                {Array.from({ length: selectedBookData?.chapters || 28 }, (_, i) => i + 1).map(ch => (
+                  <option key={ch} value={ch}>{ch}장</option>
+                ))}
+              </select>
+              <span className="text-sm text-stone-500">{selectedBookData?.chapters}장 중</span>
             </div>
 
             {loadingBook ? (
@@ -680,7 +711,9 @@ const getTierColor = (tier: string) => {
               </div>
             ) : (
               <div className="space-y-6">
-                {Object.entries(bookData).map(([chapter, data]) => {
+                {Object.entries(bookData)
+                  .filter(([chapter]) => selectedChapterFilter === 'all' || parseInt(chapter) === selectedChapterFilter)
+                  .map(([chapter, data]) => {
                   const hasContent = data.reflections.length > 0 || data.notes.length > 0;
                   if (!hasContent) return null;
 
@@ -726,10 +759,15 @@ const getTierColor = (tier: string) => {
                   );
                 })}
                 
-                {Object.keys(bookData).length === 0 && (
+                {(Object.keys(bookData).length === 0 || 
+                  Object.entries(bookData).filter(([chapter]) => selectedChapterFilter === 'all' || parseInt(chapter) === selectedChapterFilter).length === 0) && (
                   <div className="text-center py-12 text-stone-400">
                     <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p className="text-sm">이 책에 작성된 내용이 없습니다.</p>
+                    <p className="text-sm">
+                      {selectedChapterFilter === 'all' 
+                        ? '이 책에 작성된 내용이 없습니다.' 
+                        : `${selectedChapterFilter}장에 작성된 내용이 없습니다.`}
+                    </p>
                   </div>
                 )}
               </div>

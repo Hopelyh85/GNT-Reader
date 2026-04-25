@@ -749,7 +749,10 @@ export async function togglePinPost(reflectionId: string, isPinned: boolean): Pr
     .eq('id', user.id)
     .maybeSingle();
     
-  if (profileError || !profile?.tier?.toLowerCase().includes('admin')) {
+  const isAdmin = profile?.tier?.includes('관리자') || 
+                  profile?.tier?.includes('Admin') || 
+                  profile?.tier?.includes('⭐⭐⭐⭐⭐');
+  if (profileError || !isAdmin) {
     throw new Error('Admin access required');
   }
   
@@ -803,8 +806,10 @@ export async function deleteReflection(reflectionId: string): Promise<void> {
     
   if (profileError) console.error('Error fetching profile:', profileError.message);
     
-  const canDelete = reflection.user_id === user.id || 
-    ['Admin', 'Staff'].includes(profile?.tier);
+  const isAdminOrStaff = profile?.tier?.includes('관리자') || profile?.tier?.includes('Admin') ||
+                         profile?.tier?.includes('스태프') || profile?.tier?.includes('Staff') ||
+                         profile?.tier?.includes('⭐⭐⭐⭐⭐');
+  const canDelete = reflection.user_id === user.id || isAdminOrStaff;
     
   if (!canDelete) throw new Error('Not authorized to delete');
   
@@ -821,6 +826,23 @@ export async function markReflectionAsBest(
   isBest: boolean
 ): Promise<void> {
   const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+  
+  // Check admin status
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('tier')
+    .eq('id', user.id)
+    .maybeSingle();
+    
+  const isAdmin = profile?.tier?.includes('관리자') || 
+                  profile?.tier?.includes('Admin') || 
+                  profile?.tier?.includes('⭐⭐⭐⭐⭐');
+  if (profileError || !isAdmin) {
+    throw new Error('Admin access required');
+  }
+  
   const { error } = await supabase
     .from('reflections')
     .update({ is_best: isBest, updated_at: new Date().toISOString() })
@@ -1002,6 +1024,22 @@ export async function getNotice(): Promise<{ id: number; content: string; update
 
 export async function updateNotice(content: string): Promise<boolean> {
   const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+  
+  // Check admin status
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('tier')
+    .eq('id', user.id)
+    .maybeSingle();
+    
+  const isAdmin = profile?.tier?.includes('관리자') || 
+                  profile?.tier?.includes('Admin') || 
+                  profile?.tier?.includes('⭐⭐⭐⭐⭐');
+  if (profileError || !isAdmin) {
+    throw new Error('Admin access required');
+  }
   
   // Check if notice exists
   const { data: existing } = await supabase

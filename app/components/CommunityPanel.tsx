@@ -686,21 +686,25 @@ export function CommunityPanel({
 
   // Get post background color based on type
   const getPostBgColor = (postType?: string, tier?: string) => {
-    // Admin commentary (⭐⭐⭐⭐⭐ admin study_note)
-    if (postType === 'admin_note' || tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐')) {
+    // Admin commentary - ONLY for admin study_notes (not reflections)
+    if ((postType === 'admin_note' || postType === 'study_note') && 
+        (tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐'))) {
       return 'bg-purple-50 border-purple-200';
     }
-    // Study note (동역자 사역)
+    // Study note by non-admin (동역자 사역)
     if (postType === 'study_note') {
       return 'bg-blue-50 border-blue-200';
     }
     // Default reflection (일반 묵상) - warm beige
+    // NOTE: Even admin reflections are treated as regular posts
     return 'bg-stone-50 border-stone-200';
   };
 
   // Get post badge based on type
   const getPostBadge = (postType?: string, tier?: string) => {
-    if (postType === 'admin_note' || tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐')) {
+    // Admin commentary badge - ONLY for study_notes by admins
+    if ((postType === 'admin_note' || postType === 'study_note') && 
+        (tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐'))) {
       return (
         <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
           <Crown className="w-3 h-3" />
@@ -708,6 +712,7 @@ export function CommunityPanel({
         </span>
       );
     }
+    // Study note by non-admin
     if (postType === 'study_note') {
       return (
         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
@@ -715,6 +720,7 @@ export function CommunityPanel({
         </span>
       );
     }
+    // Reflections (even by admins) get no badge
     return null;
   };
 
