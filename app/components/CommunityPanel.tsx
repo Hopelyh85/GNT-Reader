@@ -11,7 +11,8 @@ import {
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
   addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection,
   addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser,
-  checkIsAdmin, getStudyNotesForVerse, getNotice, updateNotice, bookNameMap
+  checkIsAdmin, getStudyNotesForVerse, getNotice, updateNotice, bookNameMap,
+  getUserActivity
 } from '@/app/lib/supabase';
 
 // Books array for chapter selection
@@ -135,6 +136,12 @@ export function CommunityPanel({
   
   // Hashtag filter state
   const [hashtagFilter, setHashtagFilter] = useState<string | null>(null);
+  
+  // Profile modal state
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileModalUser, setProfileModalUser] = useState<any>(null);
+  const [profileModalActivity, setProfileModalActivity] = useState<{reflections: any[]; studyNotes: any[]} | null>(null);
+  const [loadingProfileActivity, setLoadingProfileActivity] = useState(false);
 
   // Get current user ID
   useEffect(() => {
@@ -565,24 +572,30 @@ export function CommunityPanel({
     return `${year}. ${month}. ${day}. ${hours}:${minutes}`;
   };
 
-  // Get display name from profile with fallback chain
-  // 1. nickname → 2. username → 3. email.split('@')[0] → 4. '익명 연구원'
+  // Get display name from profile with new format: [교회] [직분] 닉네임
+  // Only show church/job if user has chosen to make them public
   const getDisplayName = (profile: any, userEmail?: string) => {
     if (!profile) {
-      // Hard fallback: use provided email or anonymous
-      if (userEmail) {
-        return userEmail.split('@')[0];
-      }
+      if (userEmail) return userEmail.split('@')[0];
       return '익명 연구원';
     }
-    if (profile.nickname) return profile.nickname;
-    if (profile.username) return profile.username;
-    // Hardcoded email extraction from profile or passed email
-    const email = profile.email || userEmail;
-    if (email) {
-      return email.split('@')[0];
+    
+    const parts: string[] = [];
+    
+    // Add church if shown
+    if (profile.show_church && profile.church_name) {
+      parts.push(`[${profile.church_name}]`);
     }
-    return '익명 연구원';
+    
+    // Add job if shown
+    if (profile.show_job && profile.job_position) {
+      parts.push(`[${profile.job_position}]`);
+    }
+    
+    // Add nickname
+    parts.push(profile.nickname || profile.username || profile.email?.split('@')[0] || '익명');
+    
+    return parts.join(' ');
   };
 
   // Convert URLs in text to clickable links
@@ -681,6 +694,22 @@ export function CommunityPanel({
     return null;
   };
 
+  // Open profile modal
+  const openProfileModal = async (profile: any) => {
+    if (!profile) return;
+    setProfileModalUser(profile);
+    setProfileModalOpen(true);
+    setLoadingProfileActivity(true);
+    try {
+      const activity = await getUserActivity(profile.id);
+      setProfileModalActivity(activity);
+    } catch (err) {
+      console.error('Error loading user activity:', err);
+    } finally {
+      setLoadingProfileActivity(false);
+    }
+  };
+
   // Avatar component
   const Avatar = ({ url, tier, size = 'md' }: { url?: string | null; tier?: string; size?: 'sm' | 'md' }) => {
     const isAdminUser = tier?.toLowerCase().includes('admin');
@@ -729,9 +758,15 @@ export function CommunityPanel({
             
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-sm font-medium text-stone-800">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openProfileModal(post.profiles);
+                  }}
+                  className="text-sm font-medium text-stone-800 hover:text-blue-600 hover:underline cursor-pointer"
+                >
                   {getDisplayName(post.profiles)}
-                </span>
+                </button>
                 {post.profiles?.tier && !post.profiles.tier.toLowerCase().includes('admin') && (
                   <span className="text-xs bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded">
                     {post.profiles.tier}
@@ -1434,6 +1469,115 @@ export function CommunityPanel({
           </div>
         )}
       </div>
+      
+      {/* Profile Modal */}
+      {profileModalOpen && profileModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[80vh] overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="px-4 py-3 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+              <h3 className="font-bold text-stone-800 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                사용자 프로필
+              </h3>
+              <button
+                onClick={() => setProfileModalOpen(false)}
+                className="p-1 hover:bg-stone-200 rounded-full transition-colors"
+              >
+                <span className="text-xl leading-none">×</span>
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {/* Profile Info */}
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-stone-200 flex items-center justify-center">
+                  {profileModalUser.avatar_url ? (
+                    <img src={profileModalUser.avatar_url} alt="avatar" className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <Users className="w-6 h-6 text-stone-400" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-bold text-lg text-stone-800">
+                    {getDisplayName(profileModalUser)}
+                  </h4>
+                  <p className="text-sm text-stone-500">{profileModalUser.email}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      profileModalUser.tier === 'Admin' || profileModalUser.tier?.includes('⭐⭐⭐⭐⭐')
+                        ? 'bg-purple-100 text-purple-700' : 'bg-stone-100 text-stone-600'
+                    }`}>
+                      {profileModalUser.tier || 'General'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Activity Summary */}
+              {loadingProfileActivity ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                </div>
+              ) : profileModalActivity ? (
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <div className="flex-1 p-2 bg-stone-50 rounded text-center">
+                      <div className="text-xl font-bold text-stone-800">{profileModalActivity.reflections.length}</div>
+                      <div className="text-xs text-stone-500">묵상</div>
+                    </div>
+                    <div className="flex-1 p-2 bg-blue-50 rounded text-center">
+                      <div className="text-xl font-bold text-stone-800">{profileModalActivity.studyNotes.length}</div>
+                      <div className="text-xs text-stone-500">사역</div>
+                    </div>
+                  </div>
+                  
+                  {/* Recent Reflections */}
+                  {profileModalActivity.reflections.length > 0 && (
+                    <div>
+                      <h5 className="text-sm font-medium text-stone-700 mb-2">최근 묵상</h5>
+                      <div className="space-y-2">
+                        {profileModalActivity.reflections.slice(0, 3).map((ref) => (
+                          <div key={ref.id} className="p-2 bg-stone-50 rounded text-sm">
+                            <div className="text-xs text-stone-400">{ref.verse_ref || '글로벌'}</div>
+                            <p className="text-stone-700 line-clamp-2">{ref.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Recent Study Notes */}
+                  {profileModalActivity.studyNotes.length > 0 && (
+                    <div>
+                      <h5 className="text-sm font-medium text-stone-700 mb-2">최근 사역</h5>
+                      <div className="space-y-2">
+                        {profileModalActivity.studyNotes.slice(0, 3).map((note) => (
+                          <div key={note.id} className="p-2 bg-blue-50 rounded text-sm">
+                            <div className="text-xs text-stone-400">{note.verse_ref}</div>
+                            <p className="text-stone-700 line-clamp-2">{note.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-4 py-3 bg-stone-50 border-t border-stone-200">
+              <button
+                onClick={() => setProfileModalOpen(false)}
+                className="w-full py-2 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

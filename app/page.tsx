@@ -2,339 +2,306 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { BiblePanel } from '@/app/components/BiblePanel';
-import { StudyPanel } from '@/app/components/StudyPanel';
-import { CommunityPanel } from '@/app/components/CommunityPanel';
-import { useSBLGNT } from '@/app/hooks/useSBLGNT';
-import { SelectedVerse, SelectedWord } from '@/app/types';
-import { BookOpen, LogOut, LogIn, Menu, X, ExternalLink } from 'lucide-react';
+import { 
+  BookOpen, LogOut, LogIn, Menu, X, ExternalLink, 
+  Megaphone, Sparkles, Search, Users, Settings, Crown,
+  ChevronRight, Bell, MessageSquare, GraduationCap
+} from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
-import { getMyProfile, signOut, Profile, getGlobalNotice } from '@/app/lib/supabase';
+import { getMyProfile, signOut, Profile, getNotice } from '@/app/lib/supabase';
 
 export default function Home() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { getBooks, loading, error } = useSBLGNT();
-  const books = getBooks();
-  const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
-  const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [globalNotice, setGlobalNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ id: number; content: string; updated_at: string } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [initialPostId, setInitialPostId] = useState<string | null>(null);
-  const [activePanel, setActivePanel] = useState<'bible' | 'study' | 'community'>('bible');
-  const [focusPostId, setFocusPostId] = useState<string | null>(null);
   
-  // Navigate to verse from community post
-  const handleNavigateToVerse = (book: string, chapter: number, verse: number) => {
-    // Switch to bible panel (especially for mobile)
-    setActivePanel('bible');
-    
-    // Find book name from the books list
-    const bookData = books.find(b => {
-      const abbrev = b.name === '마태복음' ? 'Matt' :
-                    b.name === '마가복음' ? 'Mark' :
-                    b.name === '누가복음' ? 'Luke' :
-                    b.name === '요한복음' ? 'John' :
-                    b.name === '사도행전' ? 'Acts' :
-                    b.name === '로마서' ? 'Rom' :
-                    b.name === '고린도전서' ? '1Cor' :
-                    b.name === '고린도후서' ? '2Cor' :
-                    b.name === '갈라디아서' ? 'Gal' :
-                    b.name === '에베소서' ? 'Eph' :
-                    b.name === '빌립보서' ? 'Phil' :
-                    b.name === '골로새서' ? 'Col' :
-                    b.name === '데살로니가전서' ? '1Thess' :
-                    b.name === '데살로니가후서' ? '2Thess' :
-                    b.name === '디모데전서' ? '1Tim' :
-                    b.name === '디모데후서' ? '2Tim' :
-                    b.name === '디도서' ? 'Titus' :
-                    b.name === '빌레몬서' ? 'Phlm' :
-                    b.name === '히브리서' ? 'Heb' :
-                    b.name === '야고보서' ? 'Jas' :
-                    b.name === '베드로전서' ? '1Pet' :
-                    b.name === '베드로후서' ? '2Pet' :
-                    b.name === '요한일서' ? '1John' :
-                    b.name === '요한이서' ? '2John' :
-                    b.name === '요한삼서' ? '3John' :
-                    b.name === '유다서' ? 'Jude' :
-                    b.name === '요한계시록' ? 'Rev' : '';
-      return abbrev.toLowerCase() === book.toLowerCase();
-    });
-    
-    if (bookData) {
-      const chapterData = bookData.chapters.find(c => c.number === chapter);
-      const verseWords = chapterData?.verses[verse - 1]; // verses is 0-indexed array
-      
-      if (verseWords) {
-        setSelectedVerse({
-          book,
-          bookName: bookData.name,
-          chapter,
-          verse,
-          text: verseWords.map((w: any) => w.text).join(' ')
-        });
-      }
-    }
-  };
-  
-  // Get post_id from URL for deep linking (client-side only)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      setInitialPostId(params.get('post_id'));
-    }
-  }, []);
-
   useEffect(() => {
     if (user) {
       getMyProfile().then(setProfile).catch(console.error);
     }
-    // Load global notice
-    getGlobalNotice().then(setGlobalNotice).catch(console.error);
+    // Load notice
+    getNotice().then(setNotice).catch(console.error);
   }, [user]);
 
   const isLoggedIn = !!user;
   const userRole = profile?.tier || 'General';
-  const userName = profile?.nickname || user?.email?.split('@')[0] || '게스트';
-  const userEmail = user?.email || '';
+  const isAdmin = userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
 
   const handleLogout = async () => {
     await signOut();
     router.push('/');
   };
 
-  return (
-    <div className="flex flex-col h-screen bg-[#faf9f7]">
-      {/* Global Notice Banner */}
-      {globalNotice && (
-        <div className="px-4 py-2 bg-amber-100 border-b border-amber-200 text-center">
-          <p className="text-sm text-amber-800 font-medium">📢 {globalNotice}</p>
-        </div>
-      )}
+  const menuItems = [
+    {
+      id: 'notice',
+      title: '📢 실시간 공지사항',
+      description: '연구소의 중요 소식과 안내',
+      href: null,
+      icon: Megaphone,
+      color: 'bg-blue-50 border-blue-200 text-blue-700',
+      adminOnly: false,
+      isNotice: true
+    },
+    {
+      id: 'read',
+      title: '📖 한글 성경 나눔터',
+      description: '개역한글(KRV) 성경 읽기와 묵상 나눔',
+      href: '/read',
+      icon: BookOpen,
+      color: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+      adminOnly: false
+    },
+    {
+      id: 'study',
+      title: '🔍 원어 성경 연구소',
+      description: '헬라어 원어와 구문 분석, 심층 연구',
+      href: '/study',
+      icon: Search,
+      color: 'bg-amber-50 border-amber-200 text-amber-700',
+      adminOnly: false
+    },
+    {
+      id: 'sermon',
+      title: '🎧 설교 아카이브',
+      description: '지나간 설교와 말씀을 다시 듣기',
+      href: 'https://sermon-archive.vercel.app/',
+      icon: GraduationCap,
+      color: 'bg-purple-50 border-purple-200 text-purple-700',
+      external: true
+    },
+    {
+      id: 'community',
+      title: '👥 커뮤니티 게시판',
+      description: '성도들의 교제와 나눔의 공간',
+      href: '/community',
+      icon: Users,
+      color: 'bg-stone-50 border-stone-200 text-stone-700',
+      adminOnly: false
+    },
+    {
+      id: 'admin',
+      title: '⚙️ 관리자 대시보드',
+      description: '회원 관리, 승인, 설정',
+      href: '/admin',
+      icon: Settings,
+      color: 'bg-red-50 border-red-200 text-red-700',
+      adminOnly: true
+    },
+  ];
 
+  return (
+    <div className="min-h-screen bg-[#faf9f7]">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-stone-100 border-b border-stone-200">
+      <header className="flex items-center justify-between px-4 py-4 bg-white border-b border-stone-200 sticky top-0 z-50">
         {/* Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-100 rounded-lg">
-            <BookOpen className="w-5 h-5 text-amber-700" />
+          <div className="p-2.5 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl">
+            <BookOpen className="w-6 h-6 text-amber-700" />
           </div>
           <div>
-            <h1 className="text-lg font-serif font-bold text-stone-800">
-              기독교 커뮤니티 성경 원어 연구소
+            <h1 className="text-xl font-serif font-bold text-stone-800">
+              기독교 커뮤니티 성경 연구 포털
             </h1>
             <p className="text-xs text-stone-500">
-              헬라어 신약 성경 연구와 묵상
+              헬라어 원어 연구와 성경 묵상의 공간
             </p>
           </div>
         </div>
 
-        {/* Desktop External Links */}
-        <div className="hidden md:flex items-center gap-3">
-          <a
-            href="https://naver.me/xXnPSav8"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-stone-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            기독교 커뮤니티
-          </a>
-          <a
-            href="https://sermon-archive.vercel.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-stone-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            설교 아카이브
-          </a>
-        </div>
-
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 text-stone-600 hover:bg-stone-200 rounded-lg"
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-        
         {/* Desktop Auth */}
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-3">
           {isLoggedIn ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-500">
-                {userRole === 'Admin' ? '👑 ' : ''}{userName}
-              </span>
-              {userRole === 'Admin' && (
-                <a
-                  href="/admin"
-                  className="text-xs text-amber-600 hover:text-amber-700 underline mr-2"
-                >
-                  관리자
-                </a>
-              )}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {profile?.avatar_url && (
+                  <img 
+                    src={profile.avatar_url} 
+                    alt="avatar" 
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                )}
+                <div className="text-right">
+                  <span className="text-sm font-medium text-stone-700 block">
+                    {profile?.nickname || user?.email?.split('@')[0]}
+                  </span>
+                  <span className="text-xs text-stone-500">
+                    {isAdmin ? '👑 관리자' : userRole}
+                  </span>
+                </div>
+              </div>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 rounded-lg text-sm text-stone-600 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
-                <span>로그아웃</span>
+                <span className="hidden lg:inline">로그아웃</span>
               </button>
             </div>
           ) : (
             <a
               href="/login"
-              className="flex items-center gap-2 px-3 py-1.5 bg-stone-700 text-white rounded-lg text-sm hover:bg-stone-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-stone-800 text-white rounded-lg text-sm hover:bg-stone-700 transition-colors"
             >
               <LogIn className="w-4 h-4" />
               로그인
             </a>
           )}
         </div>
+
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden p-2 text-stone-600 hover:bg-stone-100 rounded-lg"
+        >
+          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
       </header>
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-stone-100 border-b border-stone-200 px-4 py-3 space-y-2">
-          <a
-            href="https://naver.me/xXnPSav8"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-stone-600 hover:text-amber-700 py-2"
-          >
-            <ExternalLink className="w-4 h-4" />
-            기독교 커뮤니티
-          </a>
-          <a
-            href="https://sermon-archive.vercel.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-stone-600 hover:text-blue-700 py-2"
-          >
-            <ExternalLink className="w-4 h-4" />
-            설교 아카이브
-          </a>
-          <div className="border-t border-stone-200 pt-2">
-            {isLoggedIn ? (
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 text-sm text-stone-600 hover:text-red-600 py-2"
-              >
-                <LogOut className="w-4 h-4" />
-                로그아웃
-              </button>
-            ) : (
+        <div className="md:hidden bg-white border-b border-stone-200 px-4 py-4 space-y-3">
+          {isLoggedIn ? (
+            <div className="flex items-center gap-3 pb-3 border-b border-stone-100">
+              {profile?.avatar_url && (
+                <img 
+                  src={profile.avatar_url} 
+                  alt="avatar" 
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              )}
+              <div>
+                <p className="font-medium text-stone-800">
+                  {profile?.nickname || user?.email?.split('@')[0]}
+                </p>
+                <p className="text-xs text-stone-500">{isAdmin ? '👑 관리자' : userRole}</p>
+              </div>
+            </div>
+          ) : null}
+          
+          <div className="space-y-2">
+            {menuItems.filter(item => !item.adminOnly || isAdmin).map((item) => (
               <a
-                href="/login"
-                className="flex items-center gap-2 text-sm text-stone-600 hover:text-stone-800 py-2"
+                key={item.id}
+                href={item.href || '#'}
+                target={item.external ? '_blank' : undefined}
+                rel={item.external ? 'noopener noreferrer' : undefined}
+                className={`flex items-center gap-3 p-3 rounded-lg border ${item.color} hover:shadow-md transition-all`}
               >
-                <LogIn className="w-4 h-4" />
-                로그인
+                <item.icon className="w-5 h-5" />
+                <span className="font-medium">{item.title}</span>
+                {item.external && <ExternalLink className="w-4 h-4 ml-auto" />}
               </a>
-            )}
+            ))}
           </div>
+          
+          {isLoggedIn && (
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2 p-3 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+            >
+              <LogOut className="w-5 h-5" />
+              로그아웃
+            </button>
+          )}
         </div>
       )}
 
-      {/* Error Banner */}
-      {error && (
-        <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-center">
-          <p className="text-sm text-red-600">
-            성경 데이터를 불러오는 중 오류가 발생했습니다: {error}
+      {/* Main Content */}
+      <main className="max-w-5xl mx-auto px-4 py-8 md:py-12">
+        {/* Welcome Section */}
+        <div className="text-center mb-12">
+          <h2 className="text-2xl md:text-3xl font-serif font-bold text-stone-800 mb-3">
+            성경 연구와 나눔의 공간에 오신 것을 환영합니다
+          </h2>
+          <p className="text-stone-600 max-w-2xl mx-auto">
+            헬라어 원어 연구부터 성경 묵상, 설교 아카이브까지 <br className="hidden md:block" />
+            성도들의 영적 성장을 돕는 종합 성경 연구 포털입니다.
           </p>
         </div>
-      )}
 
-      {/* Main Content - 3 Column Grid Layout */}
-      <main className="flex-1 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
-        {/* Left Panel - Bible Text */}
-        <div className="h-full border-r border-stone-200 overflow-hidden">
-          <BiblePanel
-            books={books}
-            selectedVerse={selectedVerse}
-            onSelectVerse={setSelectedVerse}
-            onSelectWord={setSelectedWord}
-            loading={loading}
-            userRole={userRole}
-            isLoggedIn={isLoggedIn}
-            userName={userName}
-            onFocusCommunity={(postId) => {
-              setActivePanel('community');
-              if (postId) setFocusPostId(postId);
-            }}
-          />
-        </div>
-
-        {/* Center Panel - Study Notes (Desktop only) */}
-        <div className="hidden md:block h-full border-r border-stone-200 overflow-hidden">
-          <StudyPanel
-            selectedVerse={selectedVerse}
-            selectedWord={selectedWord}
-            isLoggedIn={isLoggedIn}
-            userRole={userRole}
-            userName={userName}
-          />
-        </div>
-
-        {/* Mobile Bottom Sheet - StudyPanel */}
-        {(selectedVerse || selectedWord) && (
-          <div className="md:hidden">
-            <StudyPanel
-              selectedVerse={selectedVerse}
-              selectedWord={selectedWord}
-              isLoggedIn={isLoggedIn}
-              userRole={userRole}
-              userName={userName}
-              onClose={() => {
-                setSelectedWord(null);
-                // Keep verse selected, just close the panel
-              }}
-            />
-          </div>
-        )}
-
-        {/* Right Panel - Community/Reflection (Desktop only) */}
-        <div className="hidden md:block h-full overflow-hidden">
-          <CommunityPanel
-            selectedVerse={selectedVerse}
-            isLoggedIn={isLoggedIn}
-            userRole={userRole}
-            userName={userName}
-            initialPostId={focusPostId || initialPostId}
-            onNavigateToVerse={handleNavigateToVerse}
-          />
-        </div>
-
-        {/* Mobile Community Panel Overlay */}
-        {activePanel === 'community' && (
-          <div className="md:hidden fixed inset-0 z-50 bg-white flex flex-col">
-            {/* Mobile Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50">
-              <h2 className="text-lg font-semibold text-stone-800">커뮤니티 게시판</h2>
-              <button
-                onClick={() => setActivePanel('bible')}
-                className="p-2 hover:bg-stone-200 rounded-full transition-colors"
+        {/* Menu Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {menuItems.filter(item => !item.adminOnly || isAdmin).map((item) => (
+            item.isNotice ? (
+              // Notice Card (special rendering)
+              <div 
+                key={item.id}
+                className={`col-span-1 md:col-span-2 lg:col-span-3 p-5 rounded-xl border-2 ${item.color} mb-2`}
               >
-                <span className="text-2xl">×</span>
-              </button>
-            </div>
-            {/* Mobile Community Content */}
-            <div className="flex-1 overflow-hidden">
-              <CommunityPanel
-                selectedVerse={selectedVerse}
-                isLoggedIn={isLoggedIn}
-                userRole={userRole}
-                userName={userName}
-                initialPostId={focusPostId || initialPostId}
-                onNavigateToVerse={handleNavigateToVerse}
-              />
-            </div>
-          </div>
-        )}
-      </main>
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-white rounded-lg shadow-sm">
+                    <item.icon className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-blue-800 mb-1">{item.title}</h3>
+                    {notice ? (
+                      <div className="text-stone-700 whitespace-pre-wrap">
+                        {notice.content}
+                      </div>
+                    ) : (
+                      <p className="text-stone-500">공지사항이 없습니다.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Regular Menu Card
+              <a
+                key={item.id}
+                href={item.href || '#'}
+                target={item.external ? '_blank' : undefined}
+                rel={item.external ? 'noopener noreferrer' : undefined}
+                className={`group p-5 rounded-xl border-2 ${item.color} hover:shadow-lg transition-all duration-200 flex flex-col`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-2.5 bg-white rounded-lg shadow-sm group-hover:scale-110 transition-transform">
+                    <item.icon className="w-6 h-6" />
+                  </div>
+                  {item.external && (
+                    <ExternalLink className="w-4 h-4 opacity-50" />
+                  )}
+                  {!item.external && item.href && (
+                    <ChevronRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </div>
+                <h3 className="text-lg font-bold mb-1">{item.title}</h3>
+                <p className="text-sm opacity-80 leading-relaxed">{item.description}</p>
+              </a>
+            )
+          ))}
+        </div>
 
+        {/* Footer Info */}
+        <div className="mt-12 pt-8 border-t border-stone-200 text-center">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <a 
+              href="https://naver.me/xXnPSav8" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-amber-700 transition-colors"
+            >
+              <MessageSquare className="w-4 h-4" />
+              기독교 커뮤니티 카페
+            </a>
+            <span className="text-stone-300">|</span>
+            <a 
+              href="https://sermon-archive.vercel.app/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-purple-700 transition-colors"
+            >
+              <Bell className="w-4 h-4" />
+              설교 아카이브
+            </a>
+          </div>
+          <p className="text-xs text-stone-400">
+            기독교 커뮤니티 성경 연구 포털 © 2024
+          </p>
+        </div>
+      </main>
     </div>
   );
 }

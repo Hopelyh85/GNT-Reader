@@ -11,7 +11,14 @@ import {
   getAllStudyNotesForBook,
   StudioReflection,
   signOut,
-  getSupabase
+  getSupabase,
+  getUpgradeRequests,
+  getDeleteRequests,
+  approveUpgrade,
+  rejectUpgrade,
+  approveDelete,
+  rejectDelete,
+  Profile
 } from '@/app/lib/supabase';
 import { Crown, Loader2, LogOut, Users, BookOpen, User, ArrowLeft, Calendar, BookMarked } from 'lucide-react';
 

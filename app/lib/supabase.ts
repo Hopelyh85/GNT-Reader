@@ -192,6 +192,12 @@ export interface Profile {
   is_approved: boolean;
   created_at: string;
   updated_at: string;
+  // New fields for enhanced profile
+  church_name: string | null;
+  job_position: string | null;
+  show_church: boolean;
+  show_job: boolean;
+  upgrade_requested: boolean;
 }
 
 // Authentication
@@ -252,7 +258,7 @@ export async function getMyProfile(): Promise<Profile | null> {
 
 export async function updateProfile(
   userId: string,
-  updates: Partial<Pick<Profile, 'nickname' | 'avatar_url' | 'bio'>>
+  updates: Partial<Pick<Profile, 'nickname' | 'avatar_url' | 'bio' | 'church_name' | 'job_position' | 'show_church' | 'show_job' | 'upgrade_requested'>>
 ): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase
@@ -261,6 +267,64 @@ export async function updateProfile(
     .eq('id', userId);
   
   if (error) throw error;
+}
+
+// Request upgrade with profile info
+export async function requestUpgrade(
+  userId: string,
+  nickname: string,
+  churchName: string,
+  jobPosition: string,
+  showChurch: boolean,
+  showJob: boolean
+): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      nickname,
+      church_name: churchName,
+      job_position: jobPosition,
+      show_church: showChurch,
+      show_job: showJob,
+      upgrade_requested: true,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', userId);
+  
+  if (error) throw error;
+}
+
+// Get user activity (reflections + study notes)
+export async function getUserActivity(userId: string): Promise<{
+  reflections: any[];
+  studyNotes: any[];
+}> {
+  const supabase = getSupabase();
+  
+  // Get user's reflections
+  const { data: reflections, error: refError } = await supabase
+    .from('reflections')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false });
+  
+  if (refError) console.error('Error fetching reflections:', refError);
+  
+  // Get user's study notes
+  const { data: studyNotes, error: notesError } = await supabase
+    .from('study_notes')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (notesError) console.error('Error fetching study notes:', notesError);
+  
+  return {
+    reflections: reflections || [],
+    studyNotes: studyNotes || []
+  };
 }
 
 // Admin API
@@ -288,6 +352,96 @@ export async function updateUserTier(
     .from('profiles')
     .update({ tier, is_approved: isApproved, updated_at: new Date().toISOString() })
     .eq('id', userId);
+  
+  if (error) throw error;
+}
+
+// Get users with upgrade requests
+export async function getUpgradeRequests(): Promise<Profile[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('upgrade_requested', true)
+    .order('updated_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching upgrade requests:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Approve upgrade request
+export async function approveUpgrade(
+  userId: string,
+  newTier: Profile['tier'] = 'Regular'
+): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      tier: newTier,
+      is_approved: true,
+      upgrade_requested: false,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', userId);
+  
+  if (error) throw error;
+}
+
+// Reject upgrade request
+export async function rejectUpgrade(userId: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      upgrade_requested: false,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', userId);
+  
+  if (error) throw error;
+}
+
+// Get posts with delete requests
+export async function getDeleteRequests(): Promise<any[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('*, profiles(nickname, email, tier)')
+    .eq('delete_requested', true)
+    .order('updated_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching delete requests:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Approve delete request (actually delete the post)
+export async function approveDelete(reflectionId: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('reflections')
+    .delete()
+    .eq('id', reflectionId);
+  
+  if (error) throw error;
+}
+
+// Reject delete request (remove delete_requested flag)
+export async function rejectDelete(reflectionId: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('reflections')
+    .update({
+      delete_requested: false,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', reflectionId);
   
   if (error) throw error;
 }
