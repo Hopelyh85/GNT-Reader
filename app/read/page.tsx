@@ -62,7 +62,7 @@ export default function ReadPage() {
   const [loadingBible, setLoadingBible] = useState(true);
   
   // Community panel state
-  const [selectedVerse, setSelectedVerse] = useState<number | null>(null);
+  const [selectedVerseNum, setSelectedVerseNum] = useState<number | null>(null);
   const [showCommunity, setShowCommunity] = useState(false);
   const [reflections, setReflections] = useState<any[]>([]);
   const [studyNotes, setStudyNotes] = useState<any[]>([]);
@@ -70,6 +70,8 @@ export default function ReadPage() {
   const [newReflection, setNewReflection] = useState('');
   const [savingReflection, setSavingReflection] = useState(false);
   const [isGeneral, setIsGeneral] = useState(false);
+  // View mode: 'verse' for current verse, 'chapter' for whole chapter
+  const [viewMode, setViewMode] = useState<'verse' | 'chapter'>('verse');
 
   const bookInfo = books.find(b => b.id === selectedBook);
 
@@ -116,31 +118,48 @@ export default function ReadPage() {
     return verses;
   }, [krvData, bookInfo, selectedChapter]);
 
-  // Load community data for selected verse
-  const loadCommunityData = async (verseNum: number) => {
+  // Load community data for selected verse or chapter
+  const loadCommunityData = async (verseNum: number, mode: 'verse' | 'chapter' = viewMode) => {
     setLoadingCommunity(true);
     try {
       const supabase = getSupabase();
       // Use Korean book name for verseRef consistency with DB
       const bookInfo = books.find(b => b.id === selectedBook);
       const koreanBookName = bookInfo?.name || bookNameMapReverse[selectedBook] || selectedBook;
-      const verseRef = `${koreanBookName} ${selectedChapter}:${verseNum}`;
       
-      // Load reflections
-      const { data: reflectionsData, error: refError } = await supabase
+      let reflectionsQuery = supabase
         .from('reflections')
         .select('*, profiles(nickname, email, tier, church_name, job_position, show_church, show_job)')
-        .eq('verse_ref', verseRef)
-        .eq('is_public', true)
+        .eq('is_public', true);
+      
+      let notesQuery = supabase
+        .from('study_notes')
+        .select('*, profiles(nickname, email, tier, church_name, job_position, show_church, show_job)');
+      
+      if (mode === 'verse') {
+        // Filter by specific verse
+        const verseRef = `${koreanBookName} ${selectedChapter}:${verseNum}`;
+        reflectionsQuery = reflectionsQuery.eq('verse_ref', verseRef);
+        notesQuery = notesQuery.eq('verse_ref', verseRef);
+      } else {
+        // Filter by chapter (book + chapter)
+        reflectionsQuery = reflectionsQuery
+          .eq('book', koreanBookName)
+          .eq('chapter', selectedChapter);
+        notesQuery = notesQuery
+          .eq('book', koreanBookName)
+          .eq('chapter', selectedChapter);
+      }
+      
+      // Execute queries
+      const { data: reflectionsData, error: refError } = await reflectionsQuery
+        .order('verse', { ascending: true })
         .order('created_at', { ascending: false });
       
       if (refError) console.error('Reflections error:', refError);
       
-      // Load study notes (including admin notes)
-      const { data: notesData, error: notesError } = await supabase
-        .from('study_notes')
-        .select('*, profiles(nickname, email, tier, church_name, job_position, show_church, show_job)')
-        .eq('verse_ref', verseRef)
+      const { data: notesData, error: notesError } = await notesQuery
+        .order('verse', { ascending: true })
         .order('created_at', { ascending: false });
       
       if (notesError) console.error('Notes error:', notesError);
@@ -156,9 +175,18 @@ export default function ReadPage() {
 
   // Handle verse click
   const handleVerseClick = (verseNum: number) => {
-    setSelectedVerse(verseNum);
+    setSelectedVerseNum(verseNum);
+    setViewMode('verse'); // Reset to verse view when clicking a verse
     setShowCommunity(true);
-    loadCommunityData(verseNum);
+    loadCommunityData(verseNum, 'verse');
+  };
+  
+  // Handle view mode change
+  const handleViewModeChange = (mode: 'verse' | 'chapter') => {
+    setViewMode(mode);
+    if (selectedVerseNum) {
+      loadCommunityData(selectedVerseNum, mode);
+    }
   };
 
   // Save reflection
@@ -172,14 +200,14 @@ export default function ReadPage() {
       // Convert book abbreviation to Korean name for DB consistency
       const bookInfo = books.find(b => b.id === selectedBook);
       const koreanBookName = bookInfo?.name || bookNameMapReverse[selectedBook] || selectedBook;
-      const verseRef = `${koreanBookName} ${selectedChapter}:${selectedVerse}`;
+      const verseRef = `${koreanBookName} ${selectedChapter}:${selectedVerseNum}`;
       
       const { error } = await supabase.from('reflections').insert({
         user_id: user.id,
         verse_ref: verseRef,
         book: koreanBookName,
         chapter: selectedChapter,
-        verse: selectedVerse,
+        verse: selectedVerseNum,
         content: newReflection,
         is_public: true,
         title: null,
@@ -189,7 +217,7 @@ export default function ReadPage() {
       if (error) throw error;
       
       setNewReflection('');
-      await loadCommunityData(selectedVerse!);
+      await loadCommunityData(selectedVerseNum!, viewMode);
     } catch (err) {
       console.error('Error saving reflection:', err);
       alert('저장 중 오류가 발생했습니다.');
@@ -418,20 +446,20 @@ export default function ReadPage() {
                       key={v.verse}
                       onClick={() => handleVerseClick(v.verse)}
                       className={`group flex gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-                        selectedVerse === v.verse 
+                        selectedVerseNum === v.verse 
                           ? 'bg-amber-50 border border-amber-300 shadow-sm' 
                           : 'hover:bg-stone-50 hover:shadow-sm border border-transparent'
                       }`}
                     >
                       <span className={`text-sm font-bold min-w-[2rem] transition-colors ${
-                        selectedVerse === v.verse 
+                        selectedVerseNum === v.verse 
                           ? 'text-amber-700' 
                           : 'text-amber-600 group-hover:text-amber-700'
                       }`}>
                         {v.verse}
                       </span>
                       <p className={`leading-relaxed flex-1 transition-colors ${
-                        selectedVerse === v.verse 
+                        selectedVerseNum === v.verse 
                           ? 'text-stone-900' 
                           : 'text-stone-800'
                       }`}>
@@ -439,7 +467,7 @@ export default function ReadPage() {
                       </p>
                       {/* Hover indicator */}
                       <span className={`text-xs text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity ${
-                        selectedVerse === v.verse ? 'hidden' : ''
+                        selectedVerseNum === v.verse ? 'hidden' : ''
                       }`}>
                         클릭하여 보기 →
                       </span>
@@ -499,7 +527,7 @@ export default function ReadPage() {
             transition-transform duration-300 ease-out
             ${showCommunity ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
           `}>
-            {selectedVerse ? (
+            {selectedVerseNum ? (
               <div className="bg-white lg:rounded-xl border-t lg:border border-stone-200 overflow-hidden h-[70vh] lg:h-full lg:shadow-none shadow-2xl rounded-t-2xl">
                 {/* Mobile Handle Bar */}
                 <div className="lg:hidden w-full py-2 bg-stone-50 border-b border-stone-200">
@@ -512,7 +540,7 @@ export default function ReadPage() {
                     <BookOpen className="w-4 h-4 text-amber-600" />
                     <div>
                       <h3 className="font-bold text-stone-800 text-sm">
-                        {bookInfo?.name} {selectedChapter}:{selectedVerse}
+                        {bookInfo?.name} {selectedChapter}:{selectedVerseNum}
                       </h3>
                       <p className="text-xs text-stone-500">묵상과 나눔</p>
                     </div>
@@ -525,7 +553,36 @@ export default function ReadPage() {
                   </button>
                 </div>
                 
-                <div className="p-4 space-y-4 max-h-[calc(70vh-140px)] lg:max-h-[calc(100vh-300px)] overflow-y-auto">
+                {/* View Mode Toggle */}
+                <div className="px-4 py-2 bg-white border-b border-stone-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-stone-500">보기:</span>
+                    <div className="flex rounded-lg bg-stone-100 p-0.5">
+                      <button
+                        onClick={() => handleViewModeChange('verse')}
+                        className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                          viewMode === 'verse'
+                            ? 'bg-white text-stone-800 shadow-sm'
+                            : 'text-stone-500 hover:text-stone-700'
+                        }`}
+                      >
+                        {selectedVerseNum}절
+                      </button>
+                      <button
+                        onClick={() => handleViewModeChange('chapter')}
+                        className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                          viewMode === 'chapter'
+                            ? 'bg-white text-stone-800 shadow-sm'
+                            : 'text-stone-500 hover:text-stone-700'
+                        }`}
+                      >
+                        {selectedChapter}장 전체
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-4 space-y-4 max-h-[calc(70vh-180px)] lg:max-h-[calc(100vh-340px)] overflow-y-auto">
                   {/* Admin Notes (Purple) */}
                   {studyNotes.filter((n: any) => 
                     n.profiles?.tier === '관리자' || n.profiles?.tier === 'Admin' || n.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
@@ -535,6 +592,11 @@ export default function ReadPage() {
                         <Crown className="w-4 h-4 text-purple-600" />
                         <span className="text-xs font-bold text-purple-700">👑 공식 주석</span>
                         <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
+                        {viewMode === 'chapter' && note.verse > 0 && (
+                          <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">
+                            {note.verse}절
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-stone-800">{note.content}</p>
                       {note.commentary && (
@@ -555,6 +617,11 @@ export default function ReadPage() {
                         <Pin className="w-3 h-3 text-blue-600" />
                         <span className="text-xs font-bold text-blue-700">동역자 사역</span>
                         <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
+                        {viewMode === 'chapter' && note.verse > 0 && (
+                          <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">
+                            {note.verse}절
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-stone-800">{note.content}</p>
                     </div>
@@ -569,6 +636,11 @@ export default function ReadPage() {
                         <span className="text-xs text-stone-400">
                           {new Date(ref.created_at).toLocaleDateString('ko-KR')}
                         </span>
+                        {viewMode === 'chapter' && ref.verse > 0 && (
+                          <span className="text-xs bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded">
+                            {ref.verse}절
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-stone-800">{ref.content}</p>
                     </div>
@@ -583,7 +655,11 @@ export default function ReadPage() {
                   {!loadingCommunity && reflections.length === 0 && studyNotes.length === 0 && (
                     <div className="text-center py-8 text-stone-400">
                       <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">아직 이 절에 나눔이 없습니다.</p>
+                      <p className="text-sm">
+                        {viewMode === 'chapter' 
+                          ? `아직 ${selectedChapter}장에 나눔이 없습니다.` 
+                          : '아직 이 절에 나눔이 없습니다.'}
+                      </p>
                       {!isGeneral && <p className="text-xs mt-1">첫 번째 묵상을 남겨보세요!</p>}
                     </div>
                   )}
