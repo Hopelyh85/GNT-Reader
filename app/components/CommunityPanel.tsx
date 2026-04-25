@@ -71,15 +71,15 @@ export function CommunityPanel({
   selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath, showPrayerTabs = false 
 }: CommunityPanelProps) {
   // Permission helpers based on tier
-  const isGeneral = userRole === '준회원' || userRole === 'General';
-  const isRegular = userRole === '정회원' || userRole === 'Regular';
-  const isHardworking = userRole === '열심회원' || userRole === 'Hardworking';
-  const isStaff = userRole === '스태프' || userRole === 'Staff';
-  const isAdminTier = userRole === '관리자' || userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
+  const isGeneral = userRole === '준회원';
+  const isRegular = userRole === '정회원';
+  const isHardworking = userRole === '열심회원';
+  const isStaff = userRole === '스태프';
+  const isAdminTier = userRole === '관리자';
   
-  const canWrite = isLoggedIn && !isGeneral; // ⭐ General cannot write
-  const canLike = isLoggedIn; // ⭐ General and above can like
-  const canEditPost = isHardworking || isStaff || isAdminTier; // ⭐⭐⭐+ can edit
+  const canWrite = isLoggedIn && !isGeneral; // 준회원은 쓰기 불가
+  const canLike = isLoggedIn; // 모든 로그인 사용자 가능
+  const canEditPost = isHardworking || isStaff || isAdminTier; // 열심회원 이상 수정 가능
   const canDeleteImmediate = isStaff || isAdminTier; // Staff+ can delete immediately
   const canRequestDelete = isLoggedIn && !canDeleteImmediate; // Others can request delete
   // Use RPC is_admin() function for accurate admin check
@@ -338,7 +338,7 @@ export function CommunityPanel({
     }
   }, [expandedPostId]);
 
-  // Load ministry notes for selected verse (⭐⭐⭐⭐⭐ admin pinned)
+  // Load ministry notes for selected verse (관리자 pinned)
   useEffect(() => {
     const loadMinistryNotes = async () => {
       if (!selectedVerse) {
@@ -354,7 +354,7 @@ export function CommunityPanel({
         const notes = await getStudyNotesForVerse(verseRef);
         // Filter only 관리자 admin notes
         const adminNotes = notes.filter((note: any) => 
-          note.profiles?.tier === '관리자' || note.profiles?.tier === 'Admin' || note.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
+          note.profiles?.tier === '관리자'
         );
         setMinistryNotes(adminNotes);
       } catch (err) {
@@ -613,10 +613,10 @@ export function CommunityPanel({
     }
   };
   
-  // Edit post (placeholder - ⭐⭐⭐ and above only)
+  // Edit post (placeholder - 열심회원 and above only)
   const handleEdit = (post: Post) => {
     if (!canEditPost) {
-      alert('글 수정 권한은 ⭐⭐⭐(Hardworking) 등급 이상부터 가능합니다.');
+      alert('글 수정 권한은 열심회원 등급 이상부터 가능합니다.');
       return;
     }
     // TODO: Implement edit modal or inline editing
@@ -883,8 +883,7 @@ export function CommunityPanel({
       return 'bg-amber-50 border-amber-200';
     }
     // Admin commentary - ONLY for admin study_notes (not reflections)
-    if ((postType === 'admin_note' || postType === 'study_note') && 
-        (tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐'))) {
+    if ((postType === 'admin_note' || postType === 'study_note') && tier === '관리자') {
       return 'bg-purple-50 border-purple-200';
     }
     // Study note by non-admin (동역자 사역)
@@ -926,8 +925,7 @@ export function CommunityPanel({
       );
     }
     // Admin commentary badge - ONLY for study_notes by admins
-    if ((postType === 'admin_note' || postType === 'study_note') && 
-        (tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐'))) {
+    if ((postType === 'admin_note' || postType === 'study_note') && tier === '관리자') {
       return (
         <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
           <Crown className="w-3 h-3" />
@@ -1146,7 +1144,7 @@ export function CommunityPanel({
                 링크 복사
               </button>
               
-              {/* Edit Button - ⭐⭐⭐ Hardworking and above only */}
+              {/* Edit Button - 열심회원 and above only */}
               {currentUserId === post.user_id && canEditPost && (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleEdit(post); }}
@@ -1453,12 +1451,12 @@ export function CommunityPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* New Post Input - ⭐ General cannot write, show upgrade button instead */}
+        {/* New Post Input - 준회원 cannot write, show upgrade button instead */}
         {isLoggedIn && isGeneral && !upgradeRequested && (
           <div className="p-3 border-b border-stone-200 bg-stone-50">
             <div className="flex items-center justify-between">
               <p className="text-sm text-stone-600">
-                ⭐ 등급은 읽기만 가능합니다. 글쓰기는 ⭐⭐ 이상부터 가능합니다.
+                준회원 등급은 읽기만 가능합니다. 글쓰기는 정회원 이상부터 가능합니다.
               </p>
               <button
                 onClick={async () => {

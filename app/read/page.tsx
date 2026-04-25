@@ -112,7 +112,7 @@ function ReadContent() {
     if (user) {
       getMyProfile().then((p) => {
         setProfile(p);
-        setIsGeneral(p?.tier === 'General' || !p?.tier);
+        setIsGeneral(p?.tier === '준회원' || !p?.tier);
       }).catch(console.error);
     }
     getNotice().then(setNotice).catch(console.error);
@@ -316,8 +316,8 @@ function ReadContent() {
   };
 
   const isLoggedIn = !!user;
-  const userRole = profile?.tier || 'General';
-  const isAdmin = userRole === '관리자' || userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
+  const userRole = profile?.tier || '준회원';
+  const isAdmin = userRole === '관리자' || userRole === 'Admin';
   const verses = getVersesForChapter();
 
   const handleLogout = async () => {
@@ -652,7 +652,7 @@ function ReadContent() {
                 <div className="p-4 space-y-4 max-h-[calc(70vh-180px)] lg:max-h-[calc(100vh-340px)] overflow-y-auto">
                   {/* Admin Notes (Purple) */}
                   {studyNotes.filter((n: any) => 
-                    n.profiles?.tier === '관리자' || n.profiles?.tier === 'Admin' || n.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
+                    n.profiles?.tier === '관리자'
                   ).map((note: any) => (
                     <div key={note.id} className={`p-3 bg-purple-50 border rounded-lg transition-all ${
                       highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-purple-200'
@@ -678,7 +678,7 @@ function ReadContent() {
                   
                   {/* Study Notes (Blue) */}
                   {studyNotes.filter((n: any) => {
-                    const isAdminNote = n.profiles?.tier === '관리자' || n.profiles?.tier === 'Admin' || n.profiles?.tier?.includes('⭐⭐⭐⭐⭐');
+                    const isAdminNote = n.profiles?.tier === '관리자';
                     return !isAdminNote;
                   }).map((note: any) => (
                     <div key={note.id} className={`p-3 bg-blue-50 border rounded-lg transition-all ${
@@ -765,7 +765,7 @@ function ReadContent() {
                 {isLoggedIn && isGeneral && (
                   <div className="p-4 border-t border-stone-200 bg-amber-50">
                     <p className="text-sm text-amber-800 text-center">
-                      ⭐ 등급은 읽기만 가능합니다.<br />
+                      준회원 등급은 읽기만 가능합니다.<br />
                       <a href="/login?tab=profile" className="underline">등업 신청</a> 후 글쓰기가 가능합니다.
                     </p>
                   </div>

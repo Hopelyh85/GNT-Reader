@@ -27,8 +27,8 @@ function CommunityContent() {
   }, [user]);
 
   const isLoggedIn = !!user;
-  const userRole = profile?.tier || 'General';
-  const isAdmin = userRole === '관리자' || userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
+  const userRole = profile?.tier || '준회원';
+  const isAdmin = userRole === '관리자';
   const userName = profile?.nickname || user?.email?.split('@')[0] || '게스트';
 
   const handleLogout = async () => {

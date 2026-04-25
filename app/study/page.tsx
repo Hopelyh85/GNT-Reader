@@ -98,10 +98,10 @@ export default function StudyPage() {
   }, [user]);
 
   const isLoggedIn = !!user;
-  const userRole = profile?.tier || 'General';
+  const userRole = profile?.tier || '준회원';
   const userName = profile?.nickname || user?.email?.split('@')[0] || '게스트';
   const userEmail = user?.email || '';
-  const isAdmin = userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
+  const isAdmin = userRole === '관리자';
 
   const handleLogout = async () => {
     await signOut();

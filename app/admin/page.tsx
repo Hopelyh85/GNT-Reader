@@ -466,37 +466,29 @@ function AdminDashboardContent() {
 const getTierLabel = (tier: string) => {
     switch (tier) {
       case '관리자':
-      case 'Admin':
-      case '⭐⭐⭐⭐⭐': return '👑 관리자';
+      case 'Admin': return '👑 관리자';
       case '스태프':
-      case 'Staff':
-      case '⭐⭐⭐⭐': return '⭐⭐⭐⭐ 스태프';
+      case 'Staff': return '스태프';
       case '열심회원':
-      case 'Hardworking':
-      case '⭐⭐⭐': return '⭐⭐⭐ 열심회원';
+      case 'Hardworking': return '열심회원';
       case '정회원':
-      case 'Regular':
-      case '⭐⭐': return '⭐⭐ 정회원';
+      case 'Regular': return '정회원';
       case '준회원':
       case 'General':
-      default: return '⭐ 준회원';
+      default: return '준회원';
     }
   };
 
 const getTierColor = (tier: string) => {
     switch (tier) {
       case '관리자':
-      case 'Admin':
-      case '⭐⭐⭐⭐⭐': return 'text-purple-600 font-medium';
+      case 'Admin': return 'text-purple-600 font-medium';
       case '스태프':
-      case 'Staff':
-      case '⭐⭐⭐⭐': return 'text-blue-600 font-medium';
+      case 'Staff': return 'text-blue-600 font-medium';
       case '열심회원':
-      case 'Hardworking':
-      case '⭐⭐⭐': return 'text-amber-600 font-medium';
+      case 'Hardworking': return 'text-amber-600 font-medium';
       case '정회원':
-      case 'Regular':
-      case '⭐⭐': return 'text-green-600';
+      case 'Regular': return 'text-green-600';
       case '준회원':
       case 'General':
       default: return 'text-stone-500';
@@ -705,10 +697,10 @@ const getTierColor = (tier: string) => {
                               className="text-xs px-2 py-1 border border-stone-200 rounded focus:outline-none focus:border-stone-400"
                             >
                               <option value="관리자">👑 관리자</option>
-                              <option value="스태프">⭐⭐⭐⭐ 스태프</option>
-                              <option value="열심회원">⭐⭐⭐ 열심회원</option>
-                              <option value="정회원">⭐⭐ 정회원</option>
-                              <option value="준회원">⭐ 준회원</option>
+                              <option value="스태프">스태프</option>
+                              <option value="열심회원">열심회원</option>
+                              <option value="정회원">정회원</option>
+                              <option value="준회원">준회원</option>
                             </select>
                           </div>
                         </td>
@@ -948,7 +940,7 @@ const getTierColor = (tier: string) => {
                         <td className="px-4 py-3 text-stone-700">{user.nickname || user.username || '-'}</td>
                         <td className="px-4 py-3">
                           <span className="text-xs bg-stone-100 text-stone-600 px-2 py-1 rounded">
-                            {user.tier || '⭐'}
+                            {user.tier || '준회원'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-stone-500 text-xs">
