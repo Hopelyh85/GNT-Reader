@@ -121,9 +121,9 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  const isGeneral = profile?.tier === 'General' || !profile?.tier;
-  const userRole = profile?.tier || 'General';
-  const isAdmin = userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
+  const isGeneral = profile?.tier === '준회원' || profile?.tier === 'General' || !profile?.tier;
+  const userRole = profile?.tier || '준회원';
+  const isAdmin = userRole === '관리자' || userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
 
   if (authLoading || loading) {
     return (
@@ -189,9 +189,9 @@ export default function ProfilePage() {
                 <span className="text-sm text-stone-500">현재 등급:</span>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                   isAdmin ? 'bg-purple-100 text-purple-700' :
-                  userRole === 'Staff' ? 'bg-blue-100 text-blue-700' :
-                  userRole === 'Hardworking' ? 'bg-green-100 text-green-700' :
-                  userRole === 'Regular' ? 'bg-stone-100 text-stone-700' :
+                  userRole === '스태프' || userRole === 'Staff' ? 'bg-blue-100 text-blue-700' :
+                  userRole === '열심회원' || userRole === 'Hardworking' ? 'bg-green-100 text-green-700' :
+                  userRole === '정회원' || userRole === 'Regular' ? 'bg-stone-100 text-stone-700' :
                   'bg-gray-100 text-gray-700'
                 }`}>
                   {isAdmin ? '👑 관리자' : userRole}

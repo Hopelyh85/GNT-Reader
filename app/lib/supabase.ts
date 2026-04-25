@@ -186,7 +186,7 @@ export interface Profile {
   id: string;
   email: string;
   nickname: string | null;
-  tier: 'Admin' | 'Staff' | 'Hardworking' | 'Regular' | 'General';
+  tier: 'Admin' | 'Staff' | 'Hardworking' | 'Regular' | 'General' | '관리자' | '스태프' | '열심회원' | '정회원' | '준회원';
   avatar_url: string | null;
   bio: string | null;
   is_approved: boolean;

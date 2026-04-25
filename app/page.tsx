@@ -27,7 +27,7 @@ export default function Home() {
 
   const isLoggedIn = !!user;
   const userRole = profile?.tier || 'General';
-  const isAdmin = userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
+  const isAdmin = userRole === '관리자' || userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
 
   const handleLogout = async () => {
     await signOut();

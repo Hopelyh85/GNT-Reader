@@ -252,7 +252,7 @@ function AdminDashboardContent() {
       const supabase = getSupabase();
       const { error } = await supabase.rpc('admin_update_tier', {
         target_id: userId,
-        new_tier: '⭐⭐'
+        new_tier: '정회원'
       });
       
       if (error) {
@@ -264,7 +264,7 @@ function AdminDashboardContent() {
       // Also reset upgrade_requested flag
       await supabase.from('profiles').update({ upgrade_requested: false }).eq('id', userId);
       
-      alert('등업이 승인되었습니다. 사용자 등급이 ⭐⭐(Regular)로 변경되었습니다.');
+      alert('등업이 승인되었습니다. 사용자 등급이 정회원으로 변경되었습니다.');
       await loadUpgradeRequests();
     } catch (err) {
       console.error('Error approving upgrade:', err);
@@ -416,20 +416,40 @@ function AdminDashboardContent() {
 
 const getTierLabel = (tier: string) => {
     switch (tier) {
-      case '⭐⭐⭐⭐⭐': return '⭐⭐⭐⭐⭐(Admin - 모든 권한)';
-      case '⭐⭐⭐⭐': return '⭐⭐⭐⭐(Staff - 타인 글 삭제, 번역 가능)';
-      case '⭐⭐⭐': return '⭐⭐⭐(Hardworking - 번역 가능)';
-      case '⭐⭐': return '⭐⭐(Regular - 묵상/댓글 가능)';
-      default: return '⭐(General - 읽기 전용)';
+      case '관리자':
+      case 'Admin':
+      case '⭐⭐⭐⭐⭐': return '관리자(모든 권한)';
+      case '스태프':
+      case 'Staff':
+      case '⭐⭐⭐⭐': return '스태프(타인 글 삭제, 번역 가능)';
+      case '열심회원':
+      case 'Hardworking':
+      case '⭐⭐⭐': return '열심회원(번역 가능)';
+      case '정회원':
+      case 'Regular':
+      case '⭐⭐': return '정회원(묵상/댓글 가능)';
+      case '준회원':
+      case 'General':
+      default: return '준회원(읽기 전용)';
     }
   };
 
 const getTierColor = (tier: string) => {
     switch (tier) {
+      case '관리자':
+      case 'Admin':
       case '⭐⭐⭐⭐⭐': return 'text-purple-600 font-medium';
+      case '스태프':
+      case 'Staff':
       case '⭐⭐⭐⭐': return 'text-blue-600 font-medium';
+      case '열심회원':
+      case 'Hardworking':
       case '⭐⭐⭐': return 'text-amber-600 font-medium';
+      case '정회원':
+      case 'Regular':
       case '⭐⭐': return 'text-green-600';
+      case '준회원':
+      case 'General':
       default: return 'text-stone-500';
     }
   };
@@ -622,11 +642,11 @@ const getTierColor = (tier: string) => {
                             disabled={updatingTier === user.id}
                             className="text-xs px-2 py-1 border border-stone-200 rounded focus:outline-none focus:border-stone-400"
                           >
-                            <option value="⭐⭐⭐⭐⭐">⭐⭐⭐⭐⭐(Admin)</option>
-                            <option value="⭐⭐⭐⭐">⭐⭐⭐⭐(Staff)</option>
-                            <option value="⭐⭐⭐">⭐⭐⭐(Hardworking)</option>
-                            <option value="⭐⭐">⭐⭐(Regular)</option>
-                            <option value="⭐">⭐(General)</option>
+                            <option value="관리자">관리자(Admin)</option>
+                            <option value="스태프">스태프(Staff)</option>
+                            <option value="열심회원">열심회원(Hardworking)</option>
+                            <option value="정회원">정회원(Regular)</option>
+                            <option value="준회원">준회원(General)</option>
                           </select>
                         </td>
                       </tr>

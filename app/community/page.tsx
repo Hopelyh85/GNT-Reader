@@ -24,7 +24,7 @@ export default function CommunityPage() {
 
   const isLoggedIn = !!user;
   const userRole = profile?.tier || 'General';
-  const isAdmin = userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
+  const isAdmin = userRole === '관리자' || userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
   const userName = profile?.nickname || user?.email?.split('@')[0] || '게스트';
 
   const handleLogout = async () => {

@@ -222,7 +222,7 @@ export default function ReadPage() {
 
   const isLoggedIn = !!user;
   const userRole = profile?.tier || 'General';
-  const isAdmin = userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
+  const isAdmin = userRole === '관리자' || userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
   const verses = getVersesForChapter();
 
   const handleLogout = async () => {
@@ -480,7 +480,7 @@ export default function ReadPage() {
                 <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
                   {/* Admin Notes (Purple) */}
                   {studyNotes.filter((n: any) => 
-                    n.profiles?.tier === '⭐⭐⭐⭐⭐' || n.profiles?.tier === 'Admin'
+                    n.profiles?.tier === '관리자' || n.profiles?.tier === 'Admin' || n.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
                   ).map((note: any) => (
                     <div key={note.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
@@ -498,9 +498,10 @@ export default function ReadPage() {
                   ))}
                   
                   {/* Study Notes (Blue) */}
-                  {studyNotes.filter((n: any) => 
-                    n.profiles?.tier !== '⭐⭐⭐⭐⭐' && n.profiles?.tier !== 'Admin'
-                  ).map((note: any) => (
+                  {studyNotes.filter((n: any) => {
+                    const isAdminNote = n.profiles?.tier === '관리자' || n.profiles?.tier === 'Admin' || n.profiles?.tier?.includes('⭐⭐⭐⭐⭐');
+                    return !isAdminNote;
+                  }).map((note: any) => (
                     <div key={note.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <Pin className="w-3 h-3 text-blue-600" />

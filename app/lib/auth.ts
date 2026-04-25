@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getMyProfile, Profile } from './supabase';
 
 // User tiers
-export type UserTier = 'Admin' | 'Staff' | 'Hardworking' | 'Regular' | 'General';
+export type UserTier = 'Admin' | 'Staff' | 'Hardworking' | 'Regular' | 'General' | '관리자' | '스태프' | '열심회원' | '정회원' | '준회원';
 
 // Extended session user type
 export interface SessionUser {
@@ -17,11 +17,11 @@ export interface SessionUser {
 export const canViewContent = () => true; // Everyone can view
 
 export const canWriteNote = (tier: UserTier | null): boolean => {
-  return tier === 'Admin' || tier === 'Hardworking';
+  return tier === 'Admin' || tier === 'Hardworking' || tier === '관리자' || tier === '열심회원';
 };
 
 export const canWriteCommentary = (tier: UserTier | null): boolean => {
-  return tier === 'Admin';
+  return tier === 'Admin' || tier === '관리자';
 };
 
 export const canEditContent = (
@@ -30,7 +30,7 @@ export const canEditContent = (
   contentOwnerId: string
 ): boolean => {
   if (!tier) return false;
-  return tier === 'Admin' || userId === contentOwnerId;
+  return tier === 'Admin' || tier === '관리자' || userId === contentOwnerId;
 };
 
 // Supabase client with service role for server operations

@@ -66,11 +66,11 @@ export function CommunityPanel({
   selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse 
 }: CommunityPanelProps) {
   // Permission helpers based on tier
-  const isGeneral = userRole === '⭐' || userRole === 'General';
-  const isRegular = userRole === '⭐⭐' || userRole === 'Regular';
-  const isHardworking = userRole === '⭐⭐⭐' || userRole === 'Hardworking';
-  const isStaff = userRole === '⭐⭐⭐⭐' || userRole === 'Staff';
-  const isAdminTier = userRole === '⭐⭐⭐⭐⭐' || userRole === 'Admin';
+  const isGeneral = userRole === '준회원' || userRole === 'General';
+  const isRegular = userRole === '정회원' || userRole === 'Regular';
+  const isHardworking = userRole === '열심회원' || userRole === 'Hardworking';
+  const isStaff = userRole === '스태프' || userRole === 'Staff';
+  const isAdminTier = userRole === '관리자' || userRole === 'Admin' || userRole?.includes('⭐⭐⭐⭐⭐');
   
   const canWrite = isLoggedIn && !isGeneral; // ⭐ General cannot write
   const canLike = isLoggedIn; // ⭐ General and above can like
@@ -248,7 +248,7 @@ export function CommunityPanel({
         const verse = note.verse || 0;
         if (!postsByVerse[verse]) postsByVerse[verse] = [];
         // Check if admin note
-        const isAdminNote = note.profiles?.tier === '⭐⭐⭐⭐⭐' || note.profiles?.tier === 'Admin';
+        const isAdminNote = note.profiles?.tier === '관리자' || note.profiles?.tier === 'Admin' || note.profiles?.tier?.includes('⭐⭐⭐⭐⭐');
         postsByVerse[verse].push({ ...note, postType: isAdminNote ? 'admin_note' : 'study_note' });
       });
       
@@ -330,9 +330,9 @@ export function CommunityPanel({
         const koreanBookName = bookNameMap[selectedVerse.book] || selectedVerse.book;
         const verseRef = `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`;
         const notes = await getStudyNotesForVerse(verseRef);
-        // Filter only ⭐⭐⭐⭐⭐ admin notes
+        // Filter only 관리자 admin notes
         const adminNotes = notes.filter((note: any) => 
-          note.profiles?.tier === '⭐⭐⭐⭐⭐' || note.profiles?.tier === 'Admin'
+          note.profiles?.tier === '관리자' || note.profiles?.tier === 'Admin' || note.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
         );
         setMinistryNotes(adminNotes);
       } catch (err) {
@@ -667,7 +667,7 @@ export function CommunityPanel({
   // Get post background color based on type
   const getPostBgColor = (postType?: string, tier?: string) => {
     // Admin commentary (⭐⭐⭐⭐⭐ admin study_note)
-    if (postType === 'admin_note' || tier === '⭐⭐⭐⭐⭐' || tier === 'Admin') {
+    if (postType === 'admin_note' || tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐')) {
       return 'bg-purple-50 border-purple-200';
     }
     // Study note (동역자 사역)
@@ -680,7 +680,7 @@ export function CommunityPanel({
 
   // Get post badge based on type
   const getPostBadge = (postType?: string, tier?: string) => {
-    if (postType === 'admin_note' || tier === '⭐⭐⭐⭐⭐' || tier === 'Admin') {
+    if (postType === 'admin_note' || tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐')) {
       return (
         <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
           <Crown className="w-3 h-3" />
@@ -1440,7 +1440,7 @@ export function CommunityPanel({
                             <div
                               key={post.id}
                               className={`p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-shadow ${
-                                post.postType === 'admin_note' || post.profiles?.tier === '⭐⭐⭐⭐⭐'
+                                post.postType === 'admin_note' || post.profiles?.tier === '관리자' || post.profiles?.tier === 'Admin' || post.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
                                   ? 'bg-purple-50 border-purple-200' 
                                   : post.postType === 'study_note'
                                     ? 'bg-blue-50 border-blue-200'
@@ -1510,7 +1510,7 @@ export function CommunityPanel({
                   <p className="text-sm text-stone-500">{profileModalUser.email}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      profileModalUser.tier === 'Admin' || profileModalUser.tier?.includes('⭐⭐⭐⭐⭐')
+                      profileModalUser.tier === '관리자' || profileModalUser.tier === 'Admin' || profileModalUser.tier?.includes('⭐⭐⭐⭐⭐')
                         ? 'bg-purple-100 text-purple-700' : 'bg-stone-100 text-stone-600'
                     }`}>
                       {profileModalUser.tier || 'General'}
