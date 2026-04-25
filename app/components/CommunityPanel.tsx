@@ -202,8 +202,10 @@ export function CommunityPanel({
   const getFreeBoardPosts = () => {
     return posts.filter(post => {
       const cat = (post as any).category;
+      const prayerType = (post as any).prayer_type;
       const noVerseRef = !post.verse_ref || post.verse_ref === '글로벌 게시판' || post.verse_ref === '';
-      const isNotPrayer = cat !== 'prayer_general' && cat !== 'prayer_world';
+      // STRICT: Exclude ALL prayer-related posts from free board
+      const isNotPrayer = cat !== 'prayer_general' && cat !== 'prayer_world' && !prayerType;
       return noVerseRef && isNotPrayer;
     });
   };
@@ -1488,46 +1490,6 @@ export function CommunityPanel({
         <p className="text-xs text-stone-500 mt-1 hidden lg:block">
           말씀 중심 · 자유 게시판 · 기도 제목
         </p>
-      </div>
-
-      {/* View Mode Tabs */}
-      <div className="flex border-b border-stone-200 bg-white">
-        <button
-          onClick={() => {
-            setViewMode('feed');
-            setHashtagFilter(null);
-          }}
-          className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
-            viewMode === 'feed' && !hashtagFilter
-              ? 'text-stone-800 border-b-2 border-stone-800' 
-              : 'text-stone-500 hover:text-stone-700'
-          }`}
-        >
-          <span className="flex items-center justify-center gap-1">
-            <MessageSquare className="w-3 h-3" />
-            전체 게시글
-          </span>
-        </button>
-        <button
-          onClick={() => {
-            setViewMode('all-posts');
-            setHashtagFilter(null);
-            // Load initial chapter data
-            if (Object.keys(allPostsByChapter).length === 0) {
-              loadAllPostsByChapter(selectedBookForView, selectedChapterForView);
-            }
-          }}
-          className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
-            viewMode === 'all-posts'
-              ? 'text-stone-800 border-b-2 border-stone-800' 
-              : 'text-stone-500 hover:text-stone-700'
-          }`}
-        >
-          <span className="flex items-center justify-center gap-1">
-            <BookOpen className="w-3 h-3" />
-            장별 모아보기
-          </span>
-        </button>
       </div>
 
       {/* Hashtag Filter Banner */}
