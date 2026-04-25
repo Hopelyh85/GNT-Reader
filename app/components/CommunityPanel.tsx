@@ -97,13 +97,13 @@ export function CommunityPanel({
     console.log('[CommunityPanel] userRole:', userRole, 'isAdmin:', isAdmin, 'isLoggedIn:', isLoggedIn);
   }, [userRole, isAdmin, isLoggedIn]);
   
-  // New post states
-  const [newTitle, setNewTitle] = useState('');
-  const [newContent, setNewContent] = useState('');
+  // New post states - COMPLETELY SEPARATED for free board and prayer board
+  const [freeTitle, setFreeTitle] = useState('');
+  const [freeContent, setFreeContent] = useState('');
+  const [prayerTitle, setPrayerTitle] = useState('');
+  const [prayerContent, setPrayerContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [includeVerse, setIncludeVerse] = useState(false);
-  const [postCategory, setPostCategory] = useState<'reflection' | 'prayer'>('reflection');
-  const [prayerTypeOld, setPrayerTypeOld] = useState<'normal' | 'world'>('normal'); // Legacy for handleSavePost compatibility
   
   // Posts states
   const [posts, setPosts] = useState<Post[]>([]);
@@ -195,13 +195,10 @@ export function CommunityPanel({
   };
   
   const getFreeBoardPosts = () => {
+    // Simplified: Only show posts with category 'general' (free board posts)
     return posts.filter(post => {
       const cat = (post as any).category;
-      const prayerType = (post as any).prayer_type;
-      const noVerseRef = !post.verse_ref || post.verse_ref === '글로벌 게시판' || post.verse_ref === '';
-      // STRICT: Exclude ALL prayer-related posts from free board
-      const isNotPrayer = cat !== 'prayer_general' && cat !== 'prayer_world' && !prayerType;
-      return noVerseRef && isNotPrayer;
+      return cat === 'general';
     });
   };
   
@@ -421,9 +418,9 @@ export function CommunityPanel({
     }
   };
 
-  // Check 24h prayer limit
+  // Check 24h prayer limit (called from handleSavePost when target is 'prayer')
   const checkPrayerLimit = async () => {
-    if (!currentUserId || postCategory !== 'prayer' || prayerTypeOld !== 'normal') return true;
+    if (!currentUserId) return true;
     
     setCheckingLastPrayer(true);
     try {
@@ -456,19 +453,13 @@ export function CommunityPanel({
     }
   };
 
-  // Save new post with explicit target parameters (State Collision Fix)
-  const handleSavePost = async (
-    targetCategory: 'general' | 'prayer_general' | 'prayer_world',
-    targetPrayerType?: string,
-    targetPrayerSubType?: 'world' | 'nation' | 'church' | 'personal'
-  ) => {
-    if (!newContent.trim() || !canWrite) return;
-
-    // Check 24h prayer limit for normal prayers (only for prayer_general)
-    if (targetCategory === 'prayer_general' && targetPrayerType === 'normal') {
-      const canPost = await checkPrayerLimit();
-      if (!canPost) return;
-    }
+  // Save new post - COMPLETELY SEPARATED logic for free vs prayer boards
+  const handleSavePost = async (target: 'free' | 'prayer') => {
+    // Use appropriate state based on target
+    const title = target === 'free' ? freeTitle : prayerTitle;
+    const content = target === 'free' ? freeContent : prayerContent;
+    
+    if (!content.trim() || !canWrite) return;
 
     setSaving(true);
     try {
@@ -478,34 +469,71 @@ export function CommunityPanel({
         ? `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`
         : '글로벌 게시판';
       
-      const isWorldPrayer = targetCategory === 'prayer_world';
-      
-      await addPublicReflection(
-        verseRef,
-        koreanBookName,
-        selectedVerse?.chapter || 0,
-        selectedVerse?.verse || 0,
-        newContent,
-        true,
-        targetCategory,
-        null,
-        newTitle.trim() || null,
-        false, // isUrgent - only admins can set this
-        isWorldPrayer,
-        undefined, // tags
-        targetPrayerSubType || targetPrayerType, // prayer_type
-        linkedPrayerId, // linked_prayer_id
-        'wait' // prayer_status
-      );
+      if (target === 'free') {
+        // FREE BOARD: Always category 'general'
+        await addPublicReflection(
+          verseRef,
+          koreanBookName,
+          selectedVerse?.chapter || 0,
+          selectedVerse?.verse || 0,
+          content,
+          true,
+          'general', // Always general for free board
+          null,
+          title.trim() || null,
+          false,
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined
+        );
+        
+        // Clear free board inputs
+        setFreeTitle('');
+        setFreeContent('');
+      } else {
+        // PRAYER BOARD: Check prayer type and 24h limit
+        const isWorldPrayer = prayerType === 'world';
+        
+        // Check 24h prayer limit for normal prayers
+        if (!isWorldPrayer) {
+          const canPost = await checkPrayerLimit();
+          if (!canPost) {
+            setSaving(false);
+            return;
+          }
+        }
+        
+        await addPublicReflection(
+          verseRef,
+          koreanBookName,
+          selectedVerse?.chapter || 0,
+          selectedVerse?.verse || 0,
+          content,
+          true,
+          isWorldPrayer ? 'prayer_world' : 'prayer_general',
+          null,
+          title.trim() || null,
+          false,
+          isWorldPrayer,
+          undefined,
+          prayerType, // prayer_type from state
+          linkedPrayerId,
+          'wait'
+        );
 
-      // Show message for world prayers
-      if (isWorldPrayer) {
-        alert('세계 기도 제목이 제출되었습니다. 관리자 승인 후 게시됩니다.');
+        // Show message for world prayers
+        if (isWorldPrayer) {
+          alert('세계 기도 제목이 제출되었습니다. 관리자 승인 후 게시됩니다.');
+        }
+        
+        // Clear prayer board inputs
+        setPrayerTitle('');
+        setPrayerContent('');
+        setLinkedPrayerId(null);
       }
-
-      setNewTitle('');
-      setNewContent('');
-      setLinkedPrayerId(null); // Clear linked prayer
+      
       await loadPosts(1, false);
       await loadPinnedPosts();
     } catch (err: any) {
@@ -1728,21 +1756,21 @@ export function CommunityPanel({
                   <div className="p-3 border-b border-stone-200 bg-stone-50">
                     <input
                       type="text"
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
+                      value={freeTitle}
+                      onChange={(e) => setFreeTitle(e.target.value)}
                       placeholder="제목을 입력하세요 (선택사항)"
                       className="w-full mb-2 px-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                     <textarea
-                      value={newContent}
-                      onChange={(e) => setNewContent(e.target.value)}
+                      value={freeContent}
+                      onChange={(e) => setFreeContent(e.target.value)}
                       placeholder="자유롭게 글을 작성해 보세요..."
                       className="w-full h-20 p-2 text-sm bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                     <div className="flex justify-end mt-2">
                       <button
-                        onClick={() => handleSavePost('general')}
-                        disabled={!newContent.trim() || saving}
+                        onClick={() => handleSavePost('free')}
+                        disabled={!freeContent.trim() || saving}
                         className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                       >
                         <Send className="w-3 h-3" />
@@ -1857,20 +1885,23 @@ export function CommunityPanel({
                       )}
                     </div>
                     
+                    <input
+                      type="text"
+                      value={prayerTitle}
+                      onChange={(e) => setPrayerTitle(e.target.value)}
+                      placeholder="기도 제목을 입력하세요 (선택사항)"
+                      className="w-full mb-2 px-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-200"
+                    />
                     <textarea
-                      value={newContent}
-                      onChange={(e) => setNewContent(e.target.value)}
-                      placeholder={`${prayerType === 'world' ? '세계를 위한 기도' : prayerType === 'nation' ? '나라를 위한 기도' : prayerType === 'church' ? '교회를 위한 기도' : '개인 기도'} 제목을 작성해 주세요...`}
+                      value={prayerContent}
+                      onChange={(e) => setPrayerContent(e.target.value)}
+                      placeholder={`${prayerType === 'world' ? '세계를 위한 기도' : prayerType === 'nation' ? '나라를 위한 기도' : prayerType === 'church' ? '교회를 위한 기도' : '개인 기도'} 내용을 작성해 주세요...`}
                       className="w-full h-20 p-2 text-sm bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-red-200"
                     />
                     <div className="flex justify-end mt-2">
                       <button
-                        onClick={() => handleSavePost(
-                          prayerType === 'world' ? 'prayer_world' : 'prayer_general',
-                          prayerType === 'world' ? 'world' : 'normal',
-                          prayerType
-                        )}
-                        disabled={!newContent.trim() || saving}
+                        onClick={() => handleSavePost('prayer')}
+                        disabled={!prayerContent.trim() || saving}
                         className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50"
                       >
                         <Heart className="w-3 h-3" />
