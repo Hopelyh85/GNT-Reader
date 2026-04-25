@@ -11,8 +11,39 @@ import {
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
   addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection,
   addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser,
-  checkIsAdmin, getStudyNotesForVerse, getNotice, updateNotice
+  checkIsAdmin, getStudyNotesForVerse, getNotice, updateNotice, bookNameMap
 } from '@/app/lib/supabase';
+
+// Books array for chapter selection
+const books = [
+  { id: 'Matt', name: '마태복음', chapters: 28 },
+  { id: 'Mark', name: '마가복음', chapters: 16 },
+  { id: 'Luke', name: '누가복음', chapters: 24 },
+  { id: 'John', name: '요한복음', chapters: 21 },
+  { id: 'Acts', name: '사도행전', chapters: 28 },
+  { id: 'Rom', name: '로마서', chapters: 16 },
+  { id: '1Cor', name: '고린도전서', chapters: 16 },
+  { id: '2Cor', name: '고린도후서', chapters: 13 },
+  { id: 'Gal', name: '갈라디아서', chapters: 6 },
+  { id: 'Eph', name: '에베소서', chapters: 6 },
+  { id: 'Phil', name: '빌립보서', chapters: 4 },
+  { id: 'Col', name: '골로새서', chapters: 4 },
+  { id: '1Thess', name: '데살로니가전서', chapters: 5 },
+  { id: '2Thess', name: '데살로니가후서', chapters: 3 },
+  { id: '1Tim', name: '디모데전서', chapters: 6 },
+  { id: '2Tim', name: '디모데후서', chapters: 4 },
+  { id: 'Titus', name: '디도서', chapters: 3 },
+  { id: 'Phlm', name: '빌레몬서', chapters: 1 },
+  { id: 'Heb', name: '히브리서', chapters: 13 },
+  { id: 'Jas', name: '야고보서', chapters: 5 },
+  { id: '1Pet', name: '베드로전서', chapters: 5 },
+  { id: '2Pet', name: '베드로후서', chapters: 3 },
+  { id: '1John', name: '요한일서', chapters: 5 },
+  { id: '2John', name: '요한이서', chapters: 1 },
+  { id: '3John', name: '요한삼서', chapters: 1 },
+  { id: 'Jude', name: '유다서', chapters: 1 },
+  { id: 'Rev', name: '요한계시록', chapters: 22 },
+];
 
 interface CommunityPanelProps {
   selectedVerse: SelectedVerse | null;
@@ -93,6 +124,17 @@ export function CommunityPanel({
   const [isEditingNotice, setIsEditingNotice] = useState(false);
   const [noticeEditContent, setNoticeEditContent] = useState('');
   const [savingNotice, setSavingNotice] = useState(false);
+  
+  // All Posts by Chapter view state
+  const [viewMode, setViewMode] = useState<'feed' | 'all-posts'>('feed');
+  const [selectedBookForView, setSelectedBookForView] = useState('Matt');
+  const [selectedChapterForView, setSelectedChapterForView] = useState(1);
+  const [allPostsByChapter, setAllPostsByChapter] = useState<{[verse: number]: (Post | any)[]}>({});
+  const [loadingAllPosts, setLoadingAllPosts] = useState(false);
+  const [expandedVerses, setExpandedVerses] = useState<Set<number>>(new Set());
+  
+  // Hashtag filter state
+  const [hashtagFilter, setHashtagFilter] = useState<string | null>(null);
 
   // Get current user ID
   useEffect(() => {
@@ -149,6 +191,86 @@ export function CommunityPanel({
       setLoadingPosts(false);
     }
   }, [pinnedPosts]);
+
+  // Load all posts (reflections + study_notes) for a specific chapter
+  const loadAllPostsByChapter = useCallback(async (bookId: string, chapter: number) => {
+    setLoadingAllPosts(true);
+    try {
+      const supabase = getSupabase();
+      const bookName = bookNameMap[bookId] || bookId;
+      
+      // Load all reflections for this chapter
+      const { data: reflections, error: refError } = await supabase
+        .from('reflections')
+        .select('*, profiles(nickname, email, tier)')
+        .eq('book', bookId)
+        .eq('chapter', chapter)
+        .eq('is_public', true)
+        .order('verse', { ascending: true })
+        .order('created_at', { ascending: false });
+      
+      if (refError) {
+        console.error('Error loading reflections:', refError);
+      }
+      
+      // Load all study notes for this chapter
+      const { data: notes, error: notesError } = await supabase
+        .from('study_notes')
+        .select('*, profiles(nickname, email, tier)')
+        .eq('book', bookId)
+        .eq('chapter', chapter)
+        .order('verse', { ascending: true })
+        .order('created_at', { ascending: false });
+      
+      if (notesError) {
+        console.error('Error loading study notes:', notesError);
+      }
+      
+      // Group by verse
+      const postsByVerse: {[verse: number]: any[]} = {};
+      
+      // Add reflections
+      (reflections || []).forEach((post: any) => {
+        const verse = post.verse || 0;
+        if (!postsByVerse[verse]) postsByVerse[verse] = [];
+        postsByVerse[verse].push({ ...post, postType: 'reflection' });
+      });
+      
+      // Add study notes
+      (notes || []).forEach((note: any) => {
+        const verse = note.verse || 0;
+        if (!postsByVerse[verse]) postsByVerse[verse] = [];
+        // Check if admin note
+        const isAdminNote = note.profiles?.tier === '⭐⭐⭐⭐⭐' || note.profiles?.tier === 'Admin';
+        postsByVerse[verse].push({ ...note, postType: isAdminNote ? 'admin_note' : 'study_note' });
+      });
+      
+      setAllPostsByChapter(postsByVerse);
+      
+      // Auto-expand first verse with posts
+      const versesWithPosts = Object.keys(postsByVerse).map(Number).sort((a, b) => a - b);
+      if (versesWithPosts.length > 0) {
+        setExpandedVerses(new Set([versesWithPosts[0]]));
+      }
+    } catch (err) {
+      console.error('Error loading all posts:', err);
+    } finally {
+      setLoadingAllPosts(false);
+    }
+  }, []);
+
+  // Toggle verse expansion
+  const toggleVerseExpansion = (verse: number) => {
+    setExpandedVerses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(verse)) {
+        newSet.delete(verse);
+      } else {
+        newSet.add(verse);
+      }
+      return newSet;
+    });
+  };
 
   // Load reply counts
   const loadReplyCounts = useCallback(async () => {
@@ -487,6 +609,78 @@ export function CommunityPanel({
     });
   };
 
+  // Extract hashtags from content
+  const extractHashtags = (content: string): string[] => {
+    const hashtagRegex = /#[\w가-힣]+/g;
+    return content.match(hashtagRegex) || [];
+  };
+
+  // Render content with clickable hashtags
+  const renderContentWithHashtags = (content: string) => {
+    const hashtagRegex = /(#[\w가-힣]+)/g;
+    const parts = content.split(hashtagRegex);
+    
+    return parts.map((part, index) => {
+      if (part.startsWith('#')) {
+        return (
+          <button
+            key={index}
+            onClick={(e) => {
+              e.stopPropagation();
+              setHashtagFilter(part);
+              setViewMode('feed');
+            }}
+            className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+          >
+            {part}
+          </button>
+        );
+      }
+      // Also process URLs within non-hashtag parts
+      return renderContentWithLinks(part);
+    });
+  };
+
+  // Filter posts by hashtag
+  const getFilteredPosts = () => {
+    if (!hashtagFilter) return posts;
+    return posts.filter(post => post.content?.includes(hashtagFilter));
+  };
+
+  // Get post background color based on type
+  const getPostBgColor = (postType?: string, tier?: string) => {
+    // Admin commentary (⭐⭐⭐⭐⭐ admin study_note)
+    if (postType === 'admin_note' || tier === '⭐⭐⭐⭐⭐' || tier === 'Admin') {
+      return 'bg-purple-50 border-purple-200';
+    }
+    // Study note (동역자 사역)
+    if (postType === 'study_note') {
+      return 'bg-blue-50 border-blue-200';
+    }
+    // Default reflection (일반 묵상) - warm beige
+    return 'bg-stone-50 border-stone-200';
+  };
+
+  // Get post badge based on type
+  const getPostBadge = (postType?: string, tier?: string) => {
+    if (postType === 'admin_note' || tier === '⭐⭐⭐⭐⭐' || tier === 'Admin') {
+      return (
+        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+          <Crown className="w-3 h-3" />
+          공식 주석
+        </span>
+      );
+    }
+    if (postType === 'study_note') {
+      return (
+        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+          동역자 사역
+        </span>
+      );
+    }
+    return null;
+  };
+
   // Avatar component
   const Avatar = ({ url, tier, size = 'md' }: { url?: string | null; tier?: string; size?: 'sm' | 'md' }) => {
     const isAdminUser = tier?.toLowerCase().includes('admin');
@@ -512,14 +706,19 @@ export function CommunityPanel({
   };
 
   // Render post item
-  const renderPost = (post: Post, isPinned: boolean = false) => {
+  const renderPost = (post: Post, isPinned: boolean = false, postType?: string) => {
     const isExpanded = expandedPostId === post.id;
     const canDelete = currentUserId === post.user_id || isAdmin;
     
     console.log('[renderPost] post.id:', post.id, 'currentUserId:', currentUserId, 'post.user_id:', post.user_id, 'isAdmin:', isAdmin, 'canDelete:', canDelete);
     
+    // Get color-coded background based on post type
+    const bgColorClass = isPinned 
+      ? 'bg-amber-50/20 border-amber-300' 
+      : getPostBgColor(postType || (post as any).postType, post.profiles?.tier);
+    
     return (
-      <div key={post.id} className={`bg-white rounded-lg border ${isPinned ? 'border-amber-300 bg-amber-50/20' : 'border-stone-200'} overflow-hidden`}>
+      <div key={post.id} className={`rounded-lg border ${bgColorClass} overflow-hidden`}>
         {/* Post Header - Always visible */}
         <div 
           className="p-4 cursor-pointer hover:bg-stone-50/50 transition-colors"
@@ -529,7 +728,7 @@ export function CommunityPanel({
             <Avatar url={post.profiles?.avatar_url} tier={post.profiles?.tier} />
             
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="text-sm font-medium text-stone-800">
                   {getDisplayName(post.profiles)}
                 </span>
@@ -543,6 +742,8 @@ export function CommunityPanel({
                     ★ 베스트
                   </span>
                 )}
+                {/* Post Type Badge */}
+                {!isPinned && getPostBadge(postType || (post as any).postType, post.profiles?.tier)}
               </div>
               
               {/* Title with Post Number */}
@@ -599,8 +800,26 @@ export function CommunityPanel({
             {/* Post Content */}
             <div className="p-4 pt-3">
               <p className="text-sm text-stone-700 leading-relaxed break-words whitespace-pre-wrap">
-                {renderContentWithLinks(post.content)}
+                {renderContentWithHashtags(post.content || '')}
               </p>
+              {/* Hashtags */}
+              {extractHashtags(post.content || '').length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {extractHashtags(post.content || '').map((tag, idx) => (
+                    <button
+                      key={idx}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setHashtagFilter(tag);
+                        setViewMode('feed');
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-0.5 rounded-full transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             
             {/* Action Buttons */}
@@ -786,6 +1005,61 @@ export function CommunityPanel({
           성경 묵상과 나눔의 공간
         </p>
       </div>
+
+      {/* View Mode Tabs */}
+      <div className="flex border-b border-stone-200 bg-white">
+        <button
+          onClick={() => {
+            setViewMode('feed');
+            setHashtagFilter(null);
+          }}
+          className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
+            viewMode === 'feed' && !hashtagFilter
+              ? 'text-stone-800 border-b-2 border-stone-800' 
+              : 'text-stone-500 hover:text-stone-700'
+          }`}
+        >
+          <span className="flex items-center justify-center gap-1">
+            <MessageSquare className="w-3 h-3" />
+            전체 게시글
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setViewMode('all-posts');
+            setHashtagFilter(null);
+            // Load initial chapter data
+            if (Object.keys(allPostsByChapter).length === 0) {
+              loadAllPostsByChapter(selectedBookForView, selectedChapterForView);
+            }
+          }}
+          className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
+            viewMode === 'all-posts'
+              ? 'text-stone-800 border-b-2 border-stone-800' 
+              : 'text-stone-500 hover:text-stone-700'
+          }`}
+        >
+          <span className="flex items-center justify-center gap-1">
+            <BookOpen className="w-3 h-3" />
+            장별 모아보기
+          </span>
+        </button>
+      </div>
+
+      {/* Hashtag Filter Banner */}
+      {hashtagFilter && (
+        <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+          <span className="text-xs text-blue-700">
+            필터: <span className="font-bold">{hashtagFilter}</span>
+          </span>
+          <button
+            onClick={() => setHashtagFilter(null)}
+            className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 hover:bg-blue-100 rounded transition-colors"
+          >
+            필터 해제 ✕
+          </button>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
@@ -991,44 +1265,174 @@ export function CommunityPanel({
           </div>
         )}
 
-        {/* Posts Feed */}
-        <div className="p-3 space-y-3">
-          <div className="flex items-center gap-2 px-1">
-            <Users className="w-3 h-3 text-stone-500" />
-            <span className="text-xs font-medium text-stone-600">전체 게시글</span>
-          </div>
-          
-          {loadingPosts && posts.length === 0 ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+        {/* Feed View */}
+        {viewMode === 'feed' && (
+          <div className="p-3 space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <Users className="w-3 h-3 text-stone-500" />
+              <span className="text-xs font-medium text-stone-600">
+                {hashtagFilter ? '필터링된 게시글' : '전체 게시글'}
+              </span>
             </div>
-          ) : posts.length === 0 && pinnedPosts.length === 0 ? (
-            <div className="text-center py-8 text-stone-400">
-              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">아직 게시글이 없습니다.</p>
-              <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>
-            </div>
-          ) : (
-            <>
-              {posts.map(post => renderPost(post))}
-              
-              {/* Load More */}
-              {hasMore && (
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingPosts}
-                  className="w-full py-2 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
-                >
-                  {loadingPosts ? (
-                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                  ) : (
-                    '더 보기'
-                  )}
+            
+            {loadingPosts && posts.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+              </div>
+            ) : getFilteredPosts().length === 0 ? (
+              <div className="text-center py-8 text-stone-400">
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">{hashtagFilter ? '해당 태그의 게시글이 없습니다.' : '아직 게시글이 없습니다.'}</p>
+                {!hashtagFilter && <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>}
+              </div>
+            ) : (
+              <>
+                {getFilteredPosts().map(post => renderPost(post))}
+                
+                {/* Load More */}
+                {!hashtagFilter && hasMore && (
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingPosts}
+                    className="w-full py-2 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+                  >
+                    {loadingPosts ? (
+                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                    ) : (
+                      '더 보기'
+                    )}
                 </button>
               )}
             </>
           )}
         </div>
+        )}
+
+        {/* All Posts by Chapter View */}
+        {viewMode === 'all-posts' && (
+          <div className="p-3 space-y-3">
+            {/* Book/Chapter Selector */}
+            <div className="flex items-center gap-2 mb-4">
+              <select
+                value={selectedBookForView}
+                onChange={(e) => {
+                  setSelectedBookForView(e.target.value);
+                  loadAllPostsByChapter(e.target.value, selectedChapterForView);
+                }}
+                className="px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-200"
+              >
+                {books.map(book => (
+                  <option key={book.id} value={book.id}>{book.name}</option>
+                ))}
+              </select>
+              <select
+                value={selectedChapterForView}
+                onChange={(e) => {
+                  const chapter = parseInt(e.target.value);
+                  setSelectedChapterForView(chapter);
+                  loadAllPostsByChapter(selectedBookForView, chapter);
+                }}
+                className="px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-200"
+              >
+                {Array.from({ length: books.find(b => b.id === selectedBookForView)?.chapters || 28 }, (_, i) => i + 1).map(ch => (
+                  <option key={ch} value={ch}>{ch}장</option>
+                ))}
+              </select>
+              <button
+                onClick={() => loadAllPostsByChapter(selectedBookForView, selectedChapterForView)}
+                className="px-3 py-1.5 text-sm bg-stone-100 text-stone-600 rounded-lg hover:bg-stone-200 transition-colors"
+              >
+                <Loader2 className={`w-4 h-4 ${loadingAllPosts ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-2 text-xs mb-3">
+              <span className="flex items-center gap-1 px-2 py-1 bg-stone-100 rounded">
+                <span className="w-2 h-2 rounded-full bg-stone-400"></span>
+                일반 묵상
+              </span>
+              <span className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded">
+                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                동역자 사역
+              </span>
+              <span className="flex items-center gap-1 px-2 py-1 bg-purple-50 rounded">
+                <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                공식 주석
+              </span>
+            </div>
+
+            {/* Accordion by Verse */}
+            {loadingAllPosts ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+              </div>
+            ) : Object.keys(allPostsByChapter).length === 0 ? (
+              <div className="text-center py-8 text-stone-400">
+                <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">이 장에는 아직 게시글이 없습니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(allPostsByChapter)
+                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                  .map(([verse, versePosts]) => (
+                    <div key={verse} className="border border-stone-200 rounded-lg overflow-hidden">
+                      {/* Verse Header */}
+                      <button
+                        onClick={() => toggleVerseExpansion(parseInt(verse))}
+                        className="w-full px-3 py-2 bg-stone-50 flex items-center justify-between hover:bg-stone-100 transition-colors"
+                      >
+                        <span className="text-sm font-medium text-stone-700">
+                          {bookNameMap[selectedBookForView] || selectedBookForView} {selectedChapterForView}:{verse}
+                          <span className="ml-2 text-xs text-stone-500">({versePosts.length}개)</span>
+                        </span>
+                        {expandedVerses.has(parseInt(verse)) ? (
+                          <ChevronUp className="w-4 h-4 text-stone-400" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-stone-400" />
+                        )}
+                      </button>
+                      
+                      {/* Verse Posts */}
+                      {expandedVerses.has(parseInt(verse)) && (
+                        <div className="p-2 space-y-2">
+                          {versePosts.map((post: any) => (
+                            <div
+                              key={post.id}
+                              className={`p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-shadow ${
+                                post.postType === 'admin_note' || post.profiles?.tier === '⭐⭐⭐⭐⭐'
+                                  ? 'bg-purple-50 border-purple-200' 
+                                  : post.postType === 'study_note'
+                                    ? 'bg-blue-50 border-blue-200'
+                                    : 'bg-stone-50 border-stone-200'
+                              }`}
+                              onClick={() => {
+                                // Navigate to verse
+                                if (onNavigateToVerse) {
+                                  onNavigateToVerse(selectedBookForView, selectedChapterForView, parseInt(verse));
+                                }
+                              }}
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                {getPostBadge(post.postType, post.profiles?.tier)}
+                                <span className="text-xs font-medium text-stone-700">{getDisplayName(post.profiles)}</span>
+                                <span className="text-xs text-stone-400">{formatTime(post.created_at)}</span>
+                              </div>
+                              <p className="text-sm text-stone-800 line-clamp-2">{post.content}</p>
+                              {post.title && (
+                                <p className="text-xs text-stone-500 mt-1">제목: {post.title}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

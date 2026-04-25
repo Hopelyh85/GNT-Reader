@@ -1,6 +1,42 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { StudyNote, Reflection } from '@/app/types';
 
+// Book name mapping: Korean -> English abbreviation (for DB queries)
+export const bookNameMap: Record<string, string> = {
+  '마태복음': 'Matt',
+  '마가복음': 'Mark',
+  '누가복음': 'Luke',
+  '요한복음': 'John',
+  '사도행전': 'Acts',
+  '로마서': 'Rom',
+  '고린도전서': '1Cor',
+  '고린도후서': '2Cor',
+  '갈라디아서': 'Gal',
+  '에베소서': 'Eph',
+  '빌립보서': 'Phil',
+  '골로새서': 'Col',
+  '데살로니가전서': '1Thess',
+  '데살로니가후서': '2Thess',
+  '디모데전서': '1Tim',
+  '디모데후서': '2Tim',
+  '디도서': 'Titus',
+  '빌레몬서': 'Phlm',
+  '히브리서': 'Heb',
+  '야고보서': 'Jas',
+  '베드로전서': '1Pet',
+  '베드로후서': '2Pet',
+  '요한일서': '1John',
+  '요한이서': '2John',
+  '요한삼서': '3John',
+  '유다서': 'Jude',
+  '요한계시록': 'Rev',
+};
+
+// Reverse mapping: English -> Korean (for display)
+export const bookNameMapReverse: Record<string, string> = Object.fromEntries(
+  Object.entries(bookNameMap).map(([k, v]) => [v, k])
+);
+
 let supabaseInstance: SupabaseClient | null = null;
 
 export function getSupabase() {
@@ -294,12 +330,15 @@ export async function getAllStudyNotesForBook(
 ): Promise<any[]> {
   const supabase = getSupabase();
   
-  console.log('[getAllStudyNotesForBook] Querying book:', bookName, 'chapter:', chapter);
+  // Convert Korean book name to English abbreviation for DB query
+  const bookAbbrev = bookNameMap[bookName] || bookName;
+  
+  console.log('[getAllStudyNotesForBook] Querying book:', bookName, '->', bookAbbrev, 'chapter:', chapter);
   
   let query = supabase
     .from('study_notes')
     .select('*, profiles(nickname, email, tier)')
-    .eq('book', bookName)
+    .eq('book', bookAbbrev)
     .order('chapter', { ascending: true })
     .order('verse', { ascending: true });
   
@@ -315,6 +354,7 @@ export async function getAllStudyNotesForBook(
       hint: error.hint,
       code: error.code,
       bookName,
+      bookAbbrev,
       chapter
     });
     return [];
