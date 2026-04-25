@@ -622,11 +622,11 @@ export function CommunityPanel({
   const handleNavigateToVerse = (post: Post) => {
     if (!onNavigateToVerse || !post.verse_ref || post.verse_ref === '글로벌 게시판') return;
     
-    // Parse verse_ref like "Matt 1:1" or "MAT 1:1"
-    const match = post.verse_ref.match(/^([A-Za-z0-9]+)\s+(\d+):(\d+)$/);
+    // Parse verse_ref like "Matt 1:1", "마태복음 1:1", or "마태 1:1"
+    const match = post.verse_ref.match(/^([가-힣A-Za-z0-9\s]+)\s+(\d+):(\d+)$/);
     if (match) {
       const [, book, chapter, verse] = match;
-      onNavigateToVerse(book, parseInt(chapter), parseInt(verse));
+      onNavigateToVerse(book.trim(), parseInt(chapter), parseInt(verse));
     }
   };
 
@@ -1649,6 +1649,16 @@ export function CommunityPanel({
                     <BookOpen className="w-4 h-4 text-amber-700" />
                     <h3 className="text-sm font-serif font-semibold text-amber-800">말씀 묵상 게시판</h3>
                     <span className="ml-auto text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{getScripturePosts().length}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.origin + '/community#scripture');
+                        alert('게시판 링크가 복사되었습니다');
+                      }}
+                      className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded transition-colors"
+                      title="게시판 링크 복사"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <p className="text-xs text-amber-600 mt-1">
                     '말씀 나눔터'나 '원어 연구소'에서 작성된 글들입니다
@@ -1711,12 +1721,15 @@ export function CommunityPanel({
                       <div key={post.id} className="renderPost(post, false, true)">
                         {/* Simplified card render for scripture posts */}
                         <div 
-                          className={`p-2 rounded-lg border text-xs cursor-pointer hover:shadow-md transition-shadow ${
+                          className={`p-2 rounded-lg border text-xs cursor-pointer hover:shadow-md hover:border-amber-400 transition-all ${
                             (post as any).is_official ? 'bg-purple-50 border-purple-200' :
                             (post as any).is_translation ? 'bg-emerald-50 border-emerald-200' :
                             'bg-white border-stone-200'
                           }`}
-                          onClick={() => toggleExpand(post.id)}
+                          onClick={() => {
+                            toggleExpand(post.id);
+                            handleNavigateToVerse(post);
+                          }}
                         >
                           <div className="flex items-center gap-1 mb-1">
                             {(post as any).is_official && <Crown className="w-3 h-3 text-purple-600" />}
@@ -1745,6 +1758,16 @@ export function CommunityPanel({
                     <MessageSquare className="w-4 h-4 text-emerald-700" />
                     <h3 className="text-sm font-serif font-semibold text-emerald-800">자유 게시판</h3>
                     <span className="ml-auto text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{getFreeBoardPosts().length}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.origin + '/community#free');
+                        alert('게시판 링크가 복사되었습니다');
+                      }}
+                      className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 rounded transition-colors"
+                      title="게시판 링크 복사"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <p className="text-xs text-emerald-600 mt-1">
                     일상 나눔, 교제, 질문 등 자유롭게 소통하세요
@@ -1806,6 +1829,16 @@ export function CommunityPanel({
                     <Heart className="w-4 h-4 text-red-700" />
                     <h3 className="text-sm font-serif font-semibold text-red-800">기도 게시판</h3>
                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{getPrayerPosts().length}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.origin + '/community#prayer');
+                        alert('게시판 링크가 복사되었습니다');
+                      }}
+                      className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                      title="게시판 링크 복사"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <p className="text-xs text-red-600 mt-1">
                     세계 · 나라 · 교회 · 개인의 기도 제목을 나누세요
