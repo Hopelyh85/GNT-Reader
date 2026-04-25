@@ -117,6 +117,9 @@ export function CommunityPanel({
   // Accordion state
   const [expandedPostId, setExpandedPostId] = useState<string | null>(initialPostId || null);
   
+  // Highlight state for deep-linked posts
+  const [highlightedPostId, setHighlightedPostState] = useState<string | null>(initialPostId || null);
+  
   // Replies state
   const [replies, setReplies] = useState<Record<string, StudioReflection[]>>({});
   const [loadingReplies, setLoadingReplies] = useState<Record<string, boolean>>({});
@@ -338,6 +341,23 @@ export function CommunityPanel({
       loadReplies(expandedPostId);
     }
   }, [expandedPostId]);
+
+  // Auto-scroll and highlight initial post when deep-linked
+  useEffect(() => {
+    if (initialPostId && posts.length > 0) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        const element = document.getElementById(`post-${initialPostId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight for 3 seconds then remove
+          setTimeout(() => {
+            setHighlightedPostState(null);
+          }, 3000);
+        }
+      }, 500);
+    }
+  }, [initialPostId, posts.length]);
 
   // Load ministry notes for selected verse (관리자 pinned)
   useEffect(() => {
@@ -1005,8 +1025,14 @@ export function CommunityPanel({
           (post as any).category
         );
     
+    const isHighlighted = highlightedPostId === post.id;
+    
     return (
-      <div key={post.id} className={`rounded-lg border ${bgColorClass} overflow-hidden`}>
+      <div 
+        key={post.id} 
+        id={`post-${post.id}`}
+        className={`rounded-lg border ${bgColorClass} overflow-hidden transition-all duration-500 ${isHighlighted ? 'ring-2 ring-yellow-400 bg-yellow-50 shadow-lg' : ''}`}
+      >
         {/* Post Header - Always visible */}
         <div 
           className="p-4 cursor-pointer hover:bg-stone-50/50 transition-colors"
@@ -1741,15 +1767,17 @@ export function CommunityPanel({
                       <p className="text-xs">말씀 연결된 게시글이 없습니다.</p>
                     </div>
                   ) : (
-                    getScripturePosts().slice(0, 20).map(post => (
-                      <div key={post.id} className="renderPost(post, false, true)">
+                    getScripturePosts().slice(0, 20).map(post => {
+                      const isScriptureHighlighted = highlightedPostId === post.id;
+                      return (
+                      <div key={post.id} id={`post-${post.id}`} className="renderPost(post, false, true)">
                         {/* Simplified card render for scripture posts */}
                         <div 
-                          className={`p-2 rounded-lg border text-xs cursor-pointer hover:shadow-md hover:border-amber-400 transition-all ${
+                          className={`p-2 rounded-lg border text-xs cursor-pointer hover:shadow-md hover:border-amber-400 transition-all duration-500 ${
                             (post as any).is_official ? 'bg-purple-50 border-purple-200' :
                             (post as any).is_translation ? 'bg-emerald-50 border-emerald-200' :
                             'bg-white border-stone-200'
-                          }`}
+                          } ${isScriptureHighlighted ? 'ring-2 ring-yellow-400 bg-yellow-50 shadow-lg' : ''}`}
                           onClick={() => {
                             toggleExpand(post.id);
                             handleNavigateToVerse(post);
@@ -1769,7 +1797,7 @@ export function CommunityPanel({
                           )}
                         </div>
                       </div>
-                    ))
+                    )})
                   )}
                 </div>
               </div>
@@ -2051,6 +2079,18 @@ export function CommunityPanel({
                               </button>
                             </div>
                           )}
+                          
+                          {/* Share Button */}
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              onClick={() => handleShare(post.id)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs text-stone-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="링크 복사"
+                            >
+                              <Link2 className="w-3 h-3" />
+                              링크 복사
+                            </button>
+                          </div>
                           
                           {/* Linked Prayer Journey */}
                           {linkedId && (

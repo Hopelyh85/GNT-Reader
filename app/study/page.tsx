@@ -30,7 +30,7 @@ export default function StudyPage() {
     // Switch to bible panel (especially for mobile)
     setActivePanel('bible');
     
-    // Find book name from the books list
+    // Find book name from the books list - support both English and Korean book names
     const bookData = books.find(b => {
       const abbrev = b.name === '마태복음' ? 'Matt' :
                     b.name === '마가복음' ? 'Mark' :
@@ -59,7 +59,10 @@ export default function StudyPage() {
                     b.name === '요한삼서' ? '3John' :
                     b.name === '유다서' ? 'Jude' :
                     b.name === '요한계시록' ? 'Rev' : '';
-      return abbrev.toLowerCase() === book.toLowerCase();
+      // Match English abbreviation OR Korean book name
+      return abbrev.toLowerCase() === book.toLowerCase() || 
+             b.name === book || 
+             b.name.includes(book);
     });
     
     if (bookData) {
