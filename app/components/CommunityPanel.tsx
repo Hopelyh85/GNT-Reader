@@ -14,7 +14,8 @@ import {
   addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser,
   checkIsAdmin, getStudyNotesForVerse, getNotice, updateNotice, bookNameMap,
   getUserActivity, hasPrayerInLast24Hours, toggleUrgentPrayer,
-  updatePrayerStatus, getUserPrayerHistory, getLinkedPrayer, addPrayerWithLink, PrayerStatus
+  updatePrayerStatus, getUserPrayerHistory, getLinkedPrayer, addPrayerWithLink, PrayerStatus,
+  requestUpgrade
 } from '@/app/lib/supabase';
 
 // Books array for chapter selection
@@ -142,6 +143,10 @@ export function CommunityPanel({
   const [prayerCategory, setPrayerCategory] = useState<'general' | 'world'>('general');
   const [lastPrayerTime, setLastPrayerTime] = useState<Date | null>(null);
   const [checkingLastPrayer, setCheckingLastPrayer] = useState(false);
+  
+  // Upgrade request state
+  const [upgradeRequested, setUpgradeRequested] = useState(false);
+  const [requestingUpgrade, setRequestingUpgrade] = useState(false);
   
   // Profile modal state
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -1449,7 +1454,7 @@ export function CommunityPanel({
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {/* New Post Input - ⭐ General cannot write, show upgrade button instead */}
-        {isLoggedIn && isGeneral && (
+        {isLoggedIn && isGeneral && !upgradeRequested && (
           <div className="p-3 border-b border-stone-200 bg-stone-50">
             <div className="flex items-center justify-between">
               <p className="text-sm text-stone-600">
@@ -1457,29 +1462,49 @@ export function CommunityPanel({
               </p>
               <button
                 onClick={async () => {
+                  if (!currentUserId) return;
+                  setRequestingUpgrade(true);
                   try {
-                    const supabase = getSupabase();
-                    const { error } = await supabase
-                      .from('profiles')
-                      .update({ upgrade_requested: true })
-                      .eq('id', currentUserId);
-                    
-                    if (error) {
-                      console.error('Upgrade request error:', error);
-                      alert('등업 신청 중 오류가 발생했습니다.');
-                      return;
-                    }
+                    await requestUpgrade(currentUserId, '', '', '', false, false);
+                    setUpgradeRequested(true);
                     alert('등업 신청이 완료되었습니다. 관리자 승인 후 등급이 상승됩니다.');
-                  } catch (err) {
+                  } catch (err: any) {
                     console.error('Upgrade request failed:', err);
-                    alert('등업 신청 중 오류가 발생했습니다.');
+                    alert('등업 신청 중 오류가 발생했습니다: ' + (err?.message || 'Unknown error'));
+                  } finally {
+                    setRequestingUpgrade(false);
                   }
                 }}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors"
+                disabled={requestingUpgrade}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Crown className="w-3 h-3" />
-                등업 신청하기
+                {requestingUpgrade ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    등업 신청 중...
+                  </>
+                ) : (
+                  <>
+                    <Crown className="w-3 h-3" />
+                    등업 신청하기
+                  </>
+                )}
               </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Show pending status after upgrade request */}
+        {isLoggedIn && isGeneral && upgradeRequested && (
+          <div className="p-3 border-b border-stone-200 bg-amber-50">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-amber-700">
+                ⏳ 등업 신청이 접수되었습니다. 관리자 승인을 기다리고 있습니다.
+              </p>
+              <span className="flex items-center gap-1 px-3 py-1.5 text-xs bg-amber-200 text-amber-800 rounded-lg">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                승인 대기 중
+              </span>
             </div>
           </div>
         )}

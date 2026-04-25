@@ -20,7 +20,8 @@ import {
   rejectDelete,
   Profile,
   getPendingWorldPrayers,
-  approveWorldPrayer
+  approveWorldPrayer,
+  updateUserTier
 } from '@/app/lib/supabase';
 import { Crown, Loader2, LogOut, Users, BookOpen, User, ArrowLeft, Calendar, BookMarked } from 'lucide-react';
 
@@ -444,28 +445,8 @@ function AdminDashboardContent() {
   const handleTierChange = async (userId: string, newTier: string) => {
     setUpdatingTier(userId);
     try {
-      const supabase = getSupabase();
-      
-      // First try RPC function
-      const { error: rpcError } = await supabase.rpc('admin_update_tier', {
-        target_id: userId,
-        new_tier: newTier
-      });
-      
-      // If RPC fails, try direct update
-      if (rpcError) {
-        console.log('RPC failed, trying direct update:', rpcError.message);
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ tier: newTier, updated_at: new Date().toISOString() })
-          .eq('id', userId);
-        
-        if (updateError) {
-          console.error('Direct update error:', updateError);
-          alert('등급 변경 실패: ' + updateError.message);
-          return;
-        }
-      }
+      // Use updateUserTier which properly sets is_approved: true
+      await updateUserTier(userId, newTier as any, true);
       
       // Update local state immediately
       setUserStats(prev => prev.map(u => 
@@ -486,19 +467,19 @@ const getTierLabel = (tier: string) => {
     switch (tier) {
       case '관리자':
       case 'Admin':
-      case '⭐⭐⭐⭐⭐': return '관리자(모든 권한)';
+      case '⭐⭐⭐⭐⭐': return '👑 관리자';
       case '스태프':
       case 'Staff':
-      case '⭐⭐⭐⭐': return '스태프(타인 글 삭제, 번역 가능)';
+      case '⭐⭐⭐⭐': return '⭐⭐⭐⭐ 스태프';
       case '열심회원':
       case 'Hardworking':
-      case '⭐⭐⭐': return '열심회원(번역 가능)';
+      case '⭐⭐⭐': return '⭐⭐⭐ 열심회원';
       case '정회원':
       case 'Regular':
-      case '⭐⭐': return '정회원(묵상/댓글 가능)';
+      case '⭐⭐': return '⭐⭐ 정회원';
       case '준회원':
       case 'General':
-      default: return '준회원(읽기 전용)';
+      default: return '⭐ 준회원';
     }
   };
 
@@ -695,11 +676,10 @@ const getTierColor = (tier: string) => {
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">이메일</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">닉네임</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">등급</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">등급/권한</th>
                       <th className="px-4 py-2 text-center text-xs font-medium text-stone-500">묵상</th>
                       <th className="px-4 py-2 text-center text-xs font-medium text-stone-500">노트</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-stone-500">가입일</th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-stone-500">권한</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
@@ -711,31 +691,31 @@ const getTierColor = (tier: string) => {
                       >
                         <td className="px-4 py-2 text-stone-800">{user.email}</td>
                         <td className="px-4 py-2 text-stone-600">{user.nickname || '-'}</td>
-                        <td className="px-4 py-2">
-                          <span className={`text-xs ${
-                            getTierColor(user.tier)
-                          }`}>
-                            {getTierLabel(user.tier)}
-                          </span>
+                        <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs ${
+                              getTierColor(user.tier)
+                            }`}>
+                              {getTierLabel(user.tier)}
+                            </span>
+                            <select
+                              value={user.tier}
+                              onChange={(e) => handleTierChange(user.id, e.target.value)}
+                              disabled={updatingTier === user.id}
+                              className="text-xs px-2 py-1 border border-stone-200 rounded focus:outline-none focus:border-stone-400"
+                            >
+                              <option value="관리자">👑 관리자</option>
+                              <option value="스태프">⭐⭐⭐⭐ 스태프</option>
+                              <option value="열심회원">⭐⭐⭐ 열심회원</option>
+                              <option value="정회원">⭐⭐ 정회원</option>
+                              <option value="준회원">⭐ 준회원</option>
+                            </select>
+                          </div>
                         </td>
                         <td className="px-4 py-2 text-center text-stone-600">{user.total_reflections}</td>
                         <td className="px-4 py-2 text-center text-stone-600">{user.total_notes}</td>
                         <td className="px-4 py-2 text-stone-400 text-xs">
                           {new Date(user.created_at).toLocaleDateString('ko-KR')}
-                        </td>
-                        <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                          <select
-                            value={user.tier}
-                            onChange={(e) => handleTierChange(user.id, e.target.value)}
-                            disabled={updatingTier === user.id}
-                            className="text-xs px-2 py-1 border border-stone-200 rounded focus:outline-none focus:border-stone-400"
-                          >
-                            <option value="관리자">관리자(Admin)</option>
-                            <option value="스태프">스태프(Staff)</option>
-                            <option value="열심회원">열심회원(Hardworking)</option>
-                            <option value="정회원">정회원(Regular)</option>
-                            <option value="준회원">준회원(General)</option>
-                          </select>
                         </td>
                       </tr>
                     ))}
