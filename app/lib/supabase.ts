@@ -1155,3 +1155,118 @@ export async function updateNotice(content: string): Promise<boolean> {
   
   return true;
 }
+
+// ============================================
+// PRAYER STATUS & HISTORY API
+// ============================================
+
+// Prayer status types
+export type PrayerStatus = 'wait' | 'yes' | 'no';
+
+// Update prayer status with testimony note
+export async function updatePrayerStatus(
+  prayerId: string,
+  status: PrayerStatus,
+  testimonyNote?: string
+): Promise<void> {
+  const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Check if user owns the prayer
+  const { data: prayer, error: prayerError } = await supabase
+    .from('reflections')
+    .select('user_id')
+    .eq('id', prayerId)
+    .maybeSingle();
+
+  if (prayerError || !prayer) throw new Error('Prayer not found');
+  if (prayer.user_id !== user.id) throw new Error('Only the author can update prayer status');
+
+  const { error } = await supabase
+    .from('reflections')
+    .update({
+      prayer_status: status,
+      testimony_note: testimonyNote || null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', prayerId);
+
+  if (error) throw error;
+}
+
+// Get user's prayer history for linking
+export async function getUserPrayerHistory(): Promise<StudioReflection[]> {
+  const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('*, profiles(*)')
+    .eq('user_id', user.id)
+    .in('category', ['prayer_general', 'prayer_world'])
+    .is('parent_id', null)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error('Error fetching prayer history:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Get linked prayer by ID
+export async function getLinkedPrayer(prayerId: string): Promise<StudioReflection | null> {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('*, profiles(*)')
+    .eq('id', prayerId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching linked prayer:', error);
+    return null;
+  }
+  return data;
+}
+
+// Add prayer with linked history
+export async function addPrayerWithLink(
+  prayerType: 'world' | 'nation' | 'church' | 'personal',
+  content: string,
+  linkedPrayerId?: string | null,
+  title?: string | null
+): Promise<void> {
+  const supabase = getSupabase();
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const category = prayerType === 'world' ? 'prayer_world' : 'prayer_general';
+
+  const { error } = await supabase.from('reflections').insert({
+    user_id: user.id,
+    verse_ref: '글로벌 게시판',
+    book: '글로벌',
+    chapter: 0,
+    verse: 0,
+    title,
+    content,
+    is_public: true,
+    category,
+    prayer_type: prayerType,
+    linked_prayer_id: linkedPrayerId || null,
+    prayer_status: 'wait',
+    is_urgent: false,
+    is_admin_approved: prayerType === 'world' ? false : true,
+    parent_id: null,
+    likes_count: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  });
+
+  if (error) throw error;
+}

@@ -13,7 +13,8 @@ import {
   addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection,
   addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser,
   checkIsAdmin, getStudyNotesForVerse, getNotice, updateNotice, bookNameMap,
-  getUserActivity, hasPrayerInLast24Hours, toggleUrgentPrayer
+  getUserActivity, hasPrayerInLast24Hours, toggleUrgentPrayer,
+  updatePrayerStatus, getUserPrayerHistory, getLinkedPrayer, addPrayerWithLink, PrayerStatus
 } from '@/app/lib/supabase';
 
 // Books array for chapter selection
@@ -159,6 +160,18 @@ export function CommunityPanel({
 
   // Prayer panel state (4 types for new UI)
   const [prayerType, setPrayerType] = useState<'world' | 'nation' | 'church' | 'personal'>('personal');
+  
+  // Prayer status states
+  const [prayerStatusModal, setPrayerStatusModal] = useState<{open: boolean, postId: string | null, currentStatus: string}>({open: false, postId: null, currentStatus: 'wait'});
+  const [testimonyNote, setTestimonyNote] = useState('');
+  const [updatingPrayerStatus, setUpdatingPrayerStatus] = useState(false);
+  
+  // Prayer history for linking
+  const [userPrayerHistory, setUserPrayerHistory] = useState<Post[]>([]);
+  const [linkedPrayerId, setLinkedPrayerId] = useState<string | null>(null);
+  const [showLinkedPrayer, setShowLinkedPrayer] = useState<Record<string, boolean>>({});
+  const [linkedPrayerDetails, setLinkedPrayerDetails] = useState<Record<string, Post>>({});
+  const [loadingPrayerHistory, setLoadingPrayerHistory] = useState(false);
   
   // Desktop tab state (for backward compatibility)
   const [desktopTab, setDesktopTab] = useState<'scripture' | 'free' | 'prayer'>('scripture');
@@ -733,6 +746,80 @@ export function CommunityPanel({
     const nextPage = page + 1;
     setPage(nextPage);
     loadPosts(nextPage, true);
+  };
+
+  // Load user's prayer history for linking
+  const loadUserPrayerHistory = useCallback(async () => {
+    if (!isLoggedIn) return;
+    setLoadingPrayerHistory(true);
+    try {
+      const history = await getUserPrayerHistory();
+      setUserPrayerHistory(history as Post[]);
+    } catch (err) {
+      console.error('Error loading prayer history:', err);
+    } finally {
+      setLoadingPrayerHistory(false);
+    }
+  }, [isLoggedIn]);
+
+  // Load linked prayer details
+  const loadLinkedPrayer = async (prayerId: string) => {
+    if (linkedPrayerDetails[prayerId]) return;
+    try {
+      const prayer = await getLinkedPrayer(prayerId);
+      if (prayer) {
+        setLinkedPrayerDetails(prev => ({ ...prev, [prayerId]: prayer as Post }));
+      }
+    } catch (err) {
+      console.error('Error loading linked prayer:', err);
+    }
+  };
+
+  // Toggle linked prayer visibility
+  const toggleLinkedPrayer = (postId: string, linkedId: string | null) => {
+    if (!linkedId) return;
+    setShowLinkedPrayer(prev => ({ ...prev, [postId]: !prev[postId] }));
+    if (!showLinkedPrayer[postId]) {
+      loadLinkedPrayer(linkedId);
+    }
+  };
+
+  // Handle prayer status update
+  const handlePrayerStatusUpdate = async (status: PrayerStatus) => {
+    if (!prayerStatusModal.postId) return;
+    
+    setUpdatingPrayerStatus(true);
+    try {
+      await updatePrayerStatus(
+        prayerStatusModal.postId,
+        status,
+        status === 'yes' ? testimonyNote : undefined
+      );
+      
+      // Update local state
+      setPosts(prev => prev.map(post => 
+        post.id === prayerStatusModal.postId 
+          ? { ...post, prayer_status: status, testimony_note: status === 'yes' ? testimonyNote : null } as Post
+          : post
+      ));
+      
+      setPrayerStatusModal({ open: false, postId: null, currentStatus: 'wait' });
+      setTestimonyNote('');
+    } catch (err: any) {
+      console.error('Error updating prayer status:', err);
+      alert('기도 상태 업데이트 중 오류: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setUpdatingPrayerStatus(false);
+    }
+  };
+
+  // Open prayer status modal
+  const openPrayerStatusModal = (postId: string, currentStatus: string) => {
+    setPrayerStatusModal({ open: true, postId, currentStatus });
+    if (currentStatus === 'yes') {
+      const post = posts.find(p => p.id === postId);
+      if (post) setTestimonyNote((post as any).testimony_note || '');
+    }
   };
 
   // Absolute time format: YYYY. MM. DD. HH:mm
@@ -1941,7 +2028,7 @@ export function CommunityPanel({
                   </p>
                 </div>
                 
-                {/* Prayer Type Selection & Write UI */}
+                {/* Prayer Type Selection & Write UI - ENHANCED */}
                 {canWrite && (
                   <div className="p-3 border-b border-stone-200 bg-stone-50">
                     {/* Prayer Type Selector */}
@@ -1966,6 +2053,54 @@ export function CommunityPanel({
                         </button>
                       ))}
                     </div>
+                    
+                    {/* Linked Prayer Selector */}
+                    <div className="mb-2">
+                      <button
+                        onClick={() => {
+                          if (userPrayerHistory.length === 0) loadUserPrayerHistory();
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2 text-xs bg-white border border-stone-200 rounded-lg hover:bg-stone-50"
+                      >
+                        <span className="text-stone-600">
+                          {linkedPrayerId 
+                            ? `🔗 연결: ${userPrayerHistory.find(p => p.id === linkedPrayerId)?.content?.substring(0, 30) || '이전 기도'}...`
+                            : '🔄 이전 기도와 연결하기 (선택)'
+                          }
+                        </span>
+                        <ChevronDown className="w-3 h-3 text-stone-400" />
+                      </button>
+                      
+                      {userPrayerHistory.length > 0 && (
+                        <div className="mt-1 max-h-32 overflow-y-auto bg-white border border-stone-200 rounded-lg">
+                          <button
+                            onClick={() => setLinkedPrayerId(null)}
+                            className={`w-full px-3 py-2 text-xs text-left hover:bg-stone-50 ${!linkedPrayerId ? 'bg-amber-50 text-amber-700' : 'text-stone-600'}`}
+                          >
+                            ✗ 연결 없음 (새로운 기도)
+                          </button>
+                          {userPrayerHistory.map(prayer => (
+                            <button
+                              key={prayer.id}
+                              onClick={() => setLinkedPrayerId(prayer.id)}
+                              className={`w-full px-3 py-2 text-xs text-left hover:bg-stone-50 border-t border-stone-100 ${
+                                linkedPrayerId === prayer.id ? 'bg-amber-50 text-amber-700' : 'text-stone-600'
+                              }`}
+                            >
+                              <span className="text-stone-400">{new Date(prayer.created_at).toLocaleDateString('ko-KR')}</span>
+                              {' · '}
+                              <span className="line-clamp-1">{prayer.content?.substring(0, 40)}...</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {loadingPrayerHistory && (
+                        <div className="flex items-center justify-center py-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
+                        </div>
+                      )}
+                    </div>
+                    
                     <textarea
                       value={newContent}
                       onChange={(e) => setNewContent(e.target.value)}
@@ -1979,13 +2114,13 @@ export function CommunityPanel({
                         className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50"
                       >
                         <Heart className="w-3 h-3" />
-                        {saving ? '저장 중...' : '기도하기'}
+                        {saving ? '저장 중...' : linkedPrayerId ? '기도 연결하기' : '기도하기'}
                       </button>
                     </div>
                   </div>
                 )}
                 
-                {/* Prayer Posts List with Color Coding */}
+                {/* Prayer Posts List with Status UI & Journey */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
                   {loadingPosts ? (
                     <div className="flex items-center justify-center py-8">
@@ -2000,29 +2135,96 @@ export function CommunityPanel({
                   ) : (
                     getPrayerPosts().slice(0, 20).map(post => {
                       const pType = getPrayerType(post);
+                      const status = (post as any).prayer_status || 'wait';
+                      const linkedId = (post as any).linked_prayer_id;
+                      const testimony = (post as any).testimony_note;
+                      
+                      // Status styling
+                      const statusMap = {
+                        wait: { label: '⏳ 기다림', color: 'bg-stone-100 text-stone-600', border: 'border-stone-200', icon: Clock },
+                        yes: { label: '✨ 응답의 은혜', color: 'bg-amber-100 text-amber-700', border: 'border-amber-400', icon: Sparkles },
+                        no: { label: '🙏 거절의 은혜', color: 'bg-slate-100 text-slate-600', border: 'border-slate-300', icon: Heart },
+                      };
+                      const statusStyle = statusMap[status as keyof typeof statusMap];
+                      
                       const colorMap = {
-                        world: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700', icon: Globe },
-                        nation: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', icon: MapPin },
-                        church: { bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', icon: Church },
-                        personal: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', icon: User },
+                        world: { bg: status === 'yes' ? 'bg-amber-50/50' : 'bg-blue-50', border: status === 'yes' ? 'border-amber-300' : 'border-blue-200', badge: 'bg-blue-100 text-blue-700', icon: Globe },
+                        nation: { bg: status === 'yes' ? 'bg-amber-50/50' : 'bg-purple-50', border: status === 'yes' ? 'border-amber-300' : 'border-purple-200', badge: 'bg-purple-100 text-purple-700', icon: MapPin },
+                        church: { bg: status === 'yes' ? 'bg-amber-50/50' : 'bg-emerald-50', border: status === 'yes' ? 'border-amber-300' : 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', icon: Church },
+                        personal: { bg: status === 'yes' ? 'bg-amber-50/50' : 'bg-amber-50', border: status === 'yes' ? 'border-amber-300' : 'border-amber-200', badge: 'bg-amber-100 text-amber-700', icon: User },
                       };
                       const colors = colorMap[pType];
                       const Icon = colors.icon;
+                      const StatusIcon = statusStyle.icon;
+                      const isAuthor = currentUserId === post.user_id;
                       
                       return (
                         <div 
                           key={post.id}
-                          className={`p-2 rounded-lg border ${colors.bg} ${colors.border} cursor-pointer hover:shadow-md transition-shadow`}
-                          onClick={() => toggleExpand(post.id)}
+                          className={`p-2 rounded-lg border-2 ${colors.bg} ${colors.border} transition-shadow`}
                         >
+                          {/* Header Row */}
                           <div className="flex items-center gap-1 mb-1">
                             <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${colors.badge}`}>
                               <Icon className="w-3 h-3" />
                               {pType === 'world' ? '세계' : pType === 'nation' ? '나라' : pType === 'church' ? '교회' : '개인'}
                             </span>
-                            <span className="ml-auto text-xs text-stone-500">{getDisplayName(post.profiles)}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${statusStyle.color}`}>
+                              <StatusIcon className="w-3 h-3" />
+                              {statusStyle.label}
+                            </span>
+                            <span className="ml-auto text-xs text-stone-400">{getDisplayName(post.profiles)}</span>
                           </div>
-                          <p className="text-xs text-stone-700 line-clamp-2">{post.content}</p>
+                          
+                          {/* Content */}
+                          <div onClick={() => toggleExpand(post.id)} className="cursor-pointer">
+                            <p className={`text-xs text-stone-700 ${expandedPostId === post.id ? '' : 'line-clamp-2'}`}>{post.content}</p>
+                          </div>
+                          
+                          {/* Testimony Note (when answered Yes) */}
+                          {status === 'yes' && testimony && (
+                            <div className="mt-2 p-2 bg-amber-100/50 border border-amber-200 rounded">
+                              <p className="text-xs text-amber-800 font-medium mb-1">💌 간증 노트</p>
+                              <p className="text-xs text-amber-700">{testimony}</p>
+                            </div>
+                          )}
+                          
+                          {/* Action Buttons for Author */}
+                          {isAuthor && (
+                            <div className="mt-2 flex gap-1">
+                              <button
+                                onClick={() => openPrayerStatusModal(post.id, status)}
+                                className="flex-1 text-xs px-2 py-1 bg-white border border-stone-200 rounded hover:bg-stone-50 text-stone-600"
+                              >
+                                기도 응답 상태 변경
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* Linked Prayer Journey */}
+                          {linkedId && (
+                            <div className="mt-2">
+                              <button
+                                onClick={() => toggleLinkedPrayer(post.id, linkedId)}
+                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                              >
+                                <Link2 className="w-3 h-3" />
+                                {showLinkedPrayer[post.id] ? '기도의 여정 숨기기' : '🔄 기도의 여정 보기'}
+                              </button>
+                              
+                              {showLinkedPrayer[post.id] && linkedPrayerDetails[linkedId] && (
+                                <div className="mt-2 p-2 bg-blue-50/50 border-l-2 border-blue-300">
+                                  <p className="text-xs text-blue-700 font-medium mb-1">📖 이전 기도</p>
+                                  <p className="text-xs text-stone-600">
+                                    {new Date(linkedPrayerDetails[linkedId].created_at).toLocaleDateString('ko-KR')} · {' '}
+                                    {linkedPrayerDetails[linkedId].content?.substring(0, 60)}...
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Urgent Badge */}
                           {(post as any).is_urgent && (
                             <span className="inline-flex items-center gap-1 mt-1 text-xs text-red-600 font-medium">
                               <AlertTriangle className="w-3 h-3" />
@@ -2166,6 +2368,109 @@ export function CommunityPanel({
         )}
       </div>
       
+      {/* Prayer Status Modal */}
+      {prayerStatusModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-4 py-3 bg-stone-50 border-b border-stone-200">
+              <h3 className="font-bold text-stone-800">기도 응답 상태 변경</h3>
+              <p className="text-xs text-stone-500 mt-1">
+                하나님께서 어떻게 응답하셨나요?
+              </p>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-4">
+              {/* Status Buttons */}
+              <div className="space-y-2 mb-4">
+                <button
+                  onClick={() => handlePrayerStatusUpdate('wait')}
+                  disabled={updatingPrayerStatus}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
+                    prayerStatusModal.currentStatus === 'wait' 
+                      ? 'bg-stone-100 border-stone-400' 
+                      : 'bg-white border-stone-200 hover:bg-stone-50'
+                  }`}
+                >
+                  <Clock className="w-5 h-5 text-stone-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-stone-700">⏳ 기다림의 훈련</p>
+                    <p className="text-xs text-stone-500">아직 응답을 기다리고 있습니다</p>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => handlePrayerStatusUpdate('yes')}
+                  disabled={updatingPrayerStatus}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
+                    prayerStatusModal.currentStatus === 'yes' 
+                      ? 'bg-amber-100 border-amber-400' 
+                      : 'bg-white border-amber-200 hover:bg-amber-50'
+                  }`}
+                >
+                  <Sparkles className="w-5 h-5 text-amber-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-amber-700">✨ 응답의 은혜</p>
+                    <p className="text-xs text-amber-600">하나님께서 응답하셨습니다</p>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => handlePrayerStatusUpdate('no')}
+                  disabled={updatingPrayerStatus}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-colors ${
+                    prayerStatusModal.currentStatus === 'no' 
+                      ? 'bg-slate-100 border-slate-400' 
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <Heart className="w-5 h-5 text-slate-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-slate-700">🙏 거절의 은혜</p>
+                    <p className="text-xs text-slate-500">"내 은혜가 네게 족하도다"</p>
+                  </div>
+                </button>
+              </div>
+              
+              {/* Testimony Note Input (for Yes status) */}
+              {prayerStatusModal.currentStatus === 'yes' && (
+                <div className="mb-4">
+                  <label className="text-xs font-medium text-amber-700 mb-1 block">
+                    💌 간증 노트 (선택사항)
+                  </label>
+                  <textarea
+                    value={testimonyNote}
+                    onChange={(e) => setTestimonyNote(e.target.value)}
+                    placeholder="하나님께서 어떻게 응답하셨는지 간증해 주세요..."
+                    className="w-full h-24 p-2 text-sm bg-amber-50 border border-amber-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  />
+                </div>
+              )}
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-4 py-3 bg-stone-50 border-t border-stone-200 flex gap-2">
+              <button
+                onClick={() => setPrayerStatusModal({ open: false, postId: null, currentStatus: 'wait' })}
+                className="flex-1 py-2 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors"
+              >
+                닫기
+              </button>
+              {prayerStatusModal.currentStatus === 'yes' && (
+                <button
+                  onClick={() => handlePrayerStatusUpdate('yes')}
+                  disabled={updatingPrayerStatus}
+                  className="flex-1 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                >
+                  {updatingPrayerStatus ? '저장 중...' : '간증 저장'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Profile Modal */}
       {profileModalOpen && profileModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
