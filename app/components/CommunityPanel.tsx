@@ -58,6 +58,7 @@ interface CommunityPanelProps {
   onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
   currentPath?: string; // Current page path for context-aware sharing
   showPrayerTabs?: boolean; // Show prayer category tabs (general/world)
+  onlyScripture?: boolean; // Show only scripture panel (for study page)
 }
 
 interface Post extends StudioReflection {
@@ -68,7 +69,7 @@ interface Post extends StudioReflection {
 }
 
 export function CommunityPanel({ 
-  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath, showPrayerTabs = false 
+  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath, showPrayerTabs = false, onlyScripture = false 
 }: CommunityPanelProps) {
   // Permission helpers based on tier
   const isGeneral = userRole === '준회원';
@@ -1662,8 +1663,8 @@ export function CommunityPanel({
               )}
             </div>
             
-            {/* Desktop View (lg and above) - True 3-Column Grid Layout */}
-            <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 lg:h-[calc(100vh-280px)]">
+            {/* Desktop View (lg and above) - True 3-Column Grid Layout (or Single Column for onlyScripture) */}
+            <div className={`hidden lg:grid ${onlyScripture ? 'lg:grid-cols-1' : 'lg:grid-cols-3 lg:gap-4'} lg:h-[calc(100vh-280px)]`}>
               {/* LEFT PANEL: Scripture Meditation Board */}
               <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
                 {/* Panel Header */}
@@ -1773,7 +1774,8 @@ export function CommunityPanel({
                 </div>
               </div>
 
-              {/* CENTER PANEL: Free Community Board */}
+              {/* CENTER PANEL: Free Community Board - Hidden when onlyScripture */}
+              {!onlyScripture && (
               <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
                 {/* Panel Header */}
                 <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-200">
@@ -1843,8 +1845,10 @@ export function CommunityPanel({
                   )}
                 </div>
               </div>
+              )}
 
-              {/* RIGHT PANEL: Prayer Board */}
+              {/* RIGHT PANEL: Prayer Board - Hidden when onlyScripture */}
+              {!onlyScripture && (
               <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
                 {/* Panel Header */}
                 <div className="px-4 py-3 bg-red-50 border-b border-red-200">
@@ -2084,6 +2088,7 @@ export function CommunityPanel({
                   )}
                 </div>
               </div>
+              )}
             </div>
           </div>
         )}

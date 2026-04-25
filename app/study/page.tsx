@@ -316,6 +316,7 @@ export default function StudyPage() {
             initialPostId={focusPostId || initialPostId}
             currentPath="/study"
             onNavigateToVerse={handleNavigateToVerse}
+            onlyScripture={true}
           />
         </div>
 
@@ -342,6 +343,7 @@ export default function StudyPage() {
                 initialPostId={focusPostId || initialPostId}
                 currentPath="/study"
                 onNavigateToVerse={handleNavigateToVerse}
+                onlyScripture={true}
               />
             </div>
           </div>
