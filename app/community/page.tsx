@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   MessageSquare, LogOut, LogIn, ArrowLeft, Users, BookOpen
 } from 'lucide-react';
@@ -9,11 +9,15 @@ import { useAuth } from '@/app/components/AuthProvider';
 import { CommunityPanel } from '@/app/components/CommunityPanel';
 import { getMyProfile, signOut, Profile, getNotice } from '@/app/lib/supabase';
 
-export default function CommunityPage() {
+function CommunityContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [notice, setNotice] = useState<{ id: number; content: string; updated_at: string } | null>(null);
+  
+  // Get post ID from URL for deep linking
+  const postId = searchParams.get('post');
   
   useEffect(() => {
     if (user) {
@@ -92,6 +96,8 @@ export default function CommunityPage() {
           isLoggedIn={isLoggedIn}
           userRole={userRole}
           userName={userName}
+          initialPostId={postId}
+          currentPath="/community"
           onNavigateToVerse={(book, chapter, verse) => {
             // Navigate to study page with verse
             router.push(`/study?book=${book}&chapter=${chapter}&verse=${verse}`);
@@ -99,5 +105,15 @@ export default function CommunityPage() {
         />
       </main>
     </div>
+  );
+}
+
+export default function CommunityPage() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center bg-[#faf9f7]">
+      <div className="text-stone-500">로딩 중...</div>
+    </div>}>
+      <CommunityContent />
+    </Suspense>
   );
 }

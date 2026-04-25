@@ -53,6 +53,7 @@ interface CommunityPanelProps {
   userName: string;
   initialPostId?: string | null;
   onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
+  currentPath?: string; // Current page path for context-aware sharing
 }
 
 interface Post extends StudioReflection {
@@ -63,7 +64,7 @@ interface Post extends StudioReflection {
 }
 
 export function CommunityPanel({ 
-  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse 
+  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath 
 }: CommunityPanelProps) {
   // Permission helpers based on tier
   const isGeneral = userRole === '준회원' || userRole === 'General';
@@ -546,11 +547,30 @@ export function CommunityPanel({
     }
   };
 
-  // Share/copy link
+  // Share/copy link - context-aware deep linking
   const handleShare = (postId: string) => {
-    const url = `https://gnt-reader.vercel.app/?post_id=${postId}`;
+    const baseUrl = 'https://gnt-reader.vercel.app';
+    let url = '';
+    
+    // Determine current page and generate appropriate link
+    const path = currentPath || window.location.pathname;
+    
+    if (path.includes('/community')) {
+      // Community page: /community?post=ID
+      url = `${baseUrl}/community?post=${postId}`;
+    } else if (path.includes('/read')) {
+      // Korean Bible page: /read?post=ID
+      url = `${baseUrl}/read?post=${postId}`;
+    } else if (path.includes('/study')) {
+      // Study page: /study?post=ID
+      url = `${baseUrl}/study?post=${postId}`;
+    } else {
+      // Default to home with post param
+      url = `${baseUrl}/?post=${postId}`;
+    }
+    
     navigator.clipboard.writeText(url);
-    alert('링크가 클립보드에 복사되었습니다!');
+    alert('링크가 클립보드에 복사되었습니다!\n' + url);
   };
 
   // Toggle accordion

@@ -79,10 +79,13 @@ export default function StudyPage() {
   };
   
   // Get post_id from URL for deep linking (client-side only)
+  // Handle deep link post ID
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      setInitialPostId(params.get('post_id'));
+      // Support both post=ID and post_id=ID for backwards compatibility
+      const postParam = params.get('post') || params.get('post_id');
+      setInitialPostId(postParam);
     }
   }, []);
 
@@ -311,6 +314,7 @@ export default function StudyPage() {
             userRole={userRole}
             userName={userName}
             initialPostId={focusPostId || initialPostId}
+            currentPath="/study"
             onNavigateToVerse={handleNavigateToVerse}
           />
         </div>
@@ -336,6 +340,7 @@ export default function StudyPage() {
                 userRole={userRole}
                 userName={userName}
                 initialPostId={focusPostId || initialPostId}
+                currentPath="/study"
                 onNavigateToVerse={handleNavigateToVerse}
               />
             </div>

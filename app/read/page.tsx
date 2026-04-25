@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   BookOpen, LogOut, LogIn, Menu, X, ArrowLeft, ChevronDown, ChevronRight,
   MessageSquare, Send, Loader2, Heart, Crown, Pin
@@ -48,12 +48,28 @@ interface KRVBibleData {
   [key: string]: string;
 }
 
-export default function ReadPage() {
+// Book name mapping from Korean to English ID
+const koreanToEnglishMap: Record<string, string> = {
+  '마태복음': 'Matt', '마가복음': 'Mark', '누가복음': 'Luke', '요한복음': 'John',
+  '사도행전': 'Acts', '로마서': 'Rom', '고린도전서': '1Cor', '고린도후서': '2Cor',
+  '갈라디아서': 'Gal', '에베소서': 'Eph', '빌립보서': 'Phil', '골로새서': 'Col',
+  '데살로니가전서': '1Thess', '데살로니가후서': '2Thess', '디모데전서': '1Tim', '디모데후서': '2Tim',
+  '디도서': 'Titus', '빌레몬서': 'Phlm', '히브리서': 'Heb', '야고보서': 'Jas',
+  '베드로전서': '1Pet', '베드로후서': '2Pet', '요한일서': '1John', '요한이서': '2John',
+  '요한삼서': '3John', '유다서': 'Jude', '요한계시록': 'Rev',
+};
+
+function ReadContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [notice, setNotice] = useState<{ id: number; content: string; updated_at: string } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Deep link post ID
+  const postId = searchParams.get('post');
+  const [highlightedPostId, setHighlightedPostId] = useState<string | null>(postId);
   
   // Bible reading state
   const [selectedBook, setSelectedBook] = useState('Matt');
@@ -101,6 +117,57 @@ export default function ReadPage() {
     }
     getNotice().then(setNotice).catch(console.error);
   }, [user]);
+
+  // Handle deep link post ID - navigate to post's verse and show community panel
+  useEffect(() => {
+    const loadPostAndNavigate = async () => {
+      if (!postId) return;
+      
+      try {
+        const supabase = getSupabase();
+        
+        // Try to find post in reflections
+        let { data: post, error } = await supabase
+          .from('reflections')
+          .select('*')
+          .eq('id', postId)
+          .single();
+        
+        // If not found, try study_notes
+        if (!post) {
+          const { data: notePost, error: noteError } = await supabase
+            .from('study_notes')
+            .select('*')
+            .eq('id', postId)
+            .single();
+          
+          if (notePost) {
+            post = notePost;
+          }
+        }
+        
+        if (post && post.book && post.chapter && post.verse) {
+          // Convert Korean book name to English ID
+          const englishBookId = koreanToEnglishMap[post.book] || 'Matt';
+          
+          // Navigate to the verse
+          setSelectedBook(englishBookId);
+          setSelectedChapter(post.chapter);
+          setSelectedVerseNum(post.verse);
+          
+          // Show community panel
+          setShowCommunity(true);
+          
+          // Load community data for this verse
+          loadCommunityData(post.verse, 'verse');
+        }
+      } catch (err) {
+        console.error('Error loading deep-linked post:', err);
+      }
+    };
+    
+    loadPostAndNavigate();
+  }, [postId]);
 
   // Get verses for current chapter
   const getVersesForChapter = useCallback(() => {
@@ -587,7 +654,9 @@ export default function ReadPage() {
                   {studyNotes.filter((n: any) => 
                     n.profiles?.tier === '관리자' || n.profiles?.tier === 'Admin' || n.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
                   ).map((note: any) => (
-                    <div key={note.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div key={note.id} className={`p-3 bg-purple-50 border rounded-lg transition-all ${
+                      highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-purple-200'
+                    }`}>
                       <div className="flex items-center gap-2 mb-2">
                         <Crown className="w-4 h-4 text-purple-600" />
                         <span className="text-xs font-bold text-purple-700">👑 공식 주석</span>
@@ -612,7 +681,9 @@ export default function ReadPage() {
                     const isAdminNote = n.profiles?.tier === '관리자' || n.profiles?.tier === 'Admin' || n.profiles?.tier?.includes('⭐⭐⭐⭐⭐');
                     return !isAdminNote;
                   }).map((note: any) => (
-                    <div key={note.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div key={note.id} className={`p-3 bg-blue-50 border rounded-lg transition-all ${
+                      highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-blue-200'
+                    }`}>
                       <div className="flex items-center gap-2 mb-2">
                         <Pin className="w-3 h-3 text-blue-600" />
                         <span className="text-xs font-bold text-blue-700">동역자 사역</span>
@@ -629,7 +700,9 @@ export default function ReadPage() {
                   
                   {/* Reflections (Beige) */}
                   {reflections.map((ref: any) => (
-                    <div key={ref.id} className="p-3 bg-stone-50 border border-stone-200 rounded-lg">
+                    <div key={ref.id} className={`p-3 bg-stone-50 border rounded-lg transition-all ${
+                      highlightedPostId === ref.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-stone-200'
+                    }`}>
                       <div className="flex items-center gap-2 mb-2">
                         <MessageSquare className="w-3 h-3 text-stone-500" />
                         <span className="text-xs font-medium text-stone-700">{getDisplayName(ref.profiles)}</span>
@@ -710,5 +783,18 @@ export default function ReadPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ReadPage() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center bg-[#faf9f7]">
+      <div className="flex items-center gap-3">
+        <BookOpen className="w-6 h-6 text-stone-400" />
+        <span className="text-stone-500">성경을 불러오는 중...</span>
+      </div>
+    </div>}>
+      <ReadContent />
+    </Suspense>
   );
 }
