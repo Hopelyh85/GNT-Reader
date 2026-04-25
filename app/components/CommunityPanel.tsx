@@ -5,7 +5,8 @@ import { SelectedVerse } from '@/app/types';
 import { 
   Users, Send, Loader2, MessageSquare, Pin, BookOpen, Hash, 
   ChevronDown, ChevronUp, Link2, Crown, MessageCircle, CornerDownRight,
-  Heart, Trash2, Megaphone, Settings, AlertTriangle, Globe, Clock, Sparkles
+  Heart, Trash2, Megaphone, Settings, AlertTriangle, Globe, Clock, Sparkles,
+  Church, MapPin, User, Cross, Filter, Tag, BookMarked, Home
 } from 'lucide-react';
 import { 
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
@@ -101,7 +102,7 @@ export function CommunityPanel({
   const [saving, setSaving] = useState(false);
   const [includeVerse, setIncludeVerse] = useState(false);
   const [postCategory, setPostCategory] = useState<'reflection' | 'prayer'>('reflection');
-  const [prayerType, setPrayerType] = useState<'normal' | 'world'>('normal');
+  const [prayerTypeOld, setPrayerTypeOld] = useState<'normal' | 'world'>('normal'); // Legacy for handleSavePost compatibility
   
   // Posts states
   const [posts, setPosts] = useState<Post[]>([]);
@@ -152,14 +153,36 @@ export function CommunityPanel({
   const [profileModalActivity, setProfileModalActivity] = useState<{reflections: any[]; studyNotes: any[]} | null>(null);
   const [loadingProfileActivity, setLoadingProfileActivity] = useState(false);
 
-  // Desktop 3-column layout tabs
+  // Scripture panel filters
+  const [scriptureBookFilter, setScriptureBookFilter] = useState<string>('all');
+  const [scriptureTagFilter, setScriptureTagFilter] = useState<string | null>(null);
+
+  // Prayer panel state (4 types for new UI)
+  const [prayerType, setPrayerType] = useState<'world' | 'nation' | 'church' | 'personal'>('personal');
+  
+  // Desktop tab state (for backward compatibility)
   const [desktopTab, setDesktopTab] = useState<'scripture' | 'free' | 'prayer'>('scripture');
   
   // Filter posts for 3-column layout
   const getScripturePosts = () => {
     return posts.filter(post => {
       const hasVerseRef = post.verse_ref && post.verse_ref !== '글로벌 게시판' && post.verse_ref !== '';
-      return hasVerseRef;
+      const cat = (post as any).category;
+      const isNotPrayer = cat !== 'prayer_general' && cat !== 'prayer_world';
+      
+      let matches = hasVerseRef && isNotPrayer;
+      
+      // Book filter
+      if (matches && scriptureBookFilter !== 'all') {
+        matches = post.book === scriptureBookFilter;
+      }
+      
+      // Tag filter
+      if (matches && scriptureTagFilter) {
+        matches = post.content?.includes(scriptureTagFilter) || false;
+      }
+      
+      return matches;
     });
   };
   
@@ -177,6 +200,19 @@ export function CommunityPanel({
       const cat = (post as any).category;
       return cat === 'prayer_general' || cat === 'prayer_world';
     });
+  };
+
+  // Get prayer type from post (using prayer_type field or infer from content)
+  const getPrayerType = (post: Post): 'world' | 'nation' | 'church' | 'personal' => {
+    const pt = (post as any).prayer_type;
+    if (pt === 'world' || pt === 'nation' || pt === 'church' || pt === 'personal') {
+      return pt;
+    }
+    // Infer from category or is_world_prayer
+    if ((post as any).category === 'prayer_world' || (post as any).is_world_prayer) {
+      return 'world';
+    }
+    return 'personal';
   };
 
   // Get current user ID
@@ -456,7 +492,7 @@ export function CommunityPanel({
 
   // Check 24h prayer limit
   const checkPrayerLimit = async () => {
-    if (!currentUserId || postCategory !== 'prayer' || prayerType !== 'normal') return true;
+    if (!currentUserId || postCategory !== 'prayer' || prayerTypeOld !== 'normal') return true;
     
     setCheckingLastPrayer(true);
     try {
@@ -494,7 +530,7 @@ export function CommunityPanel({
     if (!newContent.trim() || !canWrite) return;
 
     // Check 24h prayer limit for normal prayers
-    if (postCategory === 'prayer' && prayerType === 'normal') {
+    if (postCategory === 'prayer' && prayerTypeOld === 'normal') {
       const canPost = await checkPrayerLimit();
       if (!canPost) return;
     }
@@ -511,7 +547,7 @@ export function CommunityPanel({
       let category: 'general' | 'prayer_general' | 'prayer_world' = 'general';
       let isWorldPrayer = false;
       if (postCategory === 'prayer') {
-        if (prayerType === 'world') {
+        if (prayerTypeOld === 'world') {
           category = 'prayer_world';
           isWorldPrayer = true;
         } else {
@@ -541,7 +577,7 @@ export function CommunityPanel({
       setNewTitle('');
       setNewContent('');
       setPostCategory('reflection');
-      setPrayerType('normal');
+      setPrayerTypeOld('normal');
       await loadPosts(1, false);
       await loadPinnedPosts();
     } catch (err: any) {
@@ -1466,7 +1502,7 @@ export function CommunityPanel({
               {/* Post Category Tabs */}
               <div className="flex gap-1 p-1 bg-stone-100 rounded-lg">
                 <button
-                  onClick={() => { setPostCategory('reflection'); setPrayerType('normal'); }}
+                  onClick={() => { setPostCategory('reflection'); setPrayerTypeOld('normal'); }}
                   className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
                     postCategory === 'reflection' 
                       ? 'bg-white text-stone-800 shadow-sm font-medium' 
@@ -1493,9 +1529,9 @@ export function CommunityPanel({
               {postCategory === 'prayer' && showPrayerTabs && (
                 <div className="flex gap-2 p-2 bg-amber-50 rounded-lg border border-amber-100">
                   <button
-                    onClick={() => setPrayerType('normal')}
+                    onClick={() => setPrayerTypeOld('normal')}
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-                      prayerType === 'normal' 
+                      prayerTypeOld === 'normal' 
                         ? 'bg-white text-amber-700 shadow-sm border border-amber-200' 
                         : 'text-amber-600 hover:bg-amber-100'
                     }`}
@@ -1505,9 +1541,9 @@ export function CommunityPanel({
                     <span className="text-[10px] opacity-70">(24시간 1회)</span>
                   </button>
                   <button
-                    onClick={() => setPrayerType('world')}
+                    onClick={() => setPrayerTypeOld('world')}
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-                      prayerType === 'world' 
+                      prayerTypeOld === 'world' 
                         ? 'bg-white text-blue-700 shadow-sm border border-blue-200' 
                         : 'text-blue-600 hover:bg-blue-100'
                     }`}
@@ -1530,7 +1566,7 @@ export function CommunityPanel({
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
                 placeholder={postCategory === 'prayer' 
-                  ? (prayerType === 'world' 
+                  ? (prayerTypeOld === 'world' 
                     ? '세계를 위한 기도제목을 작성해 주세요. 관리자 승인 후 게시됩니다.' 
                     : '기도제목을 작성해 주세요. 24시간에 1회만 작성 가능합니다.')
                   : '성경 묵상, 질문, 나눔 등을 자유롭게 작성해 보세요...'}
@@ -1732,104 +1768,273 @@ export function CommunityPanel({
               )}
             </div>
             
-            {/* Desktop View (lg and above) - 3 Column Layout */}
-            <div className="hidden lg:block">
-              {/* Desktop Tabs */}
-              <div className="flex border-b border-stone-200 mb-4 bg-white rounded-lg">
-                <button
-                  onClick={() => setDesktopTab('scripture')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors rounded-l-lg ${
-                    desktopTab === 'scripture'
-                      ? 'bg-amber-50 text-amber-700 border-b-2 border-amber-500'
-                      : 'text-stone-500 hover:bg-stone-50'
-                  }`}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <BookOpen className="w-4 h-4" />
-                    말씀 중심
-                    <span className="text-xs bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full">{getScripturePosts().length}</span>
-                  </span>
-                </button>
-                <button
-                  onClick={() => setDesktopTab('free')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                    desktopTab === 'free'
-                      ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500'
-                      : 'text-stone-500 hover:bg-stone-50'
-                  }`}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <MessageSquare className="w-4 h-4" />
-                    자유 게시판
-                    <span className="text-xs bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full">{getFreeBoardPosts().length}</span>
-                  </span>
-                </button>
-                <button
-                  onClick={() => setDesktopTab('prayer')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors rounded-r-lg ${
-                    desktopTab === 'prayer'
-                      ? 'bg-red-50 text-red-700 border-b-2 border-red-500'
-                      : 'text-stone-500 hover:bg-stone-50'
-                  }`}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <Heart className="w-4 h-4" />
-                    기도 제목
-                    <span className="text-xs bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full">{getPrayerPosts().length}</span>
-                  </span>
-                </button>
-              </div>
-              
-              {/* Desktop Content */}
-              {loadingPosts && posts.length === 0 ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
+            {/* Desktop View (lg and above) - True 3-Column Grid Layout */}
+            <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 lg:h-[calc(100vh-280px)]">
+              {/* LEFT PANEL: Scripture Meditation Board */}
+              <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
+                {/* Panel Header */}
+                <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-amber-700" />
+                    <h3 className="text-sm font-serif font-semibold text-amber-800">말씀 묵상 게시판</h3>
+                    <span className="ml-auto text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{getScripturePosts().length}</span>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-1">
+                    '말씀 나눔터'나 '원어 연구소'에서 작성된 글들입니다
+                  </p>
                 </div>
-              ) : (
-                <>
-                  {desktopTab === 'scripture' && (
-                    getScripturePosts().length === 0 ? (
-                      <div className="text-center py-12 text-stone-400 bg-white rounded-lg border border-stone-200">
-                        <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                        <p className="text-sm">말씀 연결된 게시글이 없습니다.</p>
-                      </div>
-                    ) : renderPostsTable(getScripturePosts())
-                  )}
-                  
-                  {desktopTab === 'free' && (
-                    getFreeBoardPosts().length === 0 ? (
-                      <div className="text-center py-12 text-stone-400 bg-white rounded-lg border border-stone-200">
-                        <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                        <p className="text-sm">자유 게시글이 없습니다.</p>
-                      </div>
-                    ) : renderPostsTable(getFreeBoardPosts())
-                  )}
-                  
-                  {desktopTab === 'prayer' && (
-                    getPrayerPosts().length === 0 ? (
-                      <div className="text-center py-12 text-stone-400 bg-white rounded-lg border border-stone-200">
-                        <Heart className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                        <p className="text-sm">기도 제목이 없습니다.</p>
-                      </div>
-                    ) : renderPostsTable(getPrayerPosts())
-                  )}
-                  
-                  {/* Load More */}
-                  {!hashtagFilter && hasMore && (
-                    <button
-                      onClick={handleLoadMore}
-                      disabled={loadingPosts}
-                      className="w-full mt-4 py-3 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors border border-stone-200"
+                
+                {/* Filters */}
+                <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-3 h-3 text-stone-400" />
+                    <select
+                      value={scriptureBookFilter}
+                      onChange={(e) => setScriptureBookFilter(e.target.value)}
+                      className="flex-1 text-xs px-2 py-1 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-amber-300"
                     >
-                      {loadingPosts ? (
-                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                      ) : (
-                        '더 보기'
-                      )}
-                    </button>
+                      <option value="all">전체 성경</option>
+                      {books.map(book => (
+                        <option key={book.id} value={book.id}>{book.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {['#묵상', '#번역', '#나눔', '#질문'].map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => setScriptureTagFilter(scriptureTagFilter === tag ? null : tag)}
+                        className={`text-xs px-2 py-0.5 rounded-full transition-colors ${
+                          scriptureTagFilter === tag
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Read-only Notice */}
+                <div className="px-3 py-2 bg-blue-50 border-b border-blue-100">
+                  <p className="text-xs text-blue-700">
+                    <BookMarked className="w-3 h-3 inline mr-1" />
+                    이곳은 읽기 전용입니다. 글은 성경 본문 패널에서 작성해 주세요.
+                  </p>
+                </div>
+                
+                {/* Scripture Posts List */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {loadingPosts ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                    </div>
+                  ) : getScripturePosts().length === 0 ? (
+                    <div className="text-center py-8 text-stone-400">
+                      <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-xs">말씀 연결된 게시글이 없습니다.</p>
+                    </div>
+                  ) : (
+                    getScripturePosts().slice(0, 20).map(post => (
+                      <div key={post.id} className="renderPost(post, false, true)">
+                        {/* Simplified card render for scripture posts */}
+                        <div 
+                          className={`p-2 rounded-lg border text-xs cursor-pointer hover:shadow-md transition-shadow ${
+                            (post as any).is_official ? 'bg-purple-50 border-purple-200' :
+                            (post as any).is_translation ? 'bg-emerald-50 border-emerald-200' :
+                            'bg-white border-stone-200'
+                          }`}
+                          onClick={() => toggleExpand(post.id)}
+                        >
+                          <div className="flex items-center gap-1 mb-1">
+                            {(post as any).is_official && <Crown className="w-3 h-3 text-purple-600" />}
+                            {(post as any).is_translation && <Sparkles className="w-3 h-3 text-emerald-600" />}
+                            <span className="font-medium text-stone-700 truncate">{post.verse_ref}</span>
+                            <span className="ml-auto text-stone-400">{getDisplayName(post.profiles)}</span>
+                          </div>
+                          <p className="text-stone-600 line-clamp-2">{post.content}</p>
+                          {expandedPostId === post.id && (
+                            <div className="mt-2 pt-2 border-t border-stone-100">
+                              <p className="text-stone-700 whitespace-pre-wrap">{post.content}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
                   )}
-                </>
-              )}
+                </div>
+              </div>
+
+              {/* CENTER PANEL: Free Community Board */}
+              <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
+                {/* Panel Header */}
+                <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-emerald-700" />
+                    <h3 className="text-sm font-serif font-semibold text-emerald-800">자유 게시판</h3>
+                    <span className="ml-auto text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{getFreeBoardPosts().length}</span>
+                  </div>
+                  <p className="text-xs text-emerald-600 mt-1">
+                    일상 나눔, 교제, 질문 등 자유롭게 소통하세요
+                  </p>
+                </div>
+                
+                {/* Write UI for Free Board */}
+                {canWrite && (
+                  <div className="p-3 border-b border-stone-200 bg-stone-50">
+                    <input
+                      type="text"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="제목을 입력하세요 (선택사항)"
+                      className="w-full mb-2 px-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                    <textarea
+                      value={newContent}
+                      onChange={(e) => setNewContent(e.target.value)}
+                      placeholder="자유롭게 글을 작성해 보세요..."
+                      className="w-full h-20 p-2 text-sm bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={handleSavePost}
+                        disabled={!newContent.trim() || saving}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <Send className="w-3 h-3" />
+                        {saving ? '저장 중...' : '게시하기'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Free Board Posts List */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {loadingPosts ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                    </div>
+                  ) : getFreeBoardPosts().length === 0 ? (
+                    <div className="text-center py-8 text-stone-400">
+                      <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-xs">자유 게시글이 없습니다.</p>
+                      {canWrite && <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>}
+                    </div>
+                  ) : (
+                    getFreeBoardPosts().slice(0, 20).map(post => renderPost(post))
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT PANEL: Prayer Board */}
+              <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
+                {/* Panel Header */}
+                <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-red-700" />
+                    <h3 className="text-sm font-serif font-semibold text-red-800">기도 게시판</h3>
+                    <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{getPrayerPosts().length}</span>
+                  </div>
+                  <p className="text-xs text-red-600 mt-1">
+                    세계 · 나라 · 교회 · 개인의 기도 제목을 나누세요
+                  </p>
+                </div>
+                
+                {/* Prayer Type Selection & Write UI */}
+                {canWrite && (
+                  <div className="p-3 border-b border-stone-200 bg-stone-50">
+                    {/* Prayer Type Selector */}
+                    <div className="flex gap-1 mb-2">
+                      {[
+                        { type: 'world', label: '세계', icon: Globe, color: 'blue' },
+                        { type: 'nation', label: '나라', icon: MapPin, color: 'purple' },
+                        { type: 'church', label: '교회', icon: Church, color: 'emerald' },
+                        { type: 'personal', label: '개인', icon: User, color: 'amber' },
+                      ].map(({ type, label, icon: Icon, color }) => (
+                        <button
+                          key={type}
+                          onClick={() => setPrayerType(type as any)}
+                          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs rounded transition-colors ${
+                            prayerType === type
+                              ? `bg-${color}-100 text-${color}-700 border border-${color}-300`
+                              : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-100'
+                          }`}
+                        >
+                          <Icon className="w-3 h-3" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={newContent}
+                      onChange={(e) => setNewContent(e.target.value)}
+                      placeholder={`${prayerType === 'world' ? '세계를 위한 기도' : prayerType === 'nation' ? '나라를 위한 기도' : prayerType === 'church' ? '교회를 위한 기도' : '개인 기도'} 제목을 작성해 주세요...`}
+                      className="w-full h-20 p-2 text-sm bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-red-200"
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={handleSavePost}
+                        disabled={!newContent.trim() || saving}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50"
+                      >
+                        <Heart className="w-3 h-3" />
+                        {saving ? '저장 중...' : '기도하기'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Prayer Posts List with Color Coding */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {loadingPosts ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                    </div>
+                  ) : getPrayerPosts().length === 0 ? (
+                    <div className="text-center py-8 text-stone-400">
+                      <Heart className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-xs">기도 제목이 없습니다.</p>
+                      {canWrite && <p className="text-xs mt-1">첫 기도 제목을 올려보세요!</p>}
+                    </div>
+                  ) : (
+                    getPrayerPosts().slice(0, 20).map(post => {
+                      const pType = getPrayerType(post);
+                      const colorMap = {
+                        world: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700', icon: Globe },
+                        nation: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', icon: MapPin },
+                        church: { bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', icon: Church },
+                        personal: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', icon: User },
+                      };
+                      const colors = colorMap[pType];
+                      const Icon = colors.icon;
+                      
+                      return (
+                        <div 
+                          key={post.id}
+                          className={`p-2 rounded-lg border ${colors.bg} ${colors.border} cursor-pointer hover:shadow-md transition-shadow`}
+                          onClick={() => toggleExpand(post.id)}
+                        >
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${colors.badge}`}>
+                              <Icon className="w-3 h-3" />
+                              {pType === 'world' ? '세계' : pType === 'nation' ? '나라' : pType === 'church' ? '교회' : '개인'}
+                            </span>
+                            <span className="ml-auto text-xs text-stone-500">{getDisplayName(post.profiles)}</span>
+                          </div>
+                          <p className="text-xs text-stone-700 line-clamp-2">{post.content}</p>
+                          {(post as any).is_urgent && (
+                            <span className="inline-flex items-center gap-1 mt-1 text-xs text-red-600 font-medium">
+                              <AlertTriangle className="w-3 h-3" />
+                              긴급 기도
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
