@@ -1233,50 +1233,48 @@ export function CommunityPanel({
       <div className="bg-white rounded-lg border border-stone-200 overflow-hidden">
         {/* Table Header */}
         <table className="w-full text-sm">
-          <thead className="bg-stone-50 border-b border-stone-200">
+          <thead className="bg-stone-100 border-b border-stone-200">
             <tr>
-              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500 w-12">번호</th>
-              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500 w-16">분류</th>
-              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500">제목/내용</th>
-              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500 w-24">작성자</th>
-              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500 w-20">날짜</th>
-              <th className="px-3 py-2.5 text-center text-xs font-medium text-stone-500 w-14">좋아요</th>
+              <th className="px-3 py-3 text-center text-xs font-medium text-stone-600 w-14">번호</th>
+              <th className="px-3 py-3 text-center text-xs font-medium text-stone-600 w-20">분류</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-stone-600 w-auto">제목</th>
+              <th className="px-3 py-3 text-center text-xs font-medium text-stone-600 w-24">작성자</th>
+              <th className="px-3 py-3 text-center text-xs font-medium text-stone-600 w-20">작성일</th>
+              <th className="px-3 py-3 text-center text-xs font-medium text-stone-600 w-16">좋아요</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-100">
-            {postsToRender.map((post) => {
+          <tbody>
+            {postsToRender.map((post, index) => {
               const category = getCategoryLabel(post);
               const replyCount = post.replyCount || 0;
               
               return (
                 <tr 
                   key={post.id} 
-                  className="hover:bg-stone-50 cursor-pointer transition-colors"
+                  className="border-b border-stone-100 hover:bg-stone-50 cursor-pointer transition-colors last:border-b-0"
                   onClick={() => toggleExpand(post.id)}
                 >
                   {/* 번호 */}
-                  <td className="px-3 py-3">
-                    <div className="flex items-center justify-center">
-                      {getPostIcon(post)}
-                    </div>
+                  <td className="px-3 py-3 text-center">
+                    {getPostIcon(post)}
                   </td>
                   
                   {/* 분류 */}
-                  <td className="px-2 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${category.color}`}>
+                  <td className="px-2 py-3 text-center">
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${category.color}`}>
                       {category.label}
                     </span>
                   </td>
                   
-                  {/* 제목/내용 */}
+                  {/* 제목 - 가장 넓은 공간 */}
                   <td className="px-3 py-3">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-stone-800 line-clamp-1">
-                          {post.title || post.content.substring(0, 50) + (post.content.length > 50 ? '...' : '')}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-medium text-stone-800 line-clamp-1 text-sm">
+                          {post.title || post.content.substring(0, 60) + (post.content.length > 60 ? '...' : '')}
                         </h4>
                         {replyCount > 0 && (
-                          <span className="flex items-center gap-0.5 text-xs text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded">
+                          <span className="flex items-center gap-0.5 text-xs text-amber-600 font-medium">
                             <MessageCircle className="w-3 h-3" />
                             {replyCount}
                           </span>
@@ -1295,19 +1293,16 @@ export function CommunityPanel({
                   </td>
                   
                   {/* 작성자 */}
-                  <td className="px-3 py-3">
-                    <div className="flex items-center gap-2">
-                      <Avatar url={post.profiles?.avatar_url} tier={post.profiles?.tier} size="sm" />
-                      <span className="text-sm text-stone-600 truncate max-w-[80px]">
-                        {getDisplayName(post.profiles)}
-                      </span>
-                    </div>
+                  <td className="px-3 py-3 text-center">
+                    <span className="text-sm text-stone-600 truncate">
+                      {getDisplayName(post.profiles)}
+                    </span>
                   </td>
                   
-                  {/* 날짜 */}
-                  <td className="px-3 py-3">
+                  {/* 작성일 */}
+                  <td className="px-3 py-3 text-center">
                     <span className="text-xs text-stone-500">
-                      {new Date(post.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                      {new Date(post.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
                     </span>
                   </td>
                   
