@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
 import { getSupabase, saveMyStudyNote, bookNameMap } from '../lib/supabase';
@@ -216,15 +216,69 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
   ]);
 
   // Auto-save after 1 second of inactivity (debounce)
+  // Use refs to avoid circular dependencies and infinite loops
+  const ministryNoteRef = useRef(ministryNote);
+  const commentaryRef = useRef(commentary);
+  const selectedVerseRef = useRef(selectedVerse);
+  const savingRef = useRef(saving);
+  
+  useEffect(() => {
+    ministryNoteRef.current = ministryNote;
+  }, [ministryNote]);
+  
+  useEffect(() => {
+    commentaryRef.current = commentary;
+  }, [commentary]);
+  
+  useEffect(() => {
+    selectedVerseRef.current = selectedVerse;
+  }, [selectedVerse]);
+  
+  useEffect(() => {
+    savingRef.current = saving;
+  }, [saving]);
+  
+  // Stable save function using refs (not in dependency array)
+  const autoSave = useCallback(async () => {
+    const currentVerse = selectedVerseRef.current;
+    const currentMinistryNote = ministryNoteRef.current;
+    
+    if (!currentVerse || !canWrite || savingRef.current) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const currentKoreanBookName = bookNameMap[currentVerse.book] || currentVerse.book;
+      const currentVerseRef = `${currentKoreanBookName} ${currentVerse.chapter}:${currentVerse.verse}`;
+      
+      await saveMyStudyNote(
+        currentVerseRef,
+        currentKoreanBookName,
+        currentVerse.chapter,
+        currentVerse.verse,
+        currentMinistryNote,
+        true
+      );
+
+      setLastSaved(new Date());
+      setNoteTimestamp(new Date().toISOString());
+    } catch (err: any) {
+      console.error('Error auto-saving note:', err?.message || err);
+    } finally {
+      setSaving(false);
+    }
+  }, [canWrite]); // Only depends on canWrite (stable)
+
   useEffect(() => {
     if (!selectedVerse) return;
 
     const timer = setTimeout(() => {
-      handleSave();
+      autoSave();
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [ministryNote, commentary, selectedVerse, handleSave]);
+  }, [ministryNote, commentary, selectedVerse, autoSave]);
 
   // Load lexicon data on mount
   useEffect(() => {
