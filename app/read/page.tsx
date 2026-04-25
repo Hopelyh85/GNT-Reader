@@ -385,9 +385,21 @@ export default function ReadPage() {
             <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
               {/* Chapter Header */}
               <div className="px-4 py-3 bg-stone-50 border-b border-stone-200">
-                <h2 className="text-lg font-serif font-bold text-stone-800">
-                  {bookInfo?.name} {selectedChapter}장
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-serif font-bold text-stone-800">
+                    {bookInfo?.name} {selectedChapter}장
+                  </h2>
+                  <span className="text-xs text-stone-400 hidden sm:block">
+                    💡 절을 클릭하여 묵상 보기
+                  </span>
+                </div>
+              </div>
+              
+              {/* Mobile Hint */}
+              <div className="sm:hidden px-4 py-2 bg-amber-50/50 border-b border-amber-100">
+                <p className="text-xs text-amber-700">
+                  👆 본문의 절을 클릭하면 묵상과 나눔을 볼 수 있습니다
+                </p>
               </div>
               
               {/* Verses */}
@@ -405,18 +417,32 @@ export default function ReadPage() {
                     <div 
                       key={v.verse}
                       onClick={() => handleVerseClick(v.verse)}
-                      className={`flex gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                      className={`group flex gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 ${
                         selectedVerse === v.verse 
-                          ? 'bg-amber-50 border border-amber-200' 
-                          : 'hover:bg-stone-50'
+                          ? 'bg-amber-50 border border-amber-300 shadow-sm' 
+                          : 'hover:bg-stone-50 hover:shadow-sm border border-transparent'
                       }`}
                     >
-                      <span className="text-sm font-bold text-amber-600 min-w-[2rem]">
+                      <span className={`text-sm font-bold min-w-[2rem] transition-colors ${
+                        selectedVerse === v.verse 
+                          ? 'text-amber-700' 
+                          : 'text-amber-600 group-hover:text-amber-700'
+                      }`}>
                         {v.verse}
                       </span>
-                      <p className="text-stone-800 leading-relaxed flex-1">
+                      <p className={`leading-relaxed flex-1 transition-colors ${
+                        selectedVerse === v.verse 
+                          ? 'text-stone-900' 
+                          : 'text-stone-800'
+                      }`}>
                         {v.text}
                       </p>
+                      {/* Hover indicator */}
+                      <span className={`text-xs text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity ${
+                        selectedVerse === v.verse ? 'hidden' : ''
+                      }`}>
+                        클릭하여 보기 →
+                      </span>
                     </div>
                   ))
                 )}
@@ -457,17 +483,39 @@ export default function ReadPage() {
             </div>
           </div>
 
+          {/* Mobile Backdrop */}
+          {showCommunity && (
+            <div 
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+              onClick={() => setShowCommunity(false)}
+            />
+          )}
+
           {/* Right: Community Panel */}
-          <div className={`${showCommunity ? '' : 'hidden lg:block'}`}>
+          <div className={`
+            ${showCommunity ? '' : 'hidden lg:block'}
+            lg:static lg:z-auto
+            fixed inset-x-0 bottom-0 z-50 lg:inset-auto
+            transition-transform duration-300 ease-out
+            ${showCommunity ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
+          `}>
             {selectedVerse ? (
-              <div className="bg-white rounded-xl border border-stone-200 overflow-hidden h-full">
+              <div className="bg-white lg:rounded-xl border-t lg:border border-stone-200 overflow-hidden h-[70vh] lg:h-full lg:shadow-none shadow-2xl rounded-t-2xl">
+                {/* Mobile Handle Bar */}
+                <div className="lg:hidden w-full py-2 bg-stone-50 border-b border-stone-200">
+                  <div className="w-12 h-1 bg-stone-300 rounded-full mx-auto" />
+                </div>
+                
                 {/* Header */}
                 <div className="px-4 py-3 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-stone-800">
-                      {bookInfo?.name} {selectedChapter}:{selectedVerse}
-                    </h3>
-                    <p className="text-xs text-stone-500">묵상과 나눔</p>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-amber-600" />
+                    <div>
+                      <h3 className="font-bold text-stone-800 text-sm">
+                        {bookInfo?.name} {selectedChapter}:{selectedVerse}
+                      </h3>
+                      <p className="text-xs text-stone-500">묵상과 나눔</p>
+                    </div>
                   </div>
                   <button
                     onClick={() => setShowCommunity(false)}
@@ -477,7 +525,7 @@ export default function ReadPage() {
                   </button>
                 </div>
                 
-                <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                <div className="p-4 space-y-4 max-h-[calc(70vh-140px)] lg:max-h-[calc(100vh-300px)] overflow-y-auto">
                   {/* Admin Notes (Purple) */}
                   {studyNotes.filter((n: any) => 
                     n.profiles?.tier === '관리자' || n.profiles?.tier === 'Admin' || n.profiles?.tier?.includes('⭐⭐⭐⭐⭐')
@@ -575,10 +623,11 @@ export default function ReadPage() {
                 )}
               </div>
             ) : (
-              <div className="bg-stone-50 rounded-xl border border-stone-200 p-8 text-center">
+              <div className="hidden lg:flex bg-stone-50 rounded-xl border border-stone-200 p-8 text-center flex-col items-center justify-center h-64">
                 <BookOpen className="w-12 h-12 text-stone-300 mx-auto mb-3" />
                 <p className="text-stone-600">왼쪽에서 절을 클릭하면</p>
                 <p className="text-stone-600">이 곳에 묵상과 나눔이 표시됩니다</p>
+                <p className="text-xs text-stone-400 mt-4">💡 본문의 절 번호를 클릭해보세요</p>
               </div>
             )}
           </div>
