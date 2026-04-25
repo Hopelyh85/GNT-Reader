@@ -686,7 +686,11 @@ export async function addPublicReflection(
   parentId: string | null = null,
   title?: string | null,
   isUrgent: boolean = false,
-  isWorldPrayer: boolean = false
+  isWorldPrayer: boolean = false,
+  tags?: string[],
+  prayerType?: string,
+  linkedPrayerId?: string | null,
+  prayerStatus?: string
 ): Promise<void> {
   const supabase = getSupabase();
   const user = await getCurrentUser();
@@ -706,6 +710,10 @@ export async function addPublicReflection(
     is_urgent: isUrgent,
     is_world_prayer: isWorldPrayer,
     is_admin_approved: isWorldPrayer ? false : true, // World prayers need approval
+    tags: tags || [],
+    prayer_type: prayerType || '개인 기도',
+    linked_prayer_id: linkedPrayerId || null,
+    prayer_status: prayerStatus || 'wait',
   });
   
   if (error) throw error;

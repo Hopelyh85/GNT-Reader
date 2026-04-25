@@ -80,6 +80,14 @@ export async function POST(request: NextRequest) {
       chapter,
       verse,
       content,
+      // 신규 필드들
+      category,
+      tags,
+      is_urgent,
+      is_world_prayer,
+      prayer_type,
+      prayer_status,
+      linked_prayer_id,
     } = body;
 
     if (!book || chapter === undefined || chapter === null || verse === undefined || verse === null) {
@@ -89,7 +97,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert into Supabase reflections table
+    // Insert into Supabase reflections table with all fields
     const { data, error } = await supabase
       .from('reflections')
       .upsert({
@@ -100,6 +108,15 @@ export async function POST(request: NextRequest) {
         content: content || '',
         is_public: false,
         updated_at: new Date().toISOString(),
+        // 신규 필드들 매핑
+        category: category || 'reflection',
+        tags: tags || [],
+        is_urgent: is_urgent || false,
+        is_world_prayer: is_world_prayer || false,
+        prayer_type: prayer_type || null,
+        prayer_status: prayer_status || 'wait',
+        linked_prayer_id: linked_prayer_id || null,
+        is_admin_approved: is_world_prayer ? false : true, // 세계 기도는 승인 필요
       }, {
         onConflict: 'verse_ref'
       })
