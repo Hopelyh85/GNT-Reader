@@ -21,7 +21,8 @@ import {
   Profile,
   getPendingWorldPrayers,
   approveWorldPrayer,
-  updateUserTier
+  updateUserTier,
+  getMyProfile
 } from '@/app/lib/supabase';
 import { Crown, Loader2, LogOut, Users, BookOpen, User, ArrowLeft, Calendar, BookMarked } from 'lucide-react';
 
@@ -97,8 +98,11 @@ function AdminDashboardContent() {
   const [selectedUser, setSelectedUser] = useState<AdminUserStats | null>(null);
   const [userActivity, setUserActivity] = useState<UserActivity | null>(null);
   const [loadingUser, setLoadingUser] = useState(false);
+  
+  // Current user profile
+  const [myProfile, setMyProfile] = useState<Profile | null>(null);
 
-  // Check admin access
+  // Check admin access and load profile
   useEffect(() => {
     const checkAccess = async () => {
       setCheckingAdmin(true);
@@ -109,6 +113,14 @@ function AdminDashboardContent() {
       if (!admin) {
         alert('관리자 권한이 필요합니다.');
         router.push('/');
+      } else {
+        // Load current user profile
+        try {
+          const profile = await getMyProfile();
+          setMyProfile(profile);
+        } catch (err) {
+          console.error('Error loading profile:', err);
+        }
       }
     };
     checkAccess();
@@ -537,13 +549,23 @@ const getTierColor = (tier: string) => {
               <h1 className="text-lg font-semibold text-stone-800">관리자 대시보드</h1>
             </div>
             
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm text-stone-500 hover:text-red-600 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              로그아웃
-            </button>
+            <div className="flex items-center gap-3">
+              {myProfile && (
+                <a
+                  href="/profile"
+                  className="text-sm text-stone-600 hover:text-amber-600 hover:underline cursor-pointer transition-colors"
+                >
+                  {myProfile.nickname || myProfile.email?.split('@')[0] || '관리자'}
+                </a>
+              )}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-stone-500 hover:text-red-600 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                로그아웃
+              </button>
+            </div>
           </div>
         </div>
       </header>

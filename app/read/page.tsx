@@ -384,9 +384,12 @@ function ReadContent() {
         <div className="hidden md:flex items-center gap-2">
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-500">
+              <a
+                href="/profile"
+                className="text-xs text-stone-500 hover:text-amber-600 hover:underline cursor-pointer transition-colors"
+              >
                 {isAdmin ? '👑 ' : ''}{profile?.nickname || user?.email?.split('@')[0]}
-              </span>
+              </a>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 rounded-lg text-sm text-stone-600 hover:bg-stone-200 transition-colors"

@@ -58,9 +58,12 @@ function CommunityContent() {
         <div className="hidden md:flex items-center gap-2">
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-500">
+              <a
+                href="/profile"
+                className="text-xs text-stone-500 hover:text-amber-600 hover:underline cursor-pointer transition-colors"
+              >
                 {isAdmin ? '👑 ' : ''}{userName}
-              </span>
+              </a>
               {isAdmin && (
                 <a
                   href="/admin"
