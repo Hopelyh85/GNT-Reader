@@ -626,6 +626,26 @@ export async function getPublicReflections(
   return { data: data || [], count: count || 0 };
 }
 
+// Get urgent prayers (for home page summary)
+export async function getUrgentPrayers(limit: number = 3): Promise<StudioReflection[]> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('*, profiles(nickname, email)')
+    .eq('is_public', true)
+    .eq('is_urgent', true)
+    .in('category', ['prayer_general', 'prayer_world'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  
+  if (error) {
+    console.error('Error fetching urgent prayers:', error);
+    return [];
+  }
+  return data || [];
+}
+
 export async function getBestReflections(
   verseRef?: string,
   limit: number = 5

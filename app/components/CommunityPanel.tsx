@@ -5,7 +5,7 @@ import { SelectedVerse } from '@/app/types';
 import { 
   Users, Send, Loader2, MessageSquare, Pin, BookOpen, Hash, 
   ChevronDown, ChevronUp, Link2, Crown, MessageCircle, CornerDownRight,
-  Heart, Trash2, Megaphone, Settings, AlertTriangle, Globe, Clock
+  Heart, Trash2, Megaphone, Settings, AlertTriangle, Globe, Clock, Sparkles
 } from 'lucide-react';
 import { 
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
@@ -1211,6 +1211,122 @@ export function CommunityPanel({
     );
   };
 
+  // Desktop Table View for Posts
+  const renderPostsTable = (postsToRender: Post[]) => {
+    const getCategoryLabel = (post: Post) => {
+      const cat = (post as any).category;
+      if (cat === 'prayer_general') return { label: '기도', color: 'text-amber-600 bg-amber-50' };
+      if (cat === 'prayer_world') return { label: '세계기도', color: 'text-blue-600 bg-blue-50' };
+      if ((post as any).is_urgent) return { label: '긴급', color: 'text-red-600 bg-red-50' };
+      if (cat === 'ministry' || (post as any).postType === 'study_note') return { label: '사역', color: 'text-purple-600 bg-purple-50' };
+      return { label: '묵상', color: 'text-stone-600 bg-stone-50' };
+    };
+
+    const getPostIcon = (post: Post) => {
+      if ((post as any).is_urgent) return <AlertTriangle className="w-4 h-4 text-red-500" />;
+      if (post.is_pinned) return <Pin className="w-4 h-4 text-amber-500" />;
+      if (post.is_best) return <Sparkles className="w-4 h-4 text-amber-500" />;
+      return <span className="text-xs text-stone-400">{post.post_number || '#'}</span>;
+    };
+
+    return (
+      <div className="bg-white rounded-lg border border-stone-200 overflow-hidden">
+        {/* Table Header */}
+        <table className="w-full text-sm">
+          <thead className="bg-stone-50 border-b border-stone-200">
+            <tr>
+              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500 w-12">번호</th>
+              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500 w-16">분류</th>
+              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500">제목/내용</th>
+              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500 w-24">작성자</th>
+              <th className="px-3 py-2.5 text-left text-xs font-medium text-stone-500 w-20">날짜</th>
+              <th className="px-3 py-2.5 text-center text-xs font-medium text-stone-500 w-14">좋아요</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100">
+            {postsToRender.map((post) => {
+              const category = getCategoryLabel(post);
+              const replyCount = post.replyCount || 0;
+              
+              return (
+                <tr 
+                  key={post.id} 
+                  className="hover:bg-stone-50 cursor-pointer transition-colors"
+                  onClick={() => toggleExpand(post.id)}
+                >
+                  {/* 번호 */}
+                  <td className="px-3 py-3">
+                    <div className="flex items-center justify-center">
+                      {getPostIcon(post)}
+                    </div>
+                  </td>
+                  
+                  {/* 분류 */}
+                  <td className="px-2 py-3">
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${category.color}`}>
+                      {category.label}
+                    </span>
+                  </td>
+                  
+                  {/* 제목/내용 */}
+                  <td className="px-3 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-stone-800 line-clamp-1">
+                          {post.title || post.content.substring(0, 50) + (post.content.length > 50 ? '...' : '')}
+                        </h4>
+                        {replyCount > 0 && (
+                          <span className="flex items-center gap-0.5 text-xs text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded">
+                            <MessageCircle className="w-3 h-3" />
+                            {replyCount}
+                          </span>
+                        )}
+                      </div>
+                      {!post.title && (
+                        <p className="text-xs text-stone-500 line-clamp-1">{post.content.substring(0, 80)}...</p>
+                      )}
+                      {post.verse_ref && post.verse_ref !== '글로벌 게시판' && (
+                        <span className="text-xs text-amber-600 flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" />
+                          {post.verse_ref}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  
+                  {/* 작성자 */}
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <Avatar url={post.profiles?.avatar_url} tier={post.profiles?.tier} size="sm" />
+                      <span className="text-sm text-stone-600 truncate max-w-[80px]">
+                        {getDisplayName(post.profiles)}
+                      </span>
+                    </div>
+                  </td>
+                  
+                  {/* 날짜 */}
+                  <td className="px-3 py-3">
+                    <span className="text-xs text-stone-500">
+                      {new Date(post.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </td>
+                  
+                  {/* 좋아요 */}
+                  <td className="px-3 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1 text-red-500">
+                      <Heart className="w-3.5 h-3.5" fill={post.userHasLiked ? "currentColor" : "none"} />
+                      <span className="text-xs font-medium">{post.likesCount || 0}</span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col bg-stone-50">
       {/* Header */}
@@ -1567,7 +1683,15 @@ export function CommunityPanel({
               </div>
             ) : (
               <>
-                {getFilteredPosts().map(post => renderPost(post))}
+                {/* Mobile Card View (sm, md) */}
+                <div className="lg:hidden space-y-3">
+                  {getFilteredPosts().map(post => renderPost(post))}
+                </div>
+                
+                {/* Desktop Table View (lg and above) */}
+                <div className="hidden lg:block">
+                  {renderPostsTable(getFilteredPosts())}
+                </div>
                 
                 {/* Load More */}
                 {!hashtagFilter && hasMore && (
@@ -1581,11 +1705,11 @@ export function CommunityPanel({
                     ) : (
                       '더 보기'
                     )}
-                </button>
-              )}
-            </>
-          )}
-        </div>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         )}
 
         {/* All Posts by Chapter View */}

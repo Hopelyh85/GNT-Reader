@@ -1,33 +1,39 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { 
   BookOpen, LogOut, LogIn, Menu, X, ExternalLink, 
   Megaphone, Sparkles, Search, Users, Settings, Crown,
   ChevronRight, Bell, MessageSquare, GraduationCap, Heart,
-  Home as HomeIcon, ArrowLeft
+  Home as HomeIcon, AlertTriangle, Globe, Clock
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
-import { CommunityPanel } from '@/app/components/CommunityPanel';
-import { getMyProfile, signOut, Profile, getNotice } from '@/app/lib/supabase';
+import { getMyProfile, signOut, Profile, getNotice, getUrgentPrayers, StudioReflection } from '@/app/lib/supabase';
 
 function HomeContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [notice, setNotice] = useState<{ id: number; content: string; updated_at: string } | null>(null);
+  const [urgentPrayers, setUrgentPrayers] = useState<StudioReflection[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
-  // Get post ID from URL for deep linking
-  const postId = searchParams.get('post');
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    if (user) {
-      getMyProfile().then(setProfile).catch(console.error);
+    async function loadData() {
+      if (user) {
+        getMyProfile().then(setProfile).catch(console.error);
+      }
+      const [noticeData, urgentData] = await Promise.all([
+        getNotice(),
+        getUrgentPrayers(3)
+      ]);
+      setNotice(noticeData);
+      setUrgentPrayers(urgentData);
+      setLoading(false);
     }
-    getNotice().then(setNotice).catch(console.error);
+    loadData();
   }, [user]);
 
   const isLoggedIn = !!user;
@@ -40,13 +46,21 @@ function HomeContent() {
     router.push('/');
   };
 
+  // Portal menu items
+  const portalItems = [
+    { id: 'read', title: '한글 성경', subtitle: '원어 말씀 읽기', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
+    { id: 'study', title: '원어 연구소', subtitle: '그리스어/히브리어', href: '/study', icon: Search, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
+    { id: 'community', title: 'GNT 커뮤니티', subtitle: '내부 게시판', href: '/community', icon: Users, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
+    { id: 'sermon', title: '설교 아카이브', subtitle: '말씀 아카이브', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
+  ];
+
   // Navigation items
   const navItems = [
     { id: 'home', title: '홈', href: '/', icon: HomeIcon, active: true },
     { id: 'read', title: '한글 성경', href: '/read', icon: BookOpen },
     { id: 'study', title: '원어 연구', href: '/study', icon: Search },
     { id: 'community', title: '커뮤니티', href: '/community', icon: Users },
-    { id: 'sermon', title: '설교 아카이브', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true },
+    { id: 'cafe', title: '기독교 커뮤니티', href: 'https://naver.me/xXnPSav8', icon: ExternalLink, external: true },
   ];
 
   const adminNavItem = { id: 'admin', title: '관리자', href: '/admin', icon: Settings };
@@ -178,20 +192,146 @@ function HomeContent() {
         </div>
       )}
 
-      {/* Main Content - Community Panel */}
-      <main className="flex-1 overflow-hidden">
-        <CommunityPanel
-          selectedVerse={null}
-          isLoggedIn={isLoggedIn}
-          userRole={userRole}
-          userName={userName}
-          initialPostId={postId}
-          currentPath="/"
-          showPrayerTabs={true}
-          onNavigateToVerse={(book, chapter, verse) => {
-            router.push(`/study?book=${book}&chapter=${chapter}&verse=${verse}`);
-          }}
-        />
+      {/* Main Content - Portal Style */}
+      <main className="flex-1 overflow-y-auto bg-[#faf9f7]">
+        <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
+          {/* Hero Section */}
+          <div className="text-center mb-10 md:mb-14">
+            <h1 className="font-serif text-3xl md:text-4xl font-bold text-stone-800 mb-3">
+              원어로 읽는 <span className="text-amber-600">성경</span>
+            </h1>
+            <p className="text-stone-500 text-sm md:text-base max-w-md mx-auto">
+              헬라어·히브리어 원어를 통해 하나님의 말씀을 깊이 묵상하는 공간
+            </p>
+          </div>
+
+          {/* Portal Menu Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-10 md:mb-14">
+            {portalItems.map((item) => (
+              <a
+                key={item.id}
+                href={item.href}
+                target={item.external ? '_blank' : undefined}
+                rel={item.external ? 'noopener noreferrer' : undefined}
+                className={`group relative p-4 md:p-6 rounded-xl border-2 transition-all duration-200 ${item.color}`}
+              >
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="p-2.5 rounded-lg bg-white/60 shadow-sm group-hover:scale-110 transition-transform">
+                    <item.icon className="w-6 h-6 md:w-8 md:h-8" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm md:text-base">{item.title}</h3>
+                    <p className="text-xs opacity-70 mt-0.5 hidden md:block">{item.subtitle}</p>
+                  </div>
+                </div>
+                {item.external && (
+                  <ExternalLink className="absolute top-2 right-2 w-3 h-3 opacity-40" />
+                )}
+              </a>
+            ))}
+          </div>
+
+          {/* Summary Section - Notice & Urgent Prayers */}
+          <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+            {/* Notice Card */}
+            <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
+                <Megaphone className="w-4 h-4 text-amber-600" />
+                <h3 className="font-bold text-sm text-amber-800">연구소 소식</h3>
+                <span className="ml-auto text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">공지</span>
+              </div>
+              <div className="p-4">
+                {loading ? (
+                  <div className="h-16 flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-stone-200 border-t-stone-400 rounded-full animate-spin" />
+                  </div>
+                ) : notice?.content ? (
+                  <div 
+                    className="text-sm text-stone-700 prose prose-sm max-w-none prose-stone"
+                    dangerouslySetInnerHTML={{ __html: notice.content.replace(/\n/g, '<br/>') }}
+                  />
+                ) : (
+                  <p className="text-sm text-stone-400 text-center py-4">등록된 공지사항이 없습니다.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Urgent Prayers Card */}
+            <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-red-50 to-rose-50 border-b border-red-100">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                <h3 className="font-bold text-sm text-red-800">긴급 기도제목</h3>
+                <a 
+                  href="/community" 
+                  className="ml-auto text-xs text-red-600 hover:text-red-700 flex items-center gap-1"
+                >
+                  전체보기 <ChevronRight className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="p-2">
+                {loading ? (
+                  <div className="h-16 flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-stone-200 border-t-stone-400 rounded-full animate-spin" />
+                  </div>
+                ) : urgentPrayers.length > 0 ? (
+                  <ul className="space-y-1">
+                    {urgentPrayers.map((prayer, idx) => (
+                      <li 
+                        key={prayer.id} 
+                        className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-red-50/50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/community?post=${prayer.id}`)}
+                      >
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs flex items-center justify-center font-bold mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-stone-700 line-clamp-2">
+                            {prayer.title || prayer.content.substring(0, 60) + '...'}
+                          </p>
+                          <p className="text-xs text-stone-400 mt-0.5">
+                            {prayer.profiles?.nickname || '익명'} · {new Date(prayer.created_at).toLocaleDateString('ko-KR')}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-center py-6">
+                    <Heart className="w-8 h-8 text-stone-200 mx-auto mb-2" />
+                    <p className="text-sm text-stone-400">긴급 기도제목이 없습니다.</p>
+                    <a href="/community" className="text-xs text-stone-500 hover:text-stone-700 underline mt-1 inline-block">
+                      커뮤니티에서 기도제목 작성하기
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* External Community Link Banner */}
+          <div className="mt-8 md:mt-10">
+            <a 
+              href="https://naver.me/xXnPSav8"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl hover:shadow-md transition-all group"
+            >
+              <div className="p-2 bg-green-100 rounded-lg group-hover:scale-110 transition-transform">
+                <ExternalLink className="w-5 h-5 text-green-600" />
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-green-800 text-sm md:text-base">기독교 커뮤니티 (네이버 카페)</p>
+                <p className="text-xs text-green-600 mt-0.5">더 많은 성도들과 교제하러 가기</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-green-400 group-hover:translate-x-1 transition-transform" />
+            </a>
+          </div>
+
+          {/* Footer Info */}
+          <footer className="mt-12 text-center text-xs text-stone-400">
+            <p>© 2025 GNT Reader. 원어로 읽고, 원어로 묵상하며, 원어로 선포합니다.</p>
+          </footer>
+        </div>
       </main>
     </div>
   );
