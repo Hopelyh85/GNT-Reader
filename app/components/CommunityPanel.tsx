@@ -5,14 +5,14 @@ import { SelectedVerse } from '@/app/types';
 import { 
   Users, Send, Loader2, MessageSquare, Pin, BookOpen, Hash, 
   ChevronDown, ChevronUp, Link2, Crown, MessageCircle, CornerDownRight,
-  Heart, Trash2, Megaphone, Settings
+  Heart, Trash2, Megaphone, Settings, AlertTriangle, Globe, Clock
 } from 'lucide-react';
 import { 
   addPublicReflection, getPublicReflections, getSupabase, toggleBestReflection,
   addReply, getReplies, togglePinPost, getPinnedPosts, StudioReflection,
   addLike, removeLike, hasUserLiked, getLikesCount, deleteReflection, getCurrentUser,
   checkIsAdmin, getStudyNotesForVerse, getNotice, updateNotice, bookNameMap,
-  getUserActivity
+  getUserActivity, hasPrayerInLast24Hours, toggleUrgentPrayer
 } from '@/app/lib/supabase';
 
 // Books array for chapter selection
@@ -54,6 +54,7 @@ interface CommunityPanelProps {
   initialPostId?: string | null;
   onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
   currentPath?: string; // Current page path for context-aware sharing
+  showPrayerTabs?: boolean; // Show prayer category tabs (general/world)
 }
 
 interface Post extends StudioReflection {
@@ -64,7 +65,7 @@ interface Post extends StudioReflection {
 }
 
 export function CommunityPanel({ 
-  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath 
+  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath, showPrayerTabs = false 
 }: CommunityPanelProps) {
   // Permission helpers based on tier
   const isGeneral = userRole === '준회원' || userRole === 'General';
@@ -99,6 +100,8 @@ export function CommunityPanel({
   const [newContent, setNewContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [includeVerse, setIncludeVerse] = useState(false);
+  const [postCategory, setPostCategory] = useState<'reflection' | 'prayer'>('reflection');
+  const [prayerType, setPrayerType] = useState<'normal' | 'world'>('normal');
   
   // Posts states
   const [posts, setPosts] = useState<Post[]>([]);
@@ -138,6 +141,11 @@ export function CommunityPanel({
   // Hashtag filter state
   const [hashtagFilter, setHashtagFilter] = useState<string | null>(null);
   
+  // Prayer system states
+  const [prayerCategory, setPrayerCategory] = useState<'general' | 'world'>('general');
+  const [lastPrayerTime, setLastPrayerTime] = useState<Date | null>(null);
+  const [checkingLastPrayer, setCheckingLastPrayer] = useState(false);
+  
   // Profile modal state
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileModalUser, setProfileModalUser] = useState<any>(null);
@@ -174,7 +182,16 @@ export function CommunityPanel({
     try {
       const result = await getPublicReflections(undefined, pageNum, 20);
       const pinnedIds = new Set(pinnedPosts.map(p => p.id));
-      const filteredPosts = (result.data || []).filter(p => !pinnedIds.has(p.id));
+      
+      // Filter out pinned posts and unapproved world prayers (unless admin)
+      let filteredPosts = (result.data || []).filter(p => {
+        if (pinnedIds.has(p.id)) return false;
+        // Hide unapproved world prayers from non-admins
+        if ((p as any).is_world_prayer && !(p as any).is_admin_approved && !isAdmin) {
+          return false;
+        }
+        return true;
+      });
       
       const postsWithLikes = await Promise.all(
         (filteredPosts as Post[]).map(async (post) => {
@@ -186,10 +203,18 @@ export function CommunityPanel({
         })
       );
       
+      // Sort: urgent prayers first, then by created_at
+      const sortedPosts = postsWithLikes.sort((a, b) => {
+        const aUrgent = (a as any).is_urgent ? 1 : 0;
+        const bUrgent = (b as any).is_urgent ? 1 : 0;
+        if (aUrgent !== bUrgent) return bUrgent - aUrgent; // Urgent first
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      
       if (append) {
-        setPosts(prev => [...prev, ...postsWithLikes]);
+        setPosts(prev => [...prev, ...sortedPosts]);
       } else {
-        setPosts(postsWithLikes);
+        setPosts(sortedPosts);
       }
       
       setHasMore((result.data || []).length === 20);
@@ -198,7 +223,7 @@ export function CommunityPanel({
     } finally {
       setLoadingPosts(false);
     }
-  }, [pinnedPosts]);
+  }, [pinnedPosts, isAdmin]);
 
   // Load all posts (reflections + study_notes) for a specific chapter
   const loadAllPostsByChapter = useCallback(async (bookId: string, chapter: number) => {
@@ -402,9 +427,50 @@ export function CommunityPanel({
     }
   };
 
+  // Check 24h prayer limit
+  const checkPrayerLimit = async () => {
+    if (!currentUserId || postCategory !== 'prayer' || prayerType !== 'normal') return true;
+    
+    setCheckingLastPrayer(true);
+    try {
+      const hasRecentPrayer = await hasPrayerInLast24Hours(currentUserId);
+      if (hasRecentPrayer) {
+        alert('일반 기도는 24시간에 1회만 작성 가능합니다.\n다음 기도는 24시간 후에 작성해 주세요.');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Error checking prayer limit:', err);
+      return true; // Allow on error
+    } finally {
+      setCheckingLastPrayer(false);
+    }
+  };
+
+  // Toggle urgent prayer (admin only)
+  const handleToggleUrgent = async (postId: string, currentUrgent: boolean) => {
+    if (!isAdmin) {
+      alert('관리자만 긴급 기도를 설정할 수 있습니다.');
+      return;
+    }
+    try {
+      await toggleUrgentPrayer(postId, !currentUrgent);
+      await loadPosts(1, false);
+      await loadPinnedPosts();
+    } catch (err: any) {
+      alert('긴급 설정 중 오류: ' + (err?.message || 'Unknown error'));
+    }
+  };
+
   // Save new post
   const handleSavePost = async () => {
     if (!newContent.trim() || !canWrite) return;
+
+    // Check 24h prayer limit for normal prayers
+    if (postCategory === 'prayer' && prayerType === 'normal') {
+      const canPost = await checkPrayerLimit();
+      if (!canPost) return;
+    }
 
     setSaving(true);
     try {
@@ -414,20 +480,41 @@ export function CommunityPanel({
         ? `${koreanBookName} ${selectedVerse.chapter}:${selectedVerse.verse}`
         : '글로벌 게시판';
       
+      // Determine category based on post type
+      let category: 'general' | 'prayer_general' | 'prayer_world' = 'general';
+      let isWorldPrayer = false;
+      if (postCategory === 'prayer') {
+        if (prayerType === 'world') {
+          category = 'prayer_world';
+          isWorldPrayer = true;
+        } else {
+          category = 'prayer_general';
+        }
+      }
+      
       await addPublicReflection(
         verseRef,
-        koreanBookName,  // Korean book name for consistency
+        koreanBookName,
         selectedVerse?.chapter || 0,
         selectedVerse?.verse || 0,
         newContent,
         true,
-        'general',
+        category,
         null,
-        newTitle.trim() || null
+        newTitle.trim() || null,
+        false, // isUrgent - only admins can set this
+        isWorldPrayer
       );
+
+      // Show message for world prayers
+      if (isWorldPrayer) {
+        alert('세계 기도 제목이 제출되었습니다. 관리자 승인 후 게시됩니다.');
+      }
 
       setNewTitle('');
       setNewContent('');
+      setPostCategory('reflection');
+      setPrayerType('normal');
       await loadPosts(1, false);
       await loadPinnedPosts();
     } catch (err: any) {
@@ -684,8 +771,20 @@ export function CommunityPanel({
     return posts.filter(post => post.content?.includes(hashtagFilter));
   };
 
-  // Get post background color based on type
-  const getPostBgColor = (postType?: string, tier?: string) => {
+  // Get post background color based on type and prayer status
+  const getPostBgColor = (postType?: string, tier?: string, isUrgent?: boolean, isWorldPrayer?: boolean, isAdminApproved?: boolean, category?: string) => {
+    // Urgent prayer - red border (highest priority)
+    if (isUrgent) {
+      return 'bg-red-50 border-red-500';
+    }
+    // World prayer (approved) - blue border
+    if (isWorldPrayer && isAdminApproved) {
+      return 'bg-blue-50 border-blue-500';
+    }
+    // General prayer - warm amber
+    if (category === 'prayer_general' || category === 'prayer_world') {
+      return 'bg-amber-50 border-amber-200';
+    }
     // Admin commentary - ONLY for admin study_notes (not reflections)
     if ((postType === 'admin_note' || postType === 'study_note') && 
         (tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐'))) {
@@ -700,8 +799,35 @@ export function CommunityPanel({
     return 'bg-stone-50 border-stone-200';
   };
 
-  // Get post badge based on type
-  const getPostBadge = (postType?: string, tier?: string) => {
+  // Get post badge based on type and prayer status
+  const getPostBadge = (postType?: string, tier?: string, isUrgent?: boolean, isWorldPrayer?: boolean, isAdminApproved?: boolean, category?: string) => {
+    // Urgent prayer badge
+    if (isUrgent) {
+      return (
+        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3" />
+          긴급 기도
+        </span>
+      );
+    }
+    // World prayer badge (approved)
+    if (isWorldPrayer && isAdminApproved) {
+      return (
+        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+          <Globe className="w-3 h-3" />
+          세계 기도
+        </span>
+      );
+    }
+    // General prayer badge
+    if (category === 'prayer_general') {
+      return (
+        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+          <Heart className="w-3 h-3" />
+          기도제목
+        </span>
+      );
+    }
     // Admin commentary badge - ONLY for study_notes by admins
     if ((postType === 'admin_note' || postType === 'study_note') && 
         (tier === '관리자' || tier === 'Admin' || tier?.includes('⭐⭐⭐⭐⭐'))) {
@@ -771,10 +897,17 @@ export function CommunityPanel({
     
     console.log('[renderPost] post.id:', post.id, 'currentUserId:', currentUserId, 'post.user_id:', post.user_id, 'isAdmin:', isAdmin, 'canDelete:', canDelete);
     
-    // Get color-coded background based on post type
+    // Get color-coded background based on post type and prayer status
     const bgColorClass = isPinned 
       ? 'bg-amber-50/20 border-amber-300' 
-      : getPostBgColor(postType || (post as any).postType, post.profiles?.tier);
+      : getPostBgColor(
+          postType || (post as any).postType, 
+          post.profiles?.tier,
+          (post as any).is_urgent,
+          (post as any).is_world_prayer,
+          (post as any).is_admin_approved,
+          (post as any).category
+        );
     
     return (
       <div key={post.id} className={`rounded-lg border ${bgColorClass} overflow-hidden`}>
@@ -808,7 +941,14 @@ export function CommunityPanel({
                   </span>
                 )}
                 {/* Post Type Badge */}
-                {!isPinned && getPostBadge(postType || (post as any).postType, post.profiles?.tier)}
+                {!isPinned && getPostBadge(
+                  postType || (post as any).postType, 
+                  post.profiles?.tier,
+                  (post as any).is_urgent,
+                  (post as any).is_world_prayer,
+                  (post as any).is_admin_approved,
+                  (post as any).category
+                )}
               </div>
               
               {/* Title with Post Number */}
@@ -965,6 +1105,21 @@ export function CommunityPanel({
               
               {isAdmin && (
                 <>
+                  {/* Urgent Prayer Toggle - Only for prayer posts */}
+                  {((post as any).category === 'prayer_general' || (post as any).category === 'prayer_world' || (post as any).is_urgent) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleToggleUrgent(post.id, (post as any).is_urgent); }}
+                      className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                        (post as any).is_urgent 
+                          ? 'text-red-700 bg-red-50 hover:bg-red-100 border border-red-200' 
+                          : 'text-stone-600 hover:text-red-700 hover:bg-stone-100'
+                      }`}
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      {(post as any).is_urgent ? '🚨 긴급 해제' : '🚨 긴급 설정'}
+                    </button>
+                  )}
+                  
                   <button
                     onClick={(e) => { e.stopPropagation(); handleTogglePin(post.id, post.is_pinned); }}
                     className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
@@ -1167,17 +1322,77 @@ export function CommunityPanel({
         {canWrite && (
           <div className="p-3 border-b border-stone-200 bg-white">
             <div className="space-y-2">
+              {/* Post Category Tabs */}
+              <div className="flex gap-1 p-1 bg-stone-100 rounded-lg">
+                <button
+                  onClick={() => { setPostCategory('reflection'); setPrayerType('normal'); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    postCategory === 'reflection' 
+                      ? 'bg-white text-stone-800 shadow-sm font-medium' 
+                      : 'text-stone-600 hover:text-stone-800'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  묵상/나눔
+                </button>
+                <button
+                  onClick={() => setPostCategory('prayer')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    postCategory === 'prayer' 
+                      ? 'bg-white text-stone-800 shadow-sm font-medium' 
+                      : 'text-stone-600 hover:text-stone-800'
+                  }`}
+                >
+                  <Heart className="w-4 h-4" />
+                  기도제목
+                </button>
+              </div>
+              
+              {/* Prayer Type Selection (only when prayer category selected) */}
+              {postCategory === 'prayer' && showPrayerTabs && (
+                <div className="flex gap-2 p-2 bg-amber-50 rounded-lg border border-amber-100">
+                  <button
+                    onClick={() => setPrayerType('normal')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
+                      prayerType === 'normal' 
+                        ? 'bg-white text-amber-700 shadow-sm border border-amber-200' 
+                        : 'text-amber-600 hover:bg-amber-100'
+                    }`}
+                  >
+                    <Clock className="w-3 h-3" />
+                    일반 기도
+                    <span className="text-[10px] opacity-70">(24시간 1회)</span>
+                  </button>
+                  <button
+                    onClick={() => setPrayerType('world')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
+                      prayerType === 'world' 
+                        ? 'bg-white text-blue-700 shadow-sm border border-blue-200' 
+                        : 'text-blue-600 hover:bg-blue-100'
+                    }`}
+                  >
+                    <Globe className="w-3 h-3" />
+                    세계 기도
+                    <span className="text-[10px] opacity-70">(관리자 승인)</span>
+                  </button>
+                </div>
+              )}
+              
               <input
                 type="text"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="제목을 입력하세요 (선택사항)"
+                placeholder={postCategory === 'prayer' ? '기도 제목을 입력하세요 (선택사항)' : '제목을 입력하세요 (선택사항)'}
                 className="w-full px-3 py-2 text-sm font-medium bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-200 placeholder:text-stone-400"
               />
               <textarea
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
-                placeholder="성경 묵상, 질문, 기도제목 등을 자유롭게 나눠보세요..."
+                placeholder={postCategory === 'prayer' 
+                  ? (prayerType === 'world' 
+                    ? '세계를 위한 기도제목을 작성해 주세요. 관리자 승인 후 게시됩니다.' 
+                    : '기도제목을 작성해 주세요. 24시간에 1회만 작성 가능합니다.')
+                  : '성경 묵상, 질문, 나눔 등을 자유롭게 작성해 보세요...'}
                 className="w-full h-24 p-3 text-sm leading-relaxed bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 placeholder:text-stone-400"
               />
               

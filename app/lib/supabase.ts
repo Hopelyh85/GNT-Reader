@@ -660,9 +660,11 @@ export async function addPublicReflection(
   verse: number,
   content: string,
   isPublic: boolean = true,
-  category: 'ministry' | 'commentary' | 'reflection' | 'general' = 'reflection',
+  category: 'ministry' | 'commentary' | 'reflection' | 'general' | 'prayer_general' | 'prayer_world' = 'reflection',
   parentId: string | null = null,
-  title?: string | null
+  title?: string | null,
+  isUrgent: boolean = false,
+  isWorldPrayer: boolean = false
 ): Promise<void> {
   const supabase = getSupabase();
   const user = await getCurrentUser();
@@ -679,9 +681,69 @@ export async function addPublicReflection(
     is_public: isPublic,
     category,
     parent_id: parentId,
+    is_urgent: isUrgent,
+    is_world_prayer: isWorldPrayer,
+    is_admin_approved: isWorldPrayer ? false : true, // World prayers need approval
   });
   
   if (error) throw error;
+}
+
+// Check if user has written a prayer in last 24 hours
+export async function hasPrayerInLast24Hours(userId: string): Promise<boolean> {
+  const supabase = getSupabase();
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('id')
+    .eq('user_id', userId)
+    .in('category', ['prayer_general', 'prayer_world'])
+    .gte('created_at', twentyFourHoursAgo)
+    .limit(1);
+  
+  if (error) {
+    console.error('Error checking last prayer:', error);
+    return false;
+  }
+  
+  return (data?.length || 0) > 0;
+}
+
+// Toggle urgent prayer status (admin only)
+export async function toggleUrgentPrayer(reflectionId: string, isUrgent: boolean): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('reflections')
+    .update({ is_urgent: isUrgent })
+    .eq('id', reflectionId);
+  
+  if (error) throw error;
+}
+
+// Approve world prayer (admin only)
+export async function approveWorldPrayer(reflectionId: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('reflections')
+    .update({ is_admin_approved: true })
+    .eq('id', reflectionId);
+  
+  if (error) throw error;
+}
+
+// Get pending world prayers for admin approval
+export async function getPendingWorldPrayers(): Promise<StudioReflection[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('*, profiles(nickname, email, tier, church_name, job_position, show_church, show_job)')
+    .eq('is_world_prayer', true)
+    .eq('is_admin_approved', false)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
 }
 
 // Add reply to a post
