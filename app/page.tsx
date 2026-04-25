@@ -113,9 +113,17 @@ function HomeContent() {
         <div className="hidden md:flex items-center gap-3">
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-500">
-                {isAdmin ? '👑 ' : ''}{userName}
-              </span>
+              <a 
+                href="/profile"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer"
+              >
+                <span className="text-xs text-stone-500">
+                  {isAdmin ? '👑 ' : ''}{userName}
+                </span>
+                <span className="text-xs px-2 py-0.5 bg-stone-100 rounded text-stone-600">
+                  {userRole}
+                </span>
+              </a>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 rounded-lg text-sm text-stone-600 transition-colors"

@@ -152,6 +152,33 @@ export function CommunityPanel({
   const [profileModalActivity, setProfileModalActivity] = useState<{reflections: any[]; studyNotes: any[]} | null>(null);
   const [loadingProfileActivity, setLoadingProfileActivity] = useState(false);
 
+  // Desktop 3-column layout tabs
+  const [desktopTab, setDesktopTab] = useState<'scripture' | 'free' | 'prayer'>('scripture');
+  
+  // Filter posts for 3-column layout
+  const getScripturePosts = () => {
+    return posts.filter(post => {
+      const hasVerseRef = post.verse_ref && post.verse_ref !== '글로벌 게시판' && post.verse_ref !== '';
+      return hasVerseRef;
+    });
+  };
+  
+  const getFreeBoardPosts = () => {
+    return posts.filter(post => {
+      const cat = (post as any).category;
+      const noVerseRef = !post.verse_ref || post.verse_ref === '글로벌 게시판' || post.verse_ref === '';
+      const isNotPrayer = cat !== 'prayer_general' && cat !== 'prayer_world';
+      return noVerseRef && isNotPrayer;
+    });
+  };
+  
+  const getPrayerPosts = () => {
+    return posts.filter(post => {
+      const cat = (post as any).category;
+      return cat === 'prayer_general' || cat === 'prayer_world';
+    });
+  };
+
   // Get current user ID
   useEffect(() => {
     getCurrentUser().then(user => setCurrentUserId(user?.id || null));
@@ -1332,8 +1359,11 @@ export function CommunityPanel({
             커뮤니티 게시판
           </h2>
         </div>
-        <p className="text-xs text-stone-500 mt-1">
+        <p className="text-xs text-stone-500 mt-1 lg:hidden">
           성경 묵상과 나눔의 공간
+        </p>
+        <p className="text-xs text-stone-500 mt-1 hidden lg:block">
+          말씀 중심 · 자유 게시판 · 기도 제목
         </p>
       </div>
 
@@ -1659,51 +1689,148 @@ export function CommunityPanel({
         {/* Feed View */}
         {viewMode === 'feed' && (
           <div className="p-3 space-y-3">
-            <div className="flex items-center gap-2 px-1">
-              <Users className="w-3 h-3 text-stone-500" />
-              <span className="text-xs font-medium text-stone-600">
-                {hashtagFilter ? '필터링된 게시글' : '전체 게시글'}
-              </span>
+            {/* Mobile View (sm, md) - Single column with existing tabs */}
+            <div className="lg:hidden">
+              <div className="flex items-center gap-2 px-1 mb-3">
+                <Users className="w-3 h-3 text-stone-500" />
+                <span className="text-xs font-medium text-stone-600">
+                  {hashtagFilter ? '필터링된 게시글' : '전체 게시글'}
+                </span>
+              </div>
+              
+              {loadingPosts && posts.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                </div>
+              ) : getFilteredPosts().length === 0 ? (
+                <div className="text-center py-8 text-stone-400">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">{hashtagFilter ? '해당 태그의 게시글이 없습니다.' : '아직 게시글이 없습니다.'}</p>
+                  {!hashtagFilter && <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {getFilteredPosts().map(post => renderPost(post))}
+                  </div>
+                  
+                  {/* Load More */}
+                  {!hashtagFilter && hasMore && (
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={loadingPosts}
+                      className="w-full py-2 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+                    >
+                      {loadingPosts ? (
+                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                      ) : (
+                        '더 보기'
+                      )}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
             
-            {loadingPosts && posts.length === 0 ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+            {/* Desktop View (lg and above) - 3 Column Layout */}
+            <div className="hidden lg:block">
+              {/* Desktop Tabs */}
+              <div className="flex border-b border-stone-200 mb-4 bg-white rounded-lg">
+                <button
+                  onClick={() => setDesktopTab('scripture')}
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors rounded-l-lg ${
+                    desktopTab === 'scripture'
+                      ? 'bg-amber-50 text-amber-700 border-b-2 border-amber-500'
+                      : 'text-stone-500 hover:bg-stone-50'
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <BookOpen className="w-4 h-4" />
+                    말씀 중심
+                    <span className="text-xs bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full">{getScripturePosts().length}</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => setDesktopTab('free')}
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                    desktopTab === 'free'
+                      ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500'
+                      : 'text-stone-500 hover:bg-stone-50'
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    자유 게시판
+                    <span className="text-xs bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full">{getFreeBoardPosts().length}</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => setDesktopTab('prayer')}
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors rounded-r-lg ${
+                    desktopTab === 'prayer'
+                      ? 'bg-red-50 text-red-700 border-b-2 border-red-500'
+                      : 'text-stone-500 hover:bg-stone-50'
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <Heart className="w-4 h-4" />
+                    기도 제목
+                    <span className="text-xs bg-stone-200 text-stone-600 px-2 py-0.5 rounded-full">{getPrayerPosts().length}</span>
+                  </span>
+                </button>
               </div>
-            ) : getFilteredPosts().length === 0 ? (
-              <div className="text-center py-8 text-stone-400">
-                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">{hashtagFilter ? '해당 태그의 게시글이 없습니다.' : '아직 게시글이 없습니다.'}</p>
-                {!hashtagFilter && <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>}
-              </div>
-            ) : (
-              <>
-                {/* Mobile Card View (sm, md) */}
-                <div className="lg:hidden space-y-3">
-                  {getFilteredPosts().map(post => renderPost(post))}
+              
+              {/* Desktop Content */}
+              {loadingPosts && posts.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
                 </div>
-                
-                {/* Desktop Table View (lg and above) */}
-                <div className="hidden lg:block">
-                  {renderPostsTable(getFilteredPosts())}
-                </div>
-                
-                {/* Load More */}
-                {!hashtagFilter && hasMore && (
-                  <button
-                    onClick={handleLoadMore}
-                    disabled={loadingPosts}
-                    className="w-full py-2 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
-                  >
-                    {loadingPosts ? (
-                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                    ) : (
-                      '더 보기'
-                    )}
-                  </button>
-                )}
-              </>
-            )}
+              ) : (
+                <>
+                  {desktopTab === 'scripture' && (
+                    getScripturePosts().length === 0 ? (
+                      <div className="text-center py-12 text-stone-400 bg-white rounded-lg border border-stone-200">
+                        <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">말씀 연결된 게시글이 없습니다.</p>
+                      </div>
+                    ) : renderPostsTable(getScripturePosts())
+                  )}
+                  
+                  {desktopTab === 'free' && (
+                    getFreeBoardPosts().length === 0 ? (
+                      <div className="text-center py-12 text-stone-400 bg-white rounded-lg border border-stone-200">
+                        <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">자유 게시글이 없습니다.</p>
+                      </div>
+                    ) : renderPostsTable(getFreeBoardPosts())
+                  )}
+                  
+                  {desktopTab === 'prayer' && (
+                    getPrayerPosts().length === 0 ? (
+                      <div className="text-center py-12 text-stone-400 bg-white rounded-lg border border-stone-200">
+                        <Heart className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">기도 제목이 없습니다.</p>
+                      </div>
+                    ) : renderPostsTable(getPrayerPosts())
+                  )}
+                  
+                  {/* Load More */}
+                  {!hashtagFilter && hasMore && (
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={loadingPosts}
+                      className="w-full mt-4 py-3 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors border border-stone-200"
+                    >
+                      {loadingPosts ? (
+                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                      ) : (
+                        '더 보기'
+                      )}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
 
