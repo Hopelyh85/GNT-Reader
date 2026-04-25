@@ -7,6 +7,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface NoteData {
+  user_id?: string;
   user_nickname: string;
   verse_ref: string;
   book: string;
@@ -14,6 +15,7 @@ interface NoteData {
   verse: number;
   ministry_note: string;
   commentary: string;
+  tags?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -52,13 +54,15 @@ export async function GET(request: NextRequest) {
     // Map to expected format
     if (data) {
       const noteData: NoteData = {
+        user_id: data.user_id,
         user_nickname: data.user_id?.slice(0, 8) || 'user',
         verse_ref: data.verse_ref,
         book: data.book,
         chapter: data.chapter,
         verse: data.verse,
         ministry_note: data.content || '',
-        commentary: '',
+        commentary: data.commentary || '',
+        tags: data.tags || [],
         created_at: data.created_at,
         updated_at: data.updated_at,
       };
@@ -77,6 +81,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      user_id,
       user_nickname,
       verse_ref,
       book,
@@ -84,6 +89,7 @@ export async function POST(request: NextRequest) {
       verse,
       ministry_note,
       commentary,
+      tags,
     } = body;
 
     if (!book || !chapter || !verse) {
@@ -99,11 +105,14 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('study_notes')
       .upsert({
+        user_id: user_id,
         verse_ref: verseRef,
         book,
         chapter,
         verse,
-        content: ministry_note || commentary || '',
+        content: ministry_note || '',
+        commentary: commentary || '',
+        tags: tags || [],
         is_private: true,
         updated_at: new Date().toISOString(),
       }, {
@@ -121,13 +130,15 @@ export async function POST(request: NextRequest) {
     }
 
     const noteData: NoteData = {
+      user_id: data.user_id,
       user_nickname: user_nickname || 'guest',
       verse_ref: data.verse_ref,
       book: data.book,
       chapter: data.chapter,
       verse: data.verse,
       ministry_note: data.content || '',
-      commentary: commentary || '',
+      commentary: data.commentary || '',
+      tags: data.tags || [],
       created_at: data.created_at,
       updated_at: data.updated_at,
     };
