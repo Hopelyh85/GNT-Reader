@@ -189,6 +189,10 @@ export function CommunityPanel({
   const [linkedPrayerDetails, setLinkedPrayerDetails] = useState<Record<string, Post>>({});
   const [loadingPrayerHistory, setLoadingPrayerHistory] = useState(false);
   
+  // Toggle states for input forms (Step 1 UX improvement)
+  const [showFreeInput, setShowFreeInput] = useState(false);
+  const [showPrayerInput, setShowPrayerInput] = useState(false);
+  
   // Desktop tab state (for backward compatibility)
   const [desktopTab, setDesktopTab] = useState<'scripture' | 'free' | 'prayer'>('scripture');
   
@@ -2161,6 +2165,17 @@ export function CommunityPanel({
                     <MessageSquare className="w-4 h-4 text-emerald-700" />
                     <h3 className="text-sm font-serif font-semibold text-emerald-800">자유 게시판</h3>
                     <span className="ml-auto text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{getFreeBoardPosts().length}</span>
+                    {/* [Step 1] New Post Toggle Button */}
+                    {canWrite && (
+                      <button
+                        onClick={() => setShowFreeInput(!showFreeInput)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                        title={showFreeInput ? '입력창 닫기' : '새 글 쓰기'}
+                      >
+                        <span>✍️</span>
+                        {showFreeInput ? '닫기' : '새 글 쓰기'}
+                      </button>
+                    )}
                     <button
                       onClick={() => setFullViewBoard('free')}
                       className="flex items-center gap-1 px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors"
@@ -2185,8 +2200,8 @@ export function CommunityPanel({
                   </p>
                 </div>
                 
-                {/* Write UI for Free Board */}
-                {canWrite && (
+                {/* Write UI for Free Board - [Step 1] Toggleable */}
+                {canWrite && showFreeInput && (
                   <div className="p-3 border-b border-stone-200 bg-stone-50">
                     <input
                       type="text"
@@ -2384,8 +2399,8 @@ export function CommunityPanel({
                     </div>
                   </div>
                 ) : (
-                  /* List View */
-                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  /* List View - [Step 1] Improved readability with larger spacing and fonts */
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {loadingPosts ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
@@ -2393,8 +2408,8 @@ export function CommunityPanel({
                     ) : getFreeBoardPosts().length === 0 ? (
                       <div className="text-center py-8 text-stone-400">
                         <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                        <p className="text-xs">자유 게시글이 없습니다.</p>
-                        {canWrite && <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>}
+                        <p className="text-sm">자유 게시글이 없습니다.</p>
+                        {canWrite && <p className="text-sm mt-1">첫 번째 글을 작성해보세요!</p>}
                       </div>
                     ) : (
                       getFreeBoardPosts().slice(0, 20).map(post => (
@@ -2417,6 +2432,17 @@ export function CommunityPanel({
                     <span className="text-lg">🙏</span>
                     <h3 className="text-sm font-serif font-semibold text-red-800">기도 게시판</h3>
                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{getPrayerPosts().length}</span>
+                    {/* [Step 1] New Prayer Toggle Button */}
+                    {canWrite && (
+                      <button
+                        onClick={() => setShowPrayerInput(!showPrayerInput)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        title={showPrayerInput ? '입력창 닫기' : '기도 요청하기'}
+                      >
+                        <span>🙏</span>
+                        {showPrayerInput ? '닫기' : '기도 요청하기'}
+                      </button>
+                    )}
                     <button
                       onClick={() => setFullViewBoard('prayer')}
                       className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
@@ -2441,8 +2467,8 @@ export function CommunityPanel({
                   </p>
                 </div>
                 
-                {/* Prayer Type Selection & Write UI - ENHANCED */}
-                {canWrite && (
+                {/* Prayer Type Selection & Write UI - ENHANCED - [Step 1] Toggleable */}
+                {canWrite && showPrayerInput && (
                   <div className="p-3 border-b border-stone-200 bg-stone-50">
                     {/* Prayer Type Selector */}
                     <div className="flex gap-1 mb-2">
@@ -2753,8 +2779,8 @@ export function CommunityPanel({
                     </div>
                   </div>
                 ) : (
-                  /* List View */
-                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  /* List View - [Step 1] Improved readability with larger spacing and fonts */
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {loadingPosts ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
@@ -2762,8 +2788,8 @@ export function CommunityPanel({
                     ) : getPrayerPosts().length === 0 ? (
                       <div className="text-center py-8 text-stone-400">
                         <Heart className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                        <p className="text-xs">기도 제목이 없습니다.</p>
-                        {canWrite && <p className="text-xs mt-1">첫 기도 제목을 올려보세요!</p>}
+                        <p className="text-sm">기도 제목이 없습니다.</p>
+                        {canWrite && <p className="text-sm mt-1">첫 기도 제목을 올려보세요!</p>}
                       </div>
                     ) : (
                       getPrayerPosts().slice(0, 20).map(post => {
@@ -2794,30 +2820,30 @@ export function CommunityPanel({
                           <div 
                             key={post.id}
                             onClick={() => setSelectedPrayerPost(post)}
-                            className={`p-2 rounded-lg border-2 ${colors.bg} ${colors.border} transition-shadow cursor-pointer hover:shadow-md`}
+                            className={`p-4 rounded-lg border-2 ${colors.bg} ${colors.border} transition-shadow cursor-pointer hover:shadow-md`}
                           >
-                            {/* Header Row */}
-                            <div className="flex items-center gap-1 mb-1">
-                              <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${colors.badge}`}>
-                                <Icon className="w-3 h-3" />
+                            {/* Header Row - [Step 1] Improved readability */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`text-sm px-2 py-1 rounded flex items-center gap-1 ${colors.badge}`}>
+                                <Icon className="w-4 h-4" />
                                 {pType === 'world' ? '세계' : pType === 'nation' ? '나라' : pType === 'church' ? '교회' : '개인'}
                               </span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${statusStyle.color}`}>
-                                <StatusIcon className="w-3 h-3" />
+                              <span className={`text-sm px-2 py-1 rounded flex items-center gap-1 ${statusStyle.color}`}>
+                                <StatusIcon className="w-4 h-4" />
                                 {statusStyle.label}
                               </span>
-                              <span className="ml-auto text-xs text-stone-400">{getDisplayName(post.profiles)}</span>
+                              <span className="ml-auto text-sm text-stone-500">{getDisplayName(post.profiles)}</span>
                             </div>
                             
-                            {/* Content */}
+                            {/* Content - [Step 1] Larger font */}
                             <div>
-                              <p className={`text-xs text-stone-700 ${expandedPostId === post.id ? '' : 'line-clamp-2'}`}>{post.content}</p>
+                              <p className={`text-sm text-stone-800 leading-relaxed ${expandedPostId === post.id ? '' : 'line-clamp-3'}`}>{post.content}</p>
                             </div>
                             
-                            {/* Urgent Badge */}
+                            {/* Urgent Badge - [Step 1] Enhanced styling */}
                             {(post as any).is_urgent && (
-                              <span className="inline-flex items-center gap-1 mt-1 text-xs text-red-600 font-medium">
-                                <AlertTriangle className="w-3 h-3" />
+                              <span className="inline-flex items-center gap-1 mt-2 text-sm text-red-700 font-bold bg-red-100 px-2 py-1 rounded-full">
+                                <AlertTriangle className="w-4 h-4" />
                                 긴급 기도
                               </span>
                             )}
