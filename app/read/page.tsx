@@ -91,9 +91,6 @@ function ReadContent() {
   const [isGeneral, setIsGeneral] = useState(false);
   // View mode: 'verse' for current verse, 'chapter' for whole chapter
   const [viewMode, setViewMode] = useState<'verse' | 'chapter'>('verse');
-  
-  // Detail view state for translations and commentary
-  const [selectedDetailPost, setSelectedDetailPost] = useState<any | null>(null);
 
   const bookInfo = books.find(b => b.id === selectedBook);
 
@@ -254,14 +251,11 @@ function ReadContent() {
     }
   };
 
-  // Handle verse click
+  // Handle verse click - navigate to new verse page
   const handleVerseClick = (verseNum: number) => {
-    setSelectedVerseNum(verseNum);
-    setViewMode('verse'); // Reset to verse view when clicking a verse
-    setShowCommunity(true);
-    loadCommunityData(verseNum, 'verse');
+    router.push(`/read/${selectedBook}/${selectedChapter}/${verseNum}`);
   };
-  
+
   // Handle view mode change
   const handleViewModeChange = (mode: 'verse' | 'chapter') => {
     setViewMode(mode);
@@ -334,12 +328,6 @@ function ReadContent() {
   const isAdmin = userRole === '관리자' || userRole === 'Admin';
   const verses = getVersesForChapter();
 
-  const handleNavigateToStudy = () => {
-    if (selectedDetailPost?.book && selectedDetailPost?.chapter && selectedDetailPost?.verse) {
-      const bookId = koreanToEnglishMap[selectedDetailPost.book] || 'Matt';
-      router.push(`/study?book=${bookId}&chapter=${selectedDetailPost.chapter}&verse=${selectedDetailPost.verse}`);
-    }
-  };
 
   const handleLogout = async () => {
     await signOut();
