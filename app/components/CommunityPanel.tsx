@@ -729,12 +729,23 @@ export function CommunityPanel({
       return;
     }
     
-    // Try chapter-level format "마태복음 1장 전체"
+    // Try chapter-level format "마태복음 1장 전체" or use post's verse property
     const chapterMatch = post.verse_ref.match(/^([가-힣A-Za-z0-9\s]+)\s+(\d+)장\s+전체$/);
     if (chapterMatch) {
       const [, bookName, chapter] = chapterMatch;
       const bookId = koreanToEnglishMap[bookName.trim()] || bookName.trim();
-      router.push(`/read/${bookId}/${chapter}/1`);
+      // Use post's verse property if available, otherwise default to 1
+      const verseNum = (post as any).verse || 1;
+      router.push(`/read/${bookId}/${chapter}/${verseNum}`);
+      return;
+    }
+    
+    // Fallback: try to get verse from post properties directly
+    if ((post as any).book_id && (post as any).chapter && (post as any).verse) {
+      const bookId = (post as any).book_id;
+      const chapter = (post as any).chapter;
+      const verse = (post as any).verse;
+      router.push(`/read/${bookId}/${chapter}/${verse}`);
     }
   };
 
