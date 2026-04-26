@@ -125,6 +125,9 @@ export function CommunityPanel({
   const [selectedPrayerPost, setSelectedPrayerPost] = useState<Post | null>(null);
   const [selectedScripturePost, setSelectedScripturePost] = useState<Post | null>(null);
   
+  // Full view mode for each board
+  const [fullViewBoard, setFullViewBoard] = useState<'scripture' | 'free' | 'prayer' | null>(null);
+  
   // Replies state
   const [replies, setReplies] = useState<Record<string, StudioReflection[]>>({});
   const [loadingReplies, setLoadingReplies] = useState<Record<string, boolean>>({});
@@ -1757,9 +1760,29 @@ export function CommunityPanel({
               )}
             </div>
             
-            {/* Desktop View (lg and above) - True 3-Column Grid Layout (or Single Column for onlyScripture) */}
-            <div className={`hidden lg:grid ${onlyScripture ? 'lg:grid-cols-1' : 'lg:grid-cols-3 lg:gap-4'} lg:h-[calc(100vh-280px)]`}>
-              {/* LEFT PANEL: Scripture Meditation Board */}
+            {/* Desktop View (lg and above) - True 3-Column Grid Layout (or Single Column for onlyScripture or fullViewBoard) */}
+            <div className={`hidden lg:grid ${(onlyScripture || fullViewBoard) ? 'lg:grid-cols-1' : 'lg:grid-cols-3 lg:gap-4'} lg:h-[calc(100vh-280px)]`}>
+              
+              {/* Full View Mode Back Button */}
+              {fullViewBoard && (
+                <div className="col-span-full px-4 py-3 bg-stone-100 border-b border-stone-200 flex items-center gap-2">
+                  <button
+                    onClick={() => setFullViewBoard(null)}
+                    className="flex items-center gap-1 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-200 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    전체 게시판 보기
+                  </button>
+                  <span className="text-sm text-stone-500">
+                    {fullViewBoard === 'scripture' && '말씀 묵상 게시판'}
+                    {fullViewBoard === 'free' && '자유 게시판'}
+                    {fullViewBoard === 'prayer' && '기도 게시판'}
+                  </span>
+                </div>
+              )}
+              
+              {/* LEFT PANEL: Scripture Meditation Board - Hidden in other boards' full view */}
+              {(!fullViewBoard || fullViewBoard === 'scripture') && (
               <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
                 {/* Panel Header */}
                 <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
@@ -1767,6 +1790,14 @@ export function CommunityPanel({
                     <BookOpen className="w-4 h-4 text-amber-700" />
                     <h3 className="text-sm font-serif font-semibold text-amber-800">말씀 묵상 게시판</h3>
                     <span className="ml-auto text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{getScripturePosts().length}</span>
+                    <button
+                      onClick={() => setFullViewBoard('scripture')}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors"
+                      title="크게 보기"
+                    >
+                      <span>🔎</span>
+                      크게 보기
+                    </button>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(window.location.origin + '/community#scripture');
@@ -1983,9 +2014,10 @@ export function CommunityPanel({
                   </div>
                 )}
               </div>
+              )}
 
-              {/* CENTER PANEL: Free Community Board - Hidden when onlyScripture */}
-              {!onlyScripture && (
+              {/* CENTER PANEL: Free Community Board - Hidden when onlyScripture or other boards' full view */}
+              {!onlyScripture && (!fullViewBoard || fullViewBoard === 'free') && (
               <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
                 {/* Panel Header */}
                 <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-200">
@@ -1993,6 +2025,14 @@ export function CommunityPanel({
                     <MessageSquare className="w-4 h-4 text-emerald-700" />
                     <h3 className="text-sm font-serif font-semibold text-emerald-800">자유 게시판</h3>
                     <span className="ml-auto text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{getFreeBoardPosts().length}</span>
+                    <button
+                      onClick={() => setFullViewBoard('free')}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors"
+                      title="크게 보기"
+                    >
+                      <span>🔎</span>
+                      크게 보기
+                    </button>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(window.location.origin + '/community#free');
@@ -2219,15 +2259,23 @@ export function CommunityPanel({
               </div>
               )}
 
-              {/* RIGHT PANEL: Prayer Board - Hidden when onlyScripture */}
-              {!onlyScripture && (
+              {/* RIGHT PANEL: Prayer Board - Hidden when onlyScripture or other boards' full view */}
+              {!onlyScripture && (!fullViewBoard || fullViewBoard === 'prayer') && (
               <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
                 {/* Panel Header */}
                 <div className="px-4 py-3 bg-red-50 border-b border-red-200">
                   <div className="flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-red-700" />
+                    <span className="text-lg">🙏</span>
                     <h3 className="text-sm font-serif font-semibold text-red-800">기도 게시판</h3>
                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{getPrayerPosts().length}</span>
+                    <button
+                      onClick={() => setFullViewBoard('prayer')}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                      title="크게 보기"
+                    >
+                      <span>🔎</span>
+                      크게 보기
+                    </button>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(window.location.origin + '/community#prayer');
@@ -2477,11 +2525,11 @@ export function CommunityPanel({
                               )}
                             </div>
                             
-                            {/* Replies Section - Intercessory Prayers */}
+                            {/* Replies Section - Prayer Comments */}
                             <div className="mt-6 pt-4 border-t border-stone-200">
                               <h4 className="font-bold text-stone-700 mb-4 flex items-center gap-2 text-lg">
-                                <Heart className="w-5 h-5 text-red-500" />
-                                중보 기도 ({(replies[post.id] || []).length})
+                                <span className="text-xl">🙏</span>
+                                기도합니다 ({(replies[post.id] || []).length})
                               </h4>
                               
                               {/* Reply Input */}
@@ -2491,7 +2539,7 @@ export function CommunityPanel({
                                     type="text"
                                     value={newReply[post.id] || ''}
                                     onChange={(e) => setNewReply({ ...newReply, [post.id]: e.target.value })}
-                                    placeholder="중보 기도를 남겨주세요..."
+                                    placeholder="댓글을 남겨주세요..."
                                     className="flex-1 px-4 py-3 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-200"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter' && (newReply[post.id] || '').trim()) {
@@ -2515,7 +2563,7 @@ export function CommunityPanel({
                                   <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
                                 </div>
                               ) : (replies[post.id] || []).length === 0 ? (
-                                <p className="text-sm text-stone-400 text-center py-6 bg-stone-50 rounded-lg">첫 중보 기도를 남겨보세요</p>
+                                <p className="text-sm text-stone-400 text-center py-6 bg-stone-50 rounded-lg">첫 댓글을 남겨주세요</p>
                               ) : (
                                 <div className="space-y-4">
                                   {(replies[post.id] || []).map((reply) => (
