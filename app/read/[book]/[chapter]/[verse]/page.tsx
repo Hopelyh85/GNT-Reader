@@ -121,7 +121,7 @@ function VersePageContent() {
   useEffect(() => {
     const loadBible = async () => {
       try {
-        const response = await fetch('/bible_krv.json');
+        const response = await fetch('/data/krv_bible.json');
         const data: BibleData = await response.json();
         const key = `${bookId}_${chapterNum}_${verseNum}`;
         setBibleText(data[key] || '성경 텍스트를 불러올 수 없습니다.');

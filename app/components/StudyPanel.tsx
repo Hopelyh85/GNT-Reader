@@ -260,7 +260,8 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           koreanBookName,
           selectedVerse.chapter,
           selectedVerse.verse,
-          ministryNote
+          ministryNote,
+          isChapterMode ? 'chapter_overview' : 'translation' // Different category for chapter mode
         );
       }
 
@@ -904,7 +905,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         <div className="border-t border-stone-200 pt-4 space-y-2">
           <label className="flex items-center gap-2 text-sm font-serif font-medium text-blue-700">
             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-            {isChapterMode ? '장 전체 묵상/번역' : '개인 번역 (Translation)'}
+            {isChapterMode ? '장별 개요 (Overview)' : '개인 번역 (Translation)'}
             {!canWrite && <span className="text-xs text-blue-600">(로그인 필요)</span>}
           </label>
           <textarea
@@ -913,7 +914,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
             disabled={!canWrite}
             placeholder={canWrite 
               ? isChapterMode 
-                ? "이 장 전체에 대한 묵상이나 번역을 작성해보세요..." 
+                ? "이 장의 주요 내용과 핵심 메시지를 정리해보세요..." 
                 : "성경 본문을 직접 번역해보세요..." 
               : "로그인 후 작성할 수 있습니다."}
             className="w-full h-32 p-3 text-sm leading-relaxed bg-blue-50/30 border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 placeholder:text-stone-400 disabled:bg-stone-100"

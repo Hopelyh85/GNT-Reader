@@ -264,8 +264,8 @@ export default function StudyPage() {
         </div>
       )}
 
-      {/* Main Content - 3 Column Grid Layout */}
-      <main className="flex-1 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
+      {/* Main Content - 2 Column Grid Layout (Simplified) */}
+      <main className="flex-1 grid grid-cols-1 md:grid-cols-2 overflow-hidden">
         {/* Left Panel - Bible Text */}
         <div className="h-full border-r border-stone-200 overflow-hidden">
           <BiblePanel
@@ -278,14 +278,23 @@ export default function StudyPage() {
             isLoggedIn={isLoggedIn}
             userName={userName}
             onFocusCommunity={(postId) => {
-              setActivePanel('community');
-              if (postId) setFocusPostId(postId);
+              router.push('/community');
             }}
           />
         </div>
 
-        {/* Center Panel - Study Notes (Desktop only) */}
-        <div className="hidden md:block h-full border-r border-stone-200 overflow-hidden">
+        {/* Right Panel - Study Notes */}
+        <div className="hidden md:block h-full overflow-hidden relative">
+          {/* Community Link Button */}
+          <div className="absolute top-3 right-3 z-10">
+            <button
+              onClick={() => router.push('/community')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-800 text-white text-xs rounded-lg hover:bg-stone-700 transition-colors shadow-md"
+            >
+              <span>💬</span>
+              커뮤니티 게시판
+            </button>
+          </div>
           <StudyPanel
             selectedVerse={selectedVerse}
             selectedWord={selectedWord}
@@ -309,47 +318,6 @@ export default function StudyPage() {
                 // Keep verse selected, just close the panel
               }}
             />
-          </div>
-        )}
-
-        {/* Right Panel - Community/Reflection (Desktop only) */}
-        <div className="hidden md:block h-full overflow-hidden">
-          <CommunityPanel
-            selectedVerse={selectedVerse}
-            isLoggedIn={isLoggedIn}
-            userRole={userRole}
-            userName={userName}
-            initialPostId={focusPostId || initialPostId}
-            currentPath="/study"
-            onNavigateToVerse={handleNavigateToVerse}
-          />
-        </div>
-
-        {/* Mobile Community Panel Overlay */}
-        {activePanel === 'community' && (
-          <div className="md:hidden fixed inset-0 z-50 bg-white flex flex-col">
-            {/* Mobile Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50">
-              <h2 className="text-lg font-semibold text-stone-800">커뮤니티 게시판</h2>
-              <button
-                onClick={() => setActivePanel('bible')}
-                className="p-2 hover:bg-stone-200 rounded-full transition-colors"
-              >
-                <span className="text-2xl">×</span>
-              </button>
-            </div>
-            {/* Mobile Community Content */}
-            <div className="flex-1 overflow-hidden">
-              <CommunityPanel
-                selectedVerse={selectedVerse}
-                isLoggedIn={isLoggedIn}
-                userRole={userRole}
-                userName={userName}
-                initialPostId={focusPostId || initialPostId}
-                currentPath="/study"
-                onNavigateToVerse={handleNavigateToVerse}
-              />
-            </div>
           </div>
         )}
       </main>

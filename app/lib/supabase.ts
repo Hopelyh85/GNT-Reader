@@ -725,7 +725,8 @@ export async function saveTranslation(
   book: string,
   chapter: number,
   verse: number,
-  content: string
+  content: string,
+  category: 'translation' | 'chapter_overview' | 'ministry' | 'commentary' | 'reflection' = 'translation'
 ): Promise<void> {
   const supabase = getSupabase();
   const user = await getCurrentUser();
@@ -737,7 +738,7 @@ export async function saveTranslation(
     .select('id')
     .eq('user_id', user.id)
     .eq('verse_ref', verseRef)
-    .eq('category', 'translation')
+    .eq('category', category)
     .maybeSingle();
   
   if (existing) {
@@ -757,7 +758,7 @@ export async function saveTranslation(
       verse,
       content,
       is_public: true,
-      category: 'translation',
+      category: category,
       is_admin_approved: true,
     });
     if (error) throw error;
