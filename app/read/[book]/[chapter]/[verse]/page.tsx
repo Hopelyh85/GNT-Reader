@@ -4,16 +4,15 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { 
   ArrowLeft, Heart, MessageSquare, Loader2, Send,
-  User, Crown, Sparkles, ChevronDown, ChevronUp,
-  Share2, Bookmark
+  Crown, Sparkles, Share2, BookOpen
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { 
-  getSupabase, getMyProfile, Profile, bookNameMap, bookNameMapReverse,
+  getSupabase, getMyProfile, Profile,
   addReply, getReplies, addLike, removeLike, hasUserLiked, getLikesCount
 } from '@/app/lib/supabase';
 
-// Books array
+// Books array with English ID to Korean name mapping
 const books = [
   { id: 'Matt', name: '마태복음' }, { id: 'Mark', name: '마가복음' },
   { id: 'Luke', name: '누가복음' }, { id: 'John', name: '요한복음' },
@@ -30,6 +29,17 @@ const books = [
   { id: '3John', name: '요한삼서' }, { id: 'Jude', name: '유다서' },
   { id: 'Rev', name: '요한계시록' },
 ];
+
+// English ID to Korean book name
+const englishToKoreanMap: Record<string, string> = {
+  'Matt': '마태복음', 'Mark': '마가복음', 'Luke': '누가복음', 'John': '요한복음',
+  'Acts': '사도행전', 'Rom': '로마서', '1Cor': '고린도전서', '2Cor': '고린도후서',
+  'Gal': '갈라디아서', 'Eph': '에베소서', 'Phil': '빌립보서', 'Col': '골로새서',
+  '1Thess': '데살로니가전서', '2Thess': '데살로니가후서', '1Tim': '디모데전서', '2Tim': '디모데후서',
+  'Titus': '디도서', 'Phlm': '빌레몬서', 'Heb': '히브리서', 'Jas': '야고보서',
+  '1Pet': '베드로전서', '2Pet': '베드로후서', '1John': '요한일서', '2John': '요한이서',
+  '3John': '요한삼서', 'Jude': '유다서', 'Rev': '요한계시록',
+};
 
 interface BibleData {
   [key: string]: string;
@@ -62,6 +72,14 @@ interface Reply {
   };
 }
 
+interface OfficialNote {
+  id: string;
+  content: string;
+  profiles: {
+    display_name: string;
+  };
+}
+
 function VersePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -77,6 +95,7 @@ function VersePageContent() {
   const [bibleText, setBibleText] = useState('');
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [officialNote, setOfficialNote] = useState<OfficialNote | null>(null);
   const [newComment, setNewComment] = useState('');
   const [isTranslation, setIsTranslation] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -87,8 +106,9 @@ function VersePageContent() {
   
   const commentRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   
-  const book = books.find(b => b.id.toLowerCase() === bookId.toLowerCase());
-  const verseRef = `${book?.name} ${chapterNum}:${verseNum}`;
+  // Get Korean book name from English ID
+  const bookName = englishToKoreanMap[bookId] || bookId;
+  const verseRef = `${bookName} ${chapterNum}:${verseNum}`;
   
   // Load profile
   useEffect(() => {
@@ -110,6 +130,41 @@ function VersePageContent() {
       }
     };
     loadBible();
+  }, [bookId, chapterNum, verseNum]);
+  
+  // Load official admin commentary
+  useEffect(() => {
+    const loadOfficialNote = async () => {
+      try {
+        const supabase = getSupabase();
+        const { data: notes, error } = await supabase
+          .from('study_notes')
+          .select(`
+            id, content,
+            profiles(display_name)
+          `)
+          .eq('book_id', bookId)
+          .eq('chapter', chapterNum)
+          .eq('verse', verseNum)
+          .limit(1);
+        
+        if (!error && notes && notes.length > 0) {
+          const note = notes[0];
+          setOfficialNote({
+            id: note.id,
+            content: note.content,
+            profiles: {
+              display_name: Array.isArray(note.profiles) 
+                ? note.profiles[0]?.display_name || '관리자'
+                : (note.profiles as any)?.display_name || '관리자'
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error loading official note:', err);
+      }
+    };
+    loadOfficialNote();
   }, [bookId, chapterNum, verseNum]);
   
   // Load comments (translations and reflections)
@@ -238,7 +293,7 @@ function VersePageContent() {
       setExpandedReplies(prev => new Set(prev).add(commentId));
     } catch (err) {
       console.error('Error saving reply:', err);
-      alert('대댓글 저장 중 오류가 발생했습니다.');
+      alert('답글 저장 중 오류가 발생했습니다.');
     } finally {
       setSavingReply(prev => ({ ...prev, [commentId]: false }));
     }
@@ -277,10 +332,6 @@ function VersePageContent() {
     navigator.clipboard.writeText(url);
     alert('링크가 복사되었습니다.');
   };
-  
-  if (!book) {
-    return <div className="p-8 text-center">잘못된 성경 참조입니다.</div>;
-  }
   
   return (
     <div className="min-h-screen bg-stone-50">
@@ -329,10 +380,25 @@ function VersePageContent() {
             </h1>
             
             <p className="text-sm text-stone-500">
-              개역한글 (KRV)
+              개역개정 (KRV)
             </p>
           </div>
         </div>
+        
+        {/* Official Admin Commentary */}
+        {officialNote && (
+          <div className="bg-purple-50 border-b border-purple-100">
+            <div className="px-6 py-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Crown className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium text-purple-800">소장님의 해설</span>
+              </div>
+              <p className="text-stone-800 leading-relaxed whitespace-pre-wrap">
+                {officialNote.content}
+              </p>
+            </div>
+          </div>
+        )}
         
         {/* Comments Section */}
         <div className="bg-stone-50 min-h-screen">
@@ -411,28 +477,23 @@ function VersePageContent() {
                     highlightedId === comment.id 
                       ? 'bg-amber-100 ring-2 ring-amber-300' 
                       : comment.is_translation 
-                        ? 'bg-emerald-50/50' 
+                        ? 'bg-emerald-50/30' 
                         : 'bg-white'
                   }`}
                 >
                   <div className="p-4">
-                    {/* Comment Header */}
+                    {/* Comment Header - Simple: Name, Date, Badge */}
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="flex items-center gap-1.5">
-                        {comment.is_official && <Crown className="w-3.5 h-3.5 text-amber-600" />}
-                        {comment.is_translation && <Sparkles className="w-3.5 h-3.5 text-emerald-600" />}
-                        <span className="font-medium text-sm text-stone-800">
-                          {comment.profiles?.display_name || '익명'}
-                        </span>
-                        {comment.profiles?.tier === '관리자' && (
-                          <span className="text-xs text-amber-600">✓</span>
-                        )}
-                      </div>
+                      {comment.is_official && <Crown className="w-3.5 h-3.5 text-amber-600" />}
+                      {comment.is_translation && <Sparkles className="w-3.5 h-3.5 text-emerald-600" />}
+                      <span className="font-medium text-sm text-stone-800">
+                        {comment.profiles?.display_name || '익명'}
+                      </span>
                       <span className="text-xs text-stone-400">·</span>
                       <span className="text-xs text-stone-400">{formatTime(comment.created_at)}</span>
                       {comment.is_translation && (
                         <span className="ml-auto text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
-                          개인 번역
+                          번역
                         </span>
                       )}
                     </div>
@@ -442,7 +503,7 @@ function VersePageContent() {
                       {comment.content}
                     </p>
                     
-                    {/* Comment Actions */}
+                    {/* Comment Actions - Only Two Buttons */}
                     <div className="flex items-center gap-4">
                       <button
                         onClick={() => handleToggleLike(comment.id, comment.userHasLiked)}
@@ -464,7 +525,7 @@ function VersePageContent() {
                         className="flex items-center gap-1 text-sm text-stone-500 hover:text-stone-700 transition-colors"
                       >
                         <MessageSquare className="w-4 h-4" />
-                        <span className="text-xs">대댓글</span>
+                        <span className="text-xs">답글 달기</span>
                         {comment.replies.length > 0 && (
                           <span className="text-xs font-medium">{comment.replies.length}</span>
                         )}
@@ -484,9 +545,9 @@ function VersePageContent() {
                     <div className="px-4 pb-4 bg-stone-100/50">
                       {/* Reply List */}
                       {comment.replies.length > 0 && (
-                        <div className="space-y-3 mb-3">
+                        <div className="space-y-3 mb-3 pl-2 border-l-2 border-stone-200">
                           {comment.replies.map((reply) => (
-                            <div key={reply.id} className="flex gap-3 p-3 bg-white rounded-lg">
+                            <div key={reply.id} className="flex gap-3 p-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="text-xs font-medium text-stone-700">
@@ -505,12 +566,12 @@ function VersePageContent() {
                       
                       {/* Reply Input */}
                       {user && (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 pl-2">
                           <input
                             type="text"
                             value={replyInputs[comment.id] || ''}
                             onChange={(e) => setReplyInputs(prev => ({ ...prev, [comment.id]: e.target.value }))}
-                            placeholder="대댓글을 입력하세요..."
+                            placeholder="답글을 입력하세요..."
                             className="flex-1 px-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && replyInputs[comment.id]?.trim()) {
