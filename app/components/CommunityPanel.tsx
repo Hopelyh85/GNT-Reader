@@ -878,15 +878,15 @@ export function CommunityPanel({
     }
   };
 
-  // Absolute time format: YYYY. MM. DD. HH:mm
+  // Standard timestamp format: YYYY. MM. DD. HH:mm
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}. ${month}. ${day}. ${hours}:${minutes}`;
+    return new Date(dateString).toLocaleString('ko-KR', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   };
 
   // Get display name from profile with new format: [교회] [직분] 닉네임
@@ -1548,7 +1548,7 @@ export function CommunityPanel({
                   {/* 작성일 */}
                   <td className="px-3 py-3 text-center">
                     <span className="text-xs text-stone-500">
-                      {new Date(post.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                      {formatTime(post.created_at)}
                     </span>
                   </td>
                   
@@ -1682,7 +1682,7 @@ export function CommunityPanel({
                   {notice.content}
                 </div>
                 <p className="text-xs text-stone-400 mt-2">
-                  업데이트: {new Date(notice.updated_at).toLocaleDateString('ko-KR')}
+                  업데이트: {formatTime(notice.updated_at)}
                 </p>
               </div>
             </div>
@@ -1760,7 +1760,7 @@ export function CommunityPanel({
               <div key={note.id} className="bg-white rounded-lg border border-purple-200 p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-medium text-purple-700">{getDisplayName(note.profiles)}</span>
-                  <span className="text-xs text-stone-400">· {new Date(note.created_at).toLocaleDateString('ko-KR')}</span>
+                  <span className="text-xs text-stone-400">· {formatTime(note.created_at)}</span>
                 </div>
                 <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{note.content}</p>
               </div>
@@ -2421,7 +2421,7 @@ export function CommunityPanel({
                                 linkedPrayerId === prayer.id ? 'bg-amber-50 text-amber-700' : 'text-stone-600'
                               }`}
                             >
-                              <span className="text-stone-400">{new Date(prayer.created_at).toLocaleDateString('ko-KR')}</span>
+                              <span className="text-stone-400">{formatTime(prayer.created_at)}</span>
                               {' · '}
                               <span className="line-clamp-1">{prayer.content?.substring(0, 40)}...</span>
                             </button>
@@ -2656,7 +2656,7 @@ export function CommunityPanel({
                                       <div className="flex items-center gap-2 mb-2">
                                         <span className="font-medium text-stone-700">{getDisplayName(reply.profiles)}</span>
                                         <span className="text-xs text-stone-400">
-                                          {new Date(reply.created_at).toLocaleDateString('ko-KR')}
+                                          {formatTime(reply.created_at)}
                                         </span>
                                       </div>
                                       <p className="text-stone-800 whitespace-pre-wrap">{reply.content}</p>

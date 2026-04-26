@@ -298,7 +298,7 @@ function HomeContent() {
                             {prayer.title || prayer.content.substring(0, 60) + '...'}
                           </p>
                           <p className="text-xs text-stone-400 mt-0.5">
-                            {prayer.profiles?.nickname || '익명'} · {new Date(prayer.created_at).toLocaleDateString('ko-KR')}
+                            {prayer.profiles?.nickname || '익명'} · {new Date(prayer.created_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </li>
