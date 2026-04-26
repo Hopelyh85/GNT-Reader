@@ -2446,6 +2446,19 @@ export function CommunityPanel({
                             
                             {/* Author Actions */}
                             <div className="mt-4 pt-3 border-t border-stone-200 flex gap-2">
+                              {/* Like Button */}
+                              <button
+                                onClick={() => handleToggleLike(post.id, !!(post as any).userHasLiked)}
+                                className={`flex items-center gap-1 px-3 py-2 text-sm rounded transition-colors ${
+                                  (post as any).userHasLiked 
+                                    ? 'bg-red-50 text-red-600 hover:bg-red-100' 
+                                    : 'text-stone-600 hover:bg-stone-100'
+                                }`}
+                              >
+                                <Heart className={`w-4 h-4 ${(post as any).userHasLiked ? 'fill-current' : ''}`} />
+                                공감 {(post as any).likesCount || 0}
+                              </button>
+                              
                               <button
                                 onClick={() => handleShare(post.id)}
                                 className="flex items-center gap-1 px-3 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded"
@@ -2453,6 +2466,7 @@ export function CommunityPanel({
                                 <Link2 className="w-4 h-4" />
                                 링크 복사
                               </button>
+                              
                               {isAuthor && (
                                 <button
                                   onClick={() => openPrayerStatusModal(post.id, status)}
