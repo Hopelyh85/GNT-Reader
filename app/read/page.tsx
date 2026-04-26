@@ -562,27 +562,11 @@ function ReadContent() {
           <div className="w-70">
             <div className="bg-white rounded-xl border border-stone-200 p-4">
               <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 rounded-lg text-sm text-stone-600 hover:bg-stone-200 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    로그아웃
-                  </button>
-                </div>
-              ) : (
-                <a
-                  href="/login"
-                  className="flex items-center gap-2 px-3 py-1.5 bg-stone-800 text-white rounded-lg text-sm hover:bg-stone-700 transition-colors"
-                >
-                  <LogIn className="w-4 h-4" />
-                  로그인
-                </a>
-              )}
-            </div>
-          </header>
-
-          {/* Mobile Menu */}
-          {mobileMenuOpen && (
+                onClick={() => setShowRightPanel(false)}
+                className="lg:hidden absolute top-2 right-2 p-2 text-stone-400 hover:text-stone-600"
+              >
+                <X size={20} />
+              </button>
             <div className="md:hidden bg-white border-b border-stone-200 px-4 py-3 space-y-3">
               {/* Mobile Book/Chapter Selector */}
               <div className="flex gap-2">
