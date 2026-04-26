@@ -188,6 +188,9 @@ export function CommunityPanel({
   // Desktop tab state (for backward compatibility)
   const [desktopTab, setDesktopTab] = useState<'free' | 'prayer'>('free');
   
+  // Mobile board tab state
+  const [mobileBoardTab, setMobileBoardTab] = useState<'free' | 'prayer'>('free');
+  
   
   const getFreeBoardPosts = () => {
     // Simplified: Only show posts with category 'general' (free board posts)
@@ -622,19 +625,29 @@ export function CommunityPanel({
     }
   };
 
-  // Toggle like
+  // Toggle like with optimistic update
   const handleToggleLike = async (postId: string, currentLiked: boolean) => {
     if (!isLoggedIn) {
       alert('로그인 후 좋아요를 누를 수 있습니다.');
       return;
     }
+    
+    // Optimistic update - update UI immediately
+    const optimisticCount = currentLiked ? (posts.find(p => p.id === postId)?.likesCount || 1) - 1 : (posts.find(p => p.id === postId)?.likesCount || 0) + 1;
+    setPosts(prev => prev.map(p => 
+      p.id === postId ? { ...p, likesCount: optimisticCount, userHasLiked: !currentLiked } : p
+    ));
+    setPinnedPosts(prev => prev.map(p => 
+      p.id === postId ? { ...p, likesCount: optimisticCount, userHasLiked: !currentLiked } : p
+    ));
+    
     try {
       if (currentLiked) {
         await removeLike(postId);
       } else {
         await addLike(postId);
       }
-      // Update local state
+      // Verify with server after API call
       const newCount = await getLikesCount(postId);
       setPosts(prev => prev.map(p => 
         p.id === postId ? { ...p, likesCount: newCount, userHasLiked: !currentLiked } : p
@@ -644,6 +657,14 @@ export function CommunityPanel({
       ));
     } catch (err: any) {
       console.error('Error toggling like:', err?.message);
+      // Rollback on error
+      const rollbackCount = currentLiked ? (posts.find(p => p.id === postId)?.likesCount || 0) + 1 : (posts.find(p => p.id === postId)?.likesCount || 1) - 1;
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, likesCount: rollbackCount, userHasLiked: currentLiked } : p
+      ));
+      setPinnedPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, likesCount: rollbackCount, userHasLiked: currentLiked } : p
+      ));
     }
   };
 
@@ -1750,46 +1771,193 @@ export function CommunityPanel({
         {/* Feed View */}
         {viewMode === 'feed' && (
           <div className="p-3 space-y-3">
-            {/* Mobile View (sm, md) - Single column with existing tabs */}
+            {/* Mobile View (sm, md) - Board Tabs + Content */}
             <div className="lg:hidden">
+              {/* Mobile Board Tabs */}
               <div className="flex items-center gap-2 px-1 mb-3">
-                <Users className="w-3 h-3 text-stone-500" />
-                <span className="text-xs font-medium text-stone-600">
-                  {hashtagFilter ? '필터링된 게시글' : '전체 게시글'}
-                </span>
+                <button
+                  onClick={() => setMobileBoardTab('free')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    mobileBoardTab === 'free'
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  자유 게시판
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${mobileBoardTab === 'free' ? 'bg-emerald-200 text-emerald-800' : 'bg-stone-200 text-stone-600'}`}>
+                    {getFreeBoardPosts().length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setMobileBoardTab('prayer')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    mobileBoardTab === 'prayer'
+                      ? 'bg-red-100 text-red-700 border border-red-200'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  <span className="text-sm">🙏</span>
+                  기도 게시판
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${mobileBoardTab === 'prayer' ? 'bg-red-200 text-red-800' : 'bg-stone-200 text-stone-600'}`}>
+                    {getPrayerPosts().length}
+                  </span>
+                </button>
               </div>
               
-              {loadingPosts && posts.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
-                </div>
-              ) : getFilteredPosts().length === 0 ? (
-                <div className="text-center py-8 text-stone-400">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">{hashtagFilter ? '해당 태그의 게시글이 없습니다.' : '아직 게시글이 없습니다.'}</p>
-                  {!hashtagFilter && <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>}
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {getFilteredPosts().map(post => renderPost(post))}
-                  </div>
-                  
-                  {/* Load More */}
-                  {!hashtagFilter && hasMore && (
+              {/* Mobile Free Board Content */}
+              {mobileBoardTab === 'free' && (
+                <div className="space-y-3">
+                  {canWrite && (
                     <button
-                      onClick={handleLoadMore}
-                      disabled={loadingPosts}
-                      className="w-full py-2 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+                      onClick={() => setShowFreeInput(!showFreeInput)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
                     >
-                      {loadingPosts ? (
-                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                      ) : (
-                        '더 보기'
-                      )}
+                      <span>✍️</span>
+                      {showFreeInput ? '입력창 닫기' : '새 글 쓰기'}
                     </button>
                   )}
-                </>
+                  {canWrite && showFreeInput && (
+                    <div className="p-3 border border-stone-200 rounded-lg bg-stone-50">
+                      <input
+                        type="text"
+                        value={freeTitle}
+                        onChange={(e) => setFreeTitle(e.target.value)}
+                        placeholder="제목을 입력하세요"
+                        className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <textarea
+                        value={freeContent}
+                        onChange={(e) => setFreeContent(e.target.value)}
+                        placeholder="내용을 입력하세요..."
+                        className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg mb-2 h-20 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => handleSavePost('free')}
+                          disabled={saving || !freeTitle.trim() || !freeContent.trim()}
+                          className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : '등록'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {loadingPosts && posts.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                    </div>
+                  ) : getFreeBoardPosts().length === 0 ? (
+                    <div className="text-center py-8 text-stone-400">
+                      <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">아직 게시글이 없습니다.</p>
+                      <p className="text-xs mt-1">첫 번째 글을 작성해보세요!</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3">
+                        {getFreeBoardPosts().map(post => renderPost(post))}
+                      </div>
+                      {hasMore && (
+                        <button
+                          onClick={handleLoadMore}
+                          disabled={loadingPosts}
+                          className="w-full py-2 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+                        >
+                          {loadingPosts ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '더 보기'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+              
+              {/* Mobile Prayer Board Content */}
+              {mobileBoardTab === 'prayer' && (
+                <div className="space-y-3">
+                  {canWrite && (
+                    <button
+                      onClick={() => setShowPrayerInput(!showPrayerInput)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <span>🙏</span>
+                      {showPrayerInput ? '입력창 닫기' : '기도 요청하기'}
+                    </button>
+                  )}
+                  {canWrite && showPrayerInput && (
+                    <div className="p-3 border border-stone-200 rounded-lg bg-stone-50 space-y-2">
+                      <div className="flex gap-1">
+                        {[
+                          { type: 'personal', label: '개인', icon: '👤' },
+                          { type: 'church', label: '교회', icon: '⛪' },
+                          { type: 'nation', label: '나라', icon: '🏛️' },
+                          { type: 'world', label: '세계', icon: '🌍' },
+                        ].map((t) => (
+                          <button
+                            key={t.type}
+                            onClick={() => setPrayerType(t.type as any)}
+                            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs rounded transition-colors ${
+                              prayerType === t.type
+                                ? 'bg-red-100 text-red-700 border border-red-200'
+                                : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50'
+                            }`}
+                          >
+                            <span>{t.icon}</span>
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={prayerTitle}
+                        onChange={(e) => setPrayerTitle(e.target.value)}
+                        placeholder="기도 제목을 입력하세요"
+                        className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                      <textarea
+                        value={prayerContent}
+                        onChange={(e) => setPrayerContent(e.target.value)}
+                        placeholder="기도 내용을 입력하세요..."
+                        className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg h-20 resize-none focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => handleSavePost('prayer')}
+                          disabled={saving || !prayerTitle.trim()}
+                          className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : '기도 요청'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {loadingPosts && posts.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                    </div>
+                  ) : getPrayerPosts().length === 0 ? (
+                    <div className="text-center py-8 text-stone-400">
+                      <span className="text-3xl block mb-2">🙏</span>
+                      <p className="text-sm">아직 기도 제목이 없습니다.</p>
+                      <p className="text-xs mt-1">함께 기도할 제목을 나눠주세요!</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3">
+                        {getPrayerPosts().map(post => renderPost(post))}
+                      </div>
+                      {hasMore && (
+                        <button
+                          onClick={handleLoadMore}
+                          disabled={loadingPosts}
+                          className="w-full py-2 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+                        >
+                          {loadingPosts ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '더 보기'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               )}
             </div>
             
@@ -1835,12 +2003,16 @@ export function CommunityPanel({
                       </button>
                     )}
                     <button
-                      onClick={() => setFullViewBoard('free')}
-                      className="flex items-center gap-1 px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors"
-                      title="크게 보기"
+                      onClick={() => setFullViewBoard(fullViewBoard === 'free' ? null : 'free')}
+                      className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
+                        fullViewBoard === 'free'
+                          ? 'bg-stone-200 text-stone-700 hover:bg-stone-300'
+                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                      }`}
+                      title={fullViewBoard === 'free' ? '작게 보기 (원래대로)' : '크게 보기'}
                     >
-                      <span>🔎</span>
-                      크게 보기
+                      <span>{fullViewBoard === 'free' ? '↙️' : '🔎'}</span>
+                      {fullViewBoard === 'free' ? '작게 보기' : '크게 보기'}
                     </button>
                     <button
                       onClick={() => {
@@ -2102,12 +2274,16 @@ export function CommunityPanel({
                       </button>
                     )}
                     <button
-                      onClick={() => setFullViewBoard('prayer')}
-                      className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-                      title="크게 보기"
+                      onClick={() => setFullViewBoard(fullViewBoard === 'prayer' ? null : 'prayer')}
+                      className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
+                        fullViewBoard === 'prayer'
+                          ? 'bg-stone-200 text-stone-700 hover:bg-stone-300'
+                          : 'bg-red-100 text-red-700 hover:bg-red-200'
+                      }`}
+                      title={fullViewBoard === 'prayer' ? '작게 보기 (원래대로)' : '크게 보기'}
                     >
-                      <span>🔎</span>
-                      크게 보기
+                      <span>{fullViewBoard === 'prayer' ? '↙️' : '🔎'}</span>
+                      {fullViewBoard === 'prayer' ? '작게 보기' : '크게 보기'}
                     </button>
                     <button
                       onClick={() => {
