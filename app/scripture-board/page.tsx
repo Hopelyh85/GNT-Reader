@@ -9,7 +9,7 @@ import {
 import { useAuth } from '@/app/components/AuthProvider';
 import { 
   bookNameMapReverse, getSupabase, getMyProfile, signOut,
-  getPublicReflections, addLike, removeLike, hasUserLiked, getLikesCount
+  getPublicReflections, addLike, removeLike, hasUserLiked, getLikesCount, togglePinPost
 } from '@/app/lib/supabase';
 
 // Book list for sorting/display
@@ -63,6 +63,7 @@ interface ScripturePost {
   };
   likes?: number;
   liked?: boolean;
+  is_pinned?: boolean;
 }
 
 function ScriptureBoardContent() {
@@ -77,8 +78,8 @@ function ScriptureBoardContent() {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   
-  // Filters and sort
-  const [scriptureSort, setScriptureSort] = useState<'bible' | 'newest' | 'oldest'>('newest');
+  // Filters and sort - updated with 4 options: 책별(신약순), 가나다순, 최신순, 과거순
+  const [scriptureSort, setScriptureSort] = useState<'bible' | 'alphabetical' | 'newest' | 'oldest'>('newest');
   const [bookFilter, setBookFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   
@@ -153,20 +154,57 @@ function ScriptureBoardContent() {
       );
     }
     
-    // Sort
+    // Sort with 4 options: 책별(신약순), 가나다순, 최신순, 과거순
     return filtered.sort((a, b) => {
       if (scriptureSort === 'newest') {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       } else if (scriptureSort === 'oldest') {
         return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (scriptureSort === 'alphabetical') {
+        // 가나다 순: sort by Korean book name
+        const bookA = a.book || '';
+        const bookB = b.book || '';
+        return bookA.localeCompare(bookB, 'ko-KR');
       } else if (scriptureSort === 'bible') {
-        // Bible order: sort by verse_ref
-        return (a.verse_ref || '').localeCompare(b.verse_ref || '', 'ko-KR');
+        // 책별 (신약순): use books array index for ordering
+        const bookOrder = books.map(b => b.name);
+        const indexA = bookOrder.indexOf(a.book || '');
+        const indexB = bookOrder.indexOf(b.book || '');
+        if (indexA !== -1 && indexB !== -1) {
+          // Both found in book order, compare by index
+          if (indexA !== indexB) return indexA - indexB;
+          // Same book, compare by chapter then verse
+          if (a.chapter !== b.chapter) return (a.chapter || 0) - (b.chapter || 0);
+          return (a.verse || 0) - (b.verse || 0);
+        }
+        // Fallback to alphabetical if book not found
+        return (a.book || '').localeCompare(b.book || '', 'ko-KR');
       }
       return 0;
     });
   };
   
+  // Check if user is admin
+  const isAdmin = user?.user_metadata?.tier === 'ADMIN' || user?.email?.includes('admin');
+
+  // Handle pin toggle (admin only)
+  const handleTogglePin = async (postId: string, currentlyPinned: boolean) => {
+    if (!isAdmin) {
+      alert('관리자만 핀을 설정할 수 있습니다.');
+      return;
+    }
+    try {
+      await togglePinPost(postId, !currentlyPinned);
+      // Update local state
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, is_pinned: !currentlyPinned } : p
+      ));
+    } catch (err) {
+      console.error('Error toggling pin:', err);
+      alert('핀 설정 중 오류가 발생했습니다.');
+    }
+  };
+
   // Handle like toggle
   const handleToggleLike = async (postId: string, currentlyLiked: boolean) => {
     if (!isLoggedIn) {
@@ -260,10 +298,10 @@ function ScriptureBoardContent() {
             </div>
             <div>
               <h1 className="text-lg font-serif font-bold text-stone-800">
-                말씀 묵상 연구소
+                묵상 데이터 저장 공간
               </h1>
               <p className="text-xs text-stone-500 hidden sm:block">
-                성경 구절 중심의 깊은 묵상과 나눔
+                나눔 자료들만 올라와요
               </p>
             </div>
           </div>
@@ -363,7 +401,17 @@ function ScriptureBoardContent() {
                       : 'bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-200'
                   }`}
                 >
-                  성경 순서
+                  책별 (신약순)
+                </button>
+                <button
+                  onClick={() => setScriptureSort('alphabetical')}
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                    scriptureSort === 'alphabetical'
+                      ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                      : 'bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-200'
+                  }`}
+                >
+                  가나다 순
                 </button>
                 <button
                   onClick={() => setScriptureSort('newest')}
@@ -476,13 +524,24 @@ function ScriptureBoardContent() {
                     return (
                       <tr 
                         key={post.id}
-                        className="hover:bg-stone-50 transition-colors cursor-pointer"
+                        className={`transition-colors cursor-pointer ${
+                          post.is_pinned 
+                            ? 'bg-amber-50 hover:bg-amber-100 border-l-4 border-amber-400' 
+                            : 'hover:bg-stone-50'
+                        }`}
                         onClick={() => navigateToVerse(post)}
                       >
                         <td className="px-4 py-4">
-                          <span className="font-serif font-semibold text-amber-700">
-                            {post.verse_ref}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-serif font-semibold text-amber-700">
+                              {post.verse_ref}
+                            </span>
+                            {post.is_pinned && (
+                              <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-medium">
+                                📌 핀
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4">
                           <span className={`text-xs px-2 py-1 rounded-full ${catStyle.color}`}>
@@ -499,17 +558,33 @@ function ScriptureBoardContent() {
                           <span className="text-sm text-stone-400">{formatDate(post.created_at)}</span>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleToggleLike(post.id, post.liked || false); }}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                              post.liked 
-                                ? 'bg-red-100 text-red-600' 
-                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                            }`}
-                          >
-                            <Heart className="w-3 h-3" />
-                            {post.likes || 0}
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            {/* Pin Button - Admin Only */}
+                            {isAdmin && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleTogglePin(post.id, post.is_pinned || false); }}
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                  post.is_pinned 
+                                    ? 'bg-amber-200 text-amber-800' 
+                                    : 'bg-stone-100 text-stone-400 hover:bg-amber-100 hover:text-amber-600'
+                                }`}
+                                title={post.is_pinned ? '핀 해제' : '핀 설정'}
+                              >
+                                <span className="text-xs">📌</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleToggleLike(post.id, post.liked || false); }}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                post.liked 
+                                  ? 'bg-red-100 text-red-600' 
+                                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                              }`}
+                            >
+                              <Heart className="w-3 h-3" />
+                              {post.likes || 0}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

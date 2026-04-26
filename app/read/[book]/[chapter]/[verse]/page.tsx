@@ -175,13 +175,17 @@ function VersePageContent() {
         const supabase = getSupabase();
         
         // Get reflections (translations and meditations)
+        // Filter by book, chapter, verse for exact matching
         const { data: reflections, error } = await supabase
           .from('reflections')
           .select(`
             id, user_id, verse_ref, content, created_at, is_translation, is_official,
+            book, chapter, verse,
             profiles(display_name, tier)
           `)
-          .ilike('verse_ref', verseRef)
+          .eq('book', bookName)
+          .eq('chapter', chapterNum)
+          .eq('verse', verseNum)
           .order('created_at', { ascending: true });
         
         if (error) throw error;

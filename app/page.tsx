@@ -49,7 +49,7 @@ function HomeContent() {
   // Portal menu items
   const portalItems = [
     { id: 'read', title: '말씀 나눔터(한글)', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
-    { id: 'scripture', title: '말씀 묵상 연구소', subtitle: '성경 구절 중심의 깊은 묵상과 연구 공간', href: '/scripture-board', icon: Scroll, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
+    { id: 'scripture', title: '묵상 데이터 저장 공간', subtitle: '나눔 자료들만 올라와요', href: '/scripture-board', icon: Scroll, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
     { id: 'study', title: '성경 원어 연구소(신약)', subtitle: '헬라어 원문 성경을 깊이 연구하고 주석을 작성합니다', href: '/study', icon: Search, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
     { id: 'community', title: '커뮤니티 게시판', subtitle: '자유롭게 나누고 기도하며 함께 성장하는 공간', href: '/community', icon: Users, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
     { id: 'sermon', title: '설교 아카이브', subtitle: '과거 설교를 다시 듣고 은혜를 되새깁니다', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
@@ -59,7 +59,7 @@ function HomeContent() {
   const navItems = [
     { id: 'home', title: '홈', href: '/', icon: HomeIcon, active: true },
     { id: 'read', title: '한글 성경', href: '/read', icon: BookOpen },
-    { id: 'scripture', title: '묵상 연구소', href: '/scripture-board', icon: Scroll },
+    { id: 'scripture', title: '묵상 데이터', href: '/scripture-board', icon: Scroll },
     { id: 'study', title: '원어 연구', href: '/study', icon: Search },
     { id: 'community', title: '커뮤니티', href: '/community', icon: Users },
     { id: 'cafe', title: '기독교 커뮤니티', href: 'https://naver.me/xXnPSav8', icon: ExternalLink, external: true },
