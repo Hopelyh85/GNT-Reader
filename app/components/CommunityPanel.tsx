@@ -467,15 +467,41 @@ export function CommunityPanel({
     }
   };
 
-  // Check 24h prayer limit (called from handleSavePost when target is 'prayer')
+  // Check 24h prayer limit - now allows 5 prayers per day
+  const DAILY_PRAYER_LIMIT = 5;
+  const [todayPrayerCount, setTodayPrayerCount] = useState(0);
+  
+  // Load today's prayer count
+  useEffect(() => {
+    const loadTodayCount = async () => {
+      if (!currentUserId) return;
+      try {
+        const supabase = getSupabase();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const { count, error } = await supabase
+          .from('reflections')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', currentUserId)
+          .gte('created_at', today.toISOString())
+          .in('category', ['prayer_general', 'prayer_world']);
+        if (!error) {
+          setTodayPrayerCount(count || 0);
+        }
+      } catch (err) {
+        console.error('Error loading today prayer count:', err);
+      }
+    };
+    loadTodayCount();
+  }, [currentUserId, posts]); // Reload when posts change
+  
   const checkPrayerLimit = async () => {
     if (!currentUserId) return true;
     
     setCheckingLastPrayer(true);
     try {
-      const hasRecentPrayer = await hasPrayerInLast24Hours(currentUserId);
-      if (hasRecentPrayer) {
-        alert('일반 기도는 24시간에 1회만 작성 가능합니다.\n다음 기도는 24시간 후에 작성해 주세요.');
+      if (todayPrayerCount >= DAILY_PRAYER_LIMIT) {
+        alert(`하루에 최대 ${DAILY_PRAYER_LIMIT}개의 기도만 작성할 수 있습니다.\n내일 다시 작성해 주세요.`);
         return false;
       }
       return true;
@@ -572,10 +598,7 @@ export function CommunityPanel({
           'wait'
         );
 
-        // Show message for world prayers
-        if (isWorldPrayer) {
-          alert('세계 기도 제목이 제출되었습니다. 관리자 승인 후 게시됩니다.');
-        }
+        // World prayers are now posted immediately without approval
         
         // Clear prayer board inputs
         setPrayerTitle('');
@@ -2391,6 +2414,21 @@ export function CommunityPanel({
                       )}
                     </div>
                     
+                    {/* Prayer Count Indicator */}
+                    <div className="flex items-center justify-between mb-2 px-2 py-1 bg-red-50 rounded-lg">
+                      <span className="text-xs text-red-700">
+                        오늘 {todayPrayerCount}개 작성 · {DAILY_PRAYER_LIMIT - todayPrayerCount}개 더 올릴 수 있습니다
+                      </span>
+                      <div className="flex gap-0.5">
+                        {Array.from({ length: DAILY_PRAYER_LIMIT }).map((_, i) => (
+                          <div 
+                            key={i}
+                            className={`w-2 h-2 rounded-full ${i < todayPrayerCount ? 'bg-red-500' : 'bg-red-200'}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    
                     <input
                       type="text"
                       value={prayerTitle}
@@ -2407,11 +2445,11 @@ export function CommunityPanel({
                     <div className="flex justify-end mt-2">
                       <button
                         onClick={() => handleSavePost('prayer')}
-                        disabled={!prayerContent.trim() || saving}
+                        disabled={!prayerContent.trim() || saving || todayPrayerCount >= DAILY_PRAYER_LIMIT}
                         className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 disabled:opacity-50"
                       >
-                        <Heart className="w-3 h-3" />
-                        {saving ? '저장 중...' : linkedPrayerId ? '기도 연결하기' : '기도하기'}
+                        <span className="text-lg">🙏</span>
+                        {saving ? '저장 중...' : linkedPrayerId ? '기도 연결하기' : todayPrayerCount >= DAILY_PRAYER_LIMIT ? '오늘 한도 도달' : '기도하기'}
                       </button>
                     </div>
                   </div>
