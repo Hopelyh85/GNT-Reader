@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { SelectedVerse, SelectedWord } from '@/app/types';
 import { PenLine, BookText, Save, Loader2, BookOpen, Search, X } from 'lucide-react';
 import { getSupabase, saveMyStudyNote, bookNameMap, getPublicReflections, saveTranslation, getUserTranslation } from '../lib/supabase';
@@ -37,6 +38,7 @@ interface NoteData {
 }
 
 export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, userName, onClose }: StudyPanelProps) {
+  const router = useRouter();
   const isAdmin = userRole === 'ADMIN';
   const canWrite = isLoggedIn;
   // Chapter Mode: when verse is 0 (chapter-level reflection)
@@ -334,7 +336,56 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
     } finally {
       setSaving(false);
     }
-  }, [canWrite]); // Only depends on canWrite (stable)
+  }, [canWrite]); // Only depends on canWrite
+
+  const handleToggleLike = async (reflectionId: string, currentLiked: boolean) => {
+    if (!isLoggedIn) {
+      alert('로그인 후 좋아요를 누를 수 있습니다.');
+      return;
+    }
+    try {
+      const supabase = getSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (currentLiked) {
+        // Remove like
+        await supabase.from('reflection_likes').delete().eq('reflection_id', reflectionId).eq('user_id', user.id);
+      } else {
+        // Add like
+        await supabase.from('reflection_likes').insert({ reflection_id: reflectionId, user_id: user.id });
+      }
+      // Refresh data
+      fetchVerseContent();
+    } catch (err) {
+      console.error('Error toggling like:', err);
+    }
+  };
+
+  const fetchVerseContent = async () => {
+    if (!selectedVerse) return;
+    
+    setLoadingVerseContent(true);
+    try {
+      // Load user's own translation
+      const userTranslation = await getUserTranslation(verseRef);
+      if (userTranslation) {
+        setVerseTranslations([{ content: userTranslation, isMine: true }]);
+      } else {
+        setVerseTranslations([]);
+      }
+      
+      // Load community reflections
+      const result = await getPublicReflections(verseRef, 1, 10);
+      // Filter out translations (we handle them separately)
+      const reflections = (result.data || []).filter((r: any) => r.category !== 'translation');
+      setVerseReflections(reflections);
+    } catch (err: any) {
+      console.error('Error loading verse content:', err?.message);
+    } finally {
+      setLoadingVerseContent(false);
+    }
+  };
 
   useEffect(() => {
     if (!selectedVerse) return;
@@ -903,20 +954,28 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
                 <p>아직 이 구절에 대한 커뮤니티 묵상이 없습니다.</p>
               </div>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {verseReflections.map((reflection: any) => (
-                  <div key={reflection.id} className="p-2 bg-stone-50 rounded border border-stone-200">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium text-stone-700">
-                        {reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명'}
-                      </span>
-                      <span className="text-xs text-stone-400">
-                        {new Date(reflection.created_at).toLocaleDateString('ko-KR')}
+              <div className="space-y-3">
+                {verseReflections.map((reflection) => (
+                  <div 
+                    key={reflection.id} 
+                    className="p-3 rounded-lg bg-amber-50 border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors"
+                    onClick={() => router.push(`/read/${selectedVerse?.book || 'John'}/${selectedVerse?.chapter || 1}/${selectedVerse?.verse || 1}`)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-amber-700">묵상</span>
+                      <span className="text-xs text-stone-500">
+                        {reflection.profile?.nickname || reflection.profile?.email}
                       </span>
                     </div>
-                    <p className="text-xs text-stone-600 whitespace-pre-wrap line-clamp-3">
-                      {reflection.content}
-                    </p>
+                    <p className="text-sm text-stone-800">{reflection.content}</p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleToggleLike(reflection.id, reflection.liked || false); }}
+                        className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${reflection.liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                      >
+                        🙏 기도합니다 ({reflection.likes || 0})
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

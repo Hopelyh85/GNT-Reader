@@ -380,7 +380,7 @@ function VersePageContent() {
             </h1>
             
             <p className="text-sm text-stone-500">
-              개역개정 (KRV)
+              개역한글
             </p>
           </div>
         </div>
@@ -556,6 +556,12 @@ function VersePageContent() {
                                   <span className="text-xs text-stone-400">
                                     {new Date(reply.created_at).toLocaleDateString('ko-KR')}
                                   </span>
+                                  <button 
+                                    onClick={() => handleToggleLike(reply.id, reply.liked || false)}
+                                    className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${reply.liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                                  >
+                                    🙏 기도합니다 ({reply.likes || 0})
+                                  </button>
                                 </div>
                                 <p className="text-sm text-stone-800">{reply.content}</p>
                               </div>

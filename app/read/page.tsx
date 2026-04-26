@@ -253,7 +253,8 @@ function ReadContent() {
 
   // Handle verse click - navigate to new verse page
   const handleVerseClick = (verseNum: number) => {
-    router.push(`/read/${selectedBook}/${selectedChapter}/${verseNum}`);
+    const bookId = typeof selectedBook === 'string' ? selectedBook : selectedBook?.id || 'John';
+    router.push(`/read/${bookId}/${selectedChapter}/${verseNum}`);
   };
 
   // Handle view mode change
@@ -772,16 +773,11 @@ function ReadContent() {
                     <div 
                       key={note.id} 
                       className="p-3 rounded-lg bg-stone-50 border border-stone-200 cursor-pointer hover:bg-stone-100 transition-colors"
-                      onClick={() => router.push(`/read/${selectedBook.id}/${selectedChapterNum}/${selectedVerseNum || 1}`)}
+                      onClick={() => router.push(`/read/${typeof selectedBook === 'string' ? selectedBook : selectedBook?.id || 'John'}/${selectedChapter}/${selectedVerseNum || 1}`)}
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-bold text-purple-700">👑 공식 주석</span>
                         <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
-                        {viewMode === 'chapter' && note.verse > 0 && (
-                          <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">
-                            {note.verse}절
-                          </span>
-                        )}
                       </div>
                       <p className="text-sm text-stone-800">{note.content}</p>
                       {note.commentary && (
@@ -789,9 +785,48 @@ function ReadContent() {
                           {note.commentary}
                         </p>
                       )}
+                      <div className="mt-2 flex items-center justify-end">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleToggleLike(note.id, note.liked || false); }}
+                          className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${note.liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                        >
+                          🙏 기도합니다 ({note.likes || 0})
+                        </button>
+                      </div>
                     </div>
                   ))
                 ) : null}
+                {verseTranslations.length > 0 && (
+                  <div className="space-y-2">
+                    {verseTranslations.map((t, i) => (
+                      <div 
+                        key={i} 
+                        className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 cursor-pointer hover:bg-emerald-100 transition-colors"
+                        onClick={() => router.push(`/read/${typeof selectedBook === 'string' ? selectedBook : selectedBook?.id || 'John'}/${selectedChapter}/${t.verse || selectedVerseNum || 1}`)}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-emerald-700">개인 번역</span>
+                          <span className="text-xs text-stone-500">{t.profile?.nickname || t.profile?.email}</span>
+                          {t.verse > 0 && (
+                            <span className="text-xs bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded">개역한글</span>
+                          )}
+                          {t.verse > 0 && (
+                            <span className="text-xs bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded">{t.verse}절</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-stone-800">{t.content}</p>
+                        <div className="mt-2 flex items-center justify-end">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleToggleLike(t.id, t.liked || false); }}
+                            className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${t.liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                          >
+                            기도합니다 ({t.likes || 0})
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </main>
