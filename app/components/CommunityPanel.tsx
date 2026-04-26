@@ -1909,6 +1909,19 @@ export function CommunityPanel({
                               <p className="text-base text-stone-800 whitespace-pre-wrap leading-relaxed">{post.content}</p>
                             </div>
                             
+                            {/* Like Button */}
+                            <button
+                              onClick={() => handleToggleLike(post.id, !!(post as any).userHasLiked)}
+                              className={`flex items-center gap-1 px-3 py-2 text-sm rounded transition-colors mb-4 ${
+                                (post as any).userHasLiked 
+                                  ? 'bg-red-50 text-red-600 hover:bg-red-100' 
+                                  : 'text-stone-600 hover:bg-stone-100'
+                              }`}
+                            >
+                              <Heart className={`w-4 h-4 ${(post as any).userHasLiked ? 'fill-current' : ''}`} />
+                              공감 {(post as any).likesCount || 0}
+                            </button>
+                            
                             {/* Replies Section */}
                             <div className="mt-4 pt-4 border-t border-stone-200">
                               <h4 className="font-bold text-stone-700 mb-3 flex items-center gap-2">
@@ -2144,6 +2157,19 @@ export function CommunityPanel({
                             
                             {/* Expanded Content */}
                             <div className="px-4 pb-4 border-t border-stone-100">
+                              {/* Like Button */}
+                              <button
+                                onClick={() => handleToggleLike(post.id, !!(post as any).userHasLiked)}
+                                className={`flex items-center gap-1 px-3 py-2 text-sm rounded transition-colors mt-3 mb-2 ${
+                                  (post as any).userHasLiked 
+                                    ? 'bg-red-50 text-red-600 hover:bg-red-100' 
+                                    : 'text-stone-600 hover:bg-stone-100'
+                                }`}
+                              >
+                                <Heart className={`w-4 h-4 ${(post as any).userHasLiked ? 'fill-current' : ''}`} />
+                                공감 {(post as any).likesCount || 0}
+                              </button>
+                              
                               {/* Replies Section */}
                               <div className="mt-3">
                                 {(() => {
