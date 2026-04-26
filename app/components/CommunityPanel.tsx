@@ -1133,7 +1133,7 @@ export function CommunityPanel({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    openProfileModal(post.profiles);
+                    router.push(`/profile/${post.user_id}`);
                   }}
                   className="text-sm font-medium text-stone-800 hover:text-blue-600 hover:underline cursor-pointer"
                 >
@@ -1943,8 +1943,66 @@ export function CommunityPanel({
                     </div>
                   ) : (
                     <>
-                      <div className="space-y-3">
-                        {getPrayerPosts().map(post => renderPost(post))}
+                      {/* Mobile Compact Prayer Cards */}
+                      <div className="space-y-2">
+                        {getPrayerPosts().map(post => {
+                          const pType = getPrayerType(post);
+                          const status = (post as any).prayer_status || 'wait';
+                          
+                          const colorMap = {
+                            world: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700' },
+                            nation: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
+                            church: { bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700' },
+                            personal: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700' },
+                          };
+                          const colors = colorMap[pType];
+                          
+                          return (
+                            <div 
+                              key={post.id}
+                              className={`p-2.5 rounded-lg border ${colors.bg} ${colors.border}`}
+                            >
+                              {/* Compact Header */}
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${colors.badge}`}>
+                                  {pType === 'world' ? '🌍 세계' : pType === 'nation' ? '🏛️ 나라' : pType === 'church' ? '⛪ 교회' : '👤 개인'}
+                                </span>
+                                {(post as any).is_urgent && (
+                                  <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-medium">
+                                    🚨 긴급
+                                  </span>
+                                )}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); router.push(`/profile/${post.user_id}`); }}
+                                  className="ml-auto text-[11px] text-stone-500 hover:text-blue-600 hover:underline"
+                                >
+                                  {getDisplayName(post.profiles)}
+                                </button>
+                              </div>
+                              
+                              {/* Content */}
+                              <div onClick={() => setSelectedPrayerPost(post)} className="cursor-pointer">
+                                <p className="text-xs text-stone-700 line-clamp-2 leading-snug">{post.content}</p>
+                              </div>
+                              
+                              {/* Admin Urgent Toggle */}
+                              {isAdmin && (
+                                <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-stone-200/50">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleToggleUrgent(post.id, (post as any).is_urgent); }}
+                                    className={`text-[10px] px-2 py-0.5 rounded ${
+                                      (post as any).is_urgent 
+                                        ? 'text-red-600 bg-red-50' 
+                                        : 'text-stone-500 hover:text-red-600'
+                                    }`}
+                                  >
+                                    {(post as any).is_urgent ? '🚨 긴급 해제' : '🚨 긴급 설정'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                       {hasMore && (
                         <button
@@ -2613,8 +2671,8 @@ export function CommunityPanel({
                     </div>
                   </div>
                 ) : (
-                  /* List View - [Step 1] Improved readability with larger spacing and fonts */
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  /* List View - Compact UI for more posts per screen */
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {loadingPosts ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
@@ -2626,24 +2684,24 @@ export function CommunityPanel({
                         {canWrite && <p className="text-sm mt-1">첫 기도 제목을 올려보세요!</p>}
                       </div>
                     ) : (
-                      getPrayerPosts().slice(0, 20).map(post => {
+                      getPrayerPosts().slice(0, 30).map(post => {
                         const pType = getPrayerType(post);
                         const status = (post as any).prayer_status || 'wait';
                         const linkedId = (post as any).linked_prayer_id;
                         const testimony = (post as any).testimony_note;
                         
                         const statusMap = {
-                          wait: { label: '⏳ 기다림', color: 'bg-stone-100 text-stone-600', border: 'border-stone-200', icon: Clock },
-                          yes: { label: '✨ 응답의 은혜', color: 'bg-amber-100 text-amber-700', border: 'border-amber-400', icon: Sparkles },
-                          no: { label: '🙏 거절의 은혜', color: 'bg-slate-100 text-slate-600', border: 'border-slate-300', icon: Heart },
+                          wait: { label: '기다림', color: 'bg-stone-100 text-stone-600', border: 'border-stone-200', icon: Clock },
+                          yes: { label: '응답', color: 'bg-amber-100 text-amber-700', border: 'border-amber-400', icon: Sparkles },
+                          no: { label: '거절', color: 'bg-slate-100 text-slate-600', border: 'border-slate-300', icon: Heart },
                         };
                         const statusStyle = statusMap[status as keyof typeof statusMap];
                         
                         const colorMap = {
-                          world: { bg: status === 'yes' ? 'bg-amber-50/50' : 'bg-blue-50', border: status === 'yes' ? 'border-amber-300' : 'border-blue-200', badge: 'bg-blue-100 text-blue-700', icon: Globe },
-                          nation: { bg: status === 'yes' ? 'bg-amber-50/50' : 'bg-purple-50', border: status === 'yes' ? 'border-amber-300' : 'border-purple-200', badge: 'bg-purple-100 text-purple-700', icon: MapPin },
-                          church: { bg: status === 'yes' ? 'bg-amber-50/50' : 'bg-emerald-50', border: status === 'yes' ? 'border-amber-300' : 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', icon: Church },
-                          personal: { bg: status === 'yes' ? 'bg-amber-50/50' : 'bg-amber-50', border: status === 'yes' ? 'border-amber-300' : 'border-amber-200', badge: 'bg-amber-100 text-amber-700', icon: User },
+                          world: { bg: status === 'yes' ? 'bg-amber-50/30' : 'bg-blue-50/50', border: status === 'yes' ? 'border-amber-200' : 'border-blue-200', badge: 'bg-blue-100 text-blue-700', icon: Globe },
+                          nation: { bg: status === 'yes' ? 'bg-amber-50/30' : 'bg-purple-50/50', border: status === 'yes' ? 'border-amber-200' : 'border-purple-200', badge: 'bg-purple-100 text-purple-700', icon: MapPin },
+                          church: { bg: status === 'yes' ? 'bg-amber-50/30' : 'bg-emerald-50/50', border: status === 'yes' ? 'border-amber-200' : 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', icon: Church },
+                          personal: { bg: status === 'yes' ? 'bg-amber-50/30' : 'bg-amber-50/50', border: status === 'yes' ? 'border-amber-200' : 'border-amber-200', badge: 'bg-amber-100 text-amber-700', icon: User },
                         };
                         const colors = colorMap[pType];
                         const Icon = colors.icon;
@@ -2653,33 +2711,54 @@ export function CommunityPanel({
                         return (
                           <div 
                             key={post.id}
-                            onClick={() => setSelectedPrayerPost(post)}
-                            className={`p-4 rounded-lg border-2 ${colors.bg} ${colors.border} transition-shadow cursor-pointer hover:shadow-md`}
+                            className={`p-2.5 rounded-lg border ${colors.bg} ${colors.border} transition-shadow hover:shadow-sm`}
                           >
-                            {/* Header Row - [Step 1] Improved readability */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={`text-sm px-2 py-1 rounded flex items-center gap-1 ${colors.badge}`}>
-                                <Icon className="w-4 h-4" />
+                            {/* Compact Header Row */}
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5 ${colors.badge}`}>
+                                <Icon className="w-3 h-3" />
                                 {pType === 'world' ? '세계' : pType === 'nation' ? '나라' : pType === 'church' ? '교회' : '개인'}
                               </span>
-                              <span className={`text-sm px-2 py-1 rounded flex items-center gap-1 ${statusStyle.color}`}>
-                                <StatusIcon className="w-4 h-4" />
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5 ${statusStyle.color}`}>
+                                <StatusIcon className="w-3 h-3" />
                                 {statusStyle.label}
                               </span>
-                              <span className="ml-auto text-sm text-stone-500">{getDisplayName(post.profiles)}</span>
+                              {(post as any).is_urgent && (
+                                <span className="text-[10px] text-red-600 font-medium bg-red-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  긴급
+                                </span>
+                              )}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); router.push(`/profile/${post.user_id}`); }}
+                                className="ml-auto text-[11px] text-stone-500 hover:text-blue-600 hover:underline cursor-pointer"
+                              >
+                                {getDisplayName(post.profiles)}
+                              </button>
                             </div>
                             
-                            {/* Content - [Step 1] Larger font */}
-                            <div>
-                              <p className={`text-sm text-stone-800 leading-relaxed ${expandedPostId === post.id ? '' : 'line-clamp-3'}`}>{post.content}</p>
+                            {/* Compact Content */}
+                            <div 
+                              onClick={() => setSelectedPrayerPost(post)}
+                              className="cursor-pointer"
+                            >
+                              <p className={`text-xs text-stone-700 leading-snug ${expandedPostId === post.id ? '' : 'line-clamp-2'}`}>{post.content}</p>
                             </div>
                             
-                            {/* Urgent Badge - [Step 1] Enhanced styling */}
-                            {(post as any).is_urgent && (
-                              <span className="inline-flex items-center gap-1 mt-2 text-sm text-red-700 font-bold bg-red-100 px-2 py-1 rounded-full">
-                                <AlertTriangle className="w-4 h-4" />
-                                긴급 기도
-                              </span>
+                            {/* Admin Actions - Compact */}
+                            {isAdmin && (
+                              <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-stone-200/50">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleToggleUrgent(post.id, (post as any).is_urgent); }}
+                                  className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                                    (post as any).is_urgent 
+                                      ? 'text-red-600 bg-red-50 hover:bg-red-100' 
+                                      : 'text-stone-500 hover:text-red-600 hover:bg-stone-100'
+                                  }`}
+                                >
+                                  {(post as any).is_urgent ? '🚨 긴급 해제' : '🚨 긴급 설정'}
+                                </button>
+                              </div>
                             )}
                           </div>
                         );
