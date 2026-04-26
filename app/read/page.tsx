@@ -7,6 +7,7 @@ import {
   MessageSquare, Send, Loader2, Heart, Crown, Pin
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
+import ReadDetailView from '@/app/components/ReadDetailView';
 import { 
   getMyProfile, signOut, Profile, getNotice, 
   getSupabase, bookNameMap, bookNameMapReverse 
@@ -91,6 +92,9 @@ function ReadContent() {
   const [isGeneral, setIsGeneral] = useState(false);
   // View mode: 'verse' for current verse, 'chapter' for whole chapter
   const [viewMode, setViewMode] = useState<'verse' | 'chapter'>('verse');
+  
+  // Detail view state for translations and commentary
+  const [selectedDetailPost, setSelectedDetailPost] = useState<any | null>(null);
 
   const bookInfo = books.find(b => b.id === selectedBook);
 
@@ -330,6 +334,13 @@ function ReadContent() {
   const userRole = profile?.tier || '준회원';
   const isAdmin = userRole === '관리자' || userRole === 'Admin';
   const verses = getVersesForChapter();
+
+  const handleNavigateToStudy = () => {
+    if (selectedDetailPost?.book && selectedDetailPost?.chapter && selectedDetailPost?.verse) {
+      const bookId = koreanToEnglishMap[selectedDetailPost.book] || 'Matt';
+      router.push(`/study?book=${bookId}&chapter=${selectedDetailPost.chapter}&verse=${selectedDetailPost.verse}`);
+    }
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -609,6 +620,9 @@ function ReadContent() {
             ${showCommunity ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
           `}>
             {selectedVerseNum ? (
+              selectedDetailPost ? (
+                <ReadDetailView post={selectedDetailPost} onClose={() => setSelectedDetailPost(null)} onNavigateToStudy={() => handleNavigateToStudy()} />
+              ) : (<>
               <div className="bg-white lg:rounded-xl border-t lg:border border-stone-200 overflow-hidden h-[70vh] lg:h-full lg:shadow-none shadow-2xl rounded-t-2xl">
                 {/* Mobile Handle Bar */}
                 <div className="lg:hidden w-full py-2 bg-stone-50 border-b border-stone-200">
@@ -675,9 +689,12 @@ function ReadContent() {
                           개인 번역 (Translations)
                         </label>
                         {verseTranslations.map((trans: any) => (
-                          <div key={trans.id} className={`p-3 bg-blue-50 border rounded-lg transition-all ${
-                            highlightedPostId === trans.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-blue-200'
-                          }`}>
+                          <div 
+                            key={trans.id} 
+                            onClick={() => setSelectedDetailPost(trans)}
+                            className={`p-3 bg-blue-50 border rounded-lg transition-all cursor-pointer hover:shadow-md ${
+                              highlightedPostId === trans.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-blue-200'
+                            }`}>
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-xs font-bold text-blue-700">📝 개인 번역</span>
                               <span className="text-xs text-stone-500">{getDisplayName(trans.profiles)}</span>
@@ -746,9 +763,12 @@ function ReadContent() {
                       <p className="text-xs text-stone-400 text-center py-4">등록된 주석이 없습니다</p>
                     ) : (
                       studyNotes.filter((n: any) => n.profiles?.tier === '관리자').map((note: any) => (
-                        <div key={note.id} className={`p-3 bg-white border rounded-lg transition-all ${
-                          highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg' : 'border-purple-200'
-                        }`}>
+                        <div 
+                          key={note.id} 
+                          onClick={() => setSelectedDetailPost(note)}
+                          className={`p-3 bg-white border rounded-lg transition-all cursor-pointer hover:shadow-md ${
+                            highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg' : 'border-purple-200'
+                          }`}>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs font-bold text-purple-700">👑 공식 주석</span>
                             <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
@@ -803,6 +823,7 @@ function ReadContent() {
                   </div>
                 )}
               </div>
+              </>)
             ) : (
               <div className="hidden lg:flex bg-stone-50 rounded-xl border border-stone-200 p-8 text-center flex-col items-center justify-center h-64">
                 <BookOpen className="w-12 h-12 text-stone-300 mx-auto mb-3" />
