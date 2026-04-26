@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { SelectedVerse } from '@/app/types';
 import { 
   Users, Send, Loader2, MessageSquare, Pin, BookOpen, Hash, 
@@ -71,6 +72,8 @@ interface Post extends StudioReflection {
 export function CommunityPanel({ 
   selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath, showPrayerTabs = false, onlyScripture = false 
 }: CommunityPanelProps) {
+  const router = useRouter();
+  
   // Permission helpers based on tier
   const isGeneral = userRole === '준회원';
   const isRegular = userRole === '정회원';
@@ -690,25 +693,37 @@ export function CommunityPanel({
     alert('글 수정 기능은 준비중입니다.');
   };
   
-  // Navigate to verse when clicking on post title/verse_ref
+  // Navigate to new blog-style verse page
   const handleNavigateToVerse = (post: Post) => {
-    if (!onNavigateToVerse || !post.verse_ref || post.verse_ref === '글로벌 게시판') return;
+    if (!post.verse_ref || post.verse_ref === '글로벌 게시판') return;
+    
+    // Book name mapping from Korean to English ID
+    const koreanToEnglishMap: Record<string, string> = {
+      '마태복음': 'Matt', '마가복음': 'Mark', '누가복음': 'Luke', '요한복음': 'John',
+      '사도행전': 'Acts', '로마서': 'Rom', '고린도전서': '1Cor', '고린도후서': '2Cor',
+      '갈라디아서': 'Gal', '에베소서': 'Eph', '빌립보서': 'Phil', '골로새서': 'Col',
+      '데살로니가전서': '1Thess', '데살로니가후서': '2Thess', '디모데전서': '1Tim', '디모데후서': '2Tim',
+      '디도서': 'Titus', '빌레몬서': 'Phlm', '히브리서': 'Heb', '야고보서': 'Jas',
+      '베드로전서': '1Pet', '베드로후서': '2Pet', '요한일서': '1John', '요한이서': '2John',
+      '요한삼서': '3John', '유다서': 'Jude', '요한계시록': 'Rev',
+      '마태': 'Matt', '마가': 'Mark', '누가': 'Luke', '요한': 'John',
+    };
     
     // Parse verse_ref like "Matt 1:1", "마태복음 1:1", "마태 1:1", or "마태복음 1장 전체"
-    // Try chapter:verse format first
     const verseMatch = post.verse_ref.match(/^([가-힣A-Za-z0-9\s]+)\s+(\d+):(\d+)$/);
     if (verseMatch) {
-      const [, book, chapter, verse] = verseMatch;
-      onNavigateToVerse(book.trim(), parseInt(chapter), parseInt(verse));
+      const [, bookName, chapter, verse] = verseMatch;
+      const bookId = koreanToEnglishMap[bookName.trim()] || bookName.trim();
+      router.push(`/read/${bookId}/${chapter}/${verse}`);
       return;
     }
     
     // Try chapter-level format "마태복음 1장 전체"
     const chapterMatch = post.verse_ref.match(/^([가-힣A-Za-z0-9\s]+)\s+(\d+)장\s+전체$/);
     if (chapterMatch) {
-      const [, book, chapter] = chapterMatch;
-      // Navigate to verse 1 of the chapter as default
-      onNavigateToVerse(book.trim(), parseInt(chapter), 1);
+      const [, bookName, chapter] = chapterMatch;
+      const bookId = koreanToEnglishMap[bookName.trim()] || bookName.trim();
+      router.push(`/read/${bookId}/${chapter}/1`);
     }
   };
 
