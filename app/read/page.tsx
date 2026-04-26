@@ -7,7 +7,6 @@ import {
   MessageSquare, Send, Loader2, Heart, Crown, Pin
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
-import ReadDetailView from '@/app/components/ReadDetailView';
 import { 
   getMyProfile, signOut, Profile, getNotice, 
   getSupabase, bookNameMap, bookNameMapReverse 
@@ -564,277 +563,252 @@ function ReadContent() {
                         클릭하여 보기 →
                       </span>
                     </div>
-                  ))
+                  ))}
                 )}
-              </div>
-              
-              {/* Chapter Navigation */}
-              <div className="px-4 py-3 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
-                <button
-                  onClick={() => {
-                    if (selectedChapter > 1) {
-                      setSelectedChapter(selectedChapter - 1);
-                      setShowCommunity(false);
-                    }
-                  }}
-                  disabled={selectedChapter <= 1}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-200 rounded-lg disabled:opacity-50"
-                >
-                  <ChevronDown className="w-4 h-4 rotate-90" />
-                  이전 장
-                </button>
-                <span className="text-sm text-stone-500">
-                  {selectedChapter} / {bookInfo?.chapters}장
-                </span>
-                <button
-                  onClick={() => {
-                    if (selectedChapter < (bookInfo?.chapters || 28)) {
-                      setSelectedChapter(selectedChapter + 1);
-                      setShowCommunity(false);
-                    }
-                  }}
-                  disabled={selectedChapter >= (bookInfo?.chapters || 28)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-200 rounded-lg disabled:opacity-50"
-                >
-                  다음 장
-                  <ChevronRight className="w-4 h-4" />
-                </button>
               </div>
             </div>
           </div>
 
-          {/* Mobile Backdrop */}
-          {showCommunity && (
-            <div 
-              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden transition-opacity"
-              onClick={() => setShowCommunity(false)}
-            />
-          )}
-
-          {/* Right: Community Panel */}
-          <div className={`
-            ${showCommunity ? '' : 'hidden lg:block'}
-            lg:static lg:z-auto
-            fixed inset-x-0 bottom-0 z-50 lg:inset-auto
-            transition-transform duration-300 ease-out
-            ${showCommunity ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
-          `}>
-            {selectedVerseNum ? (
-              selectedDetailPost ? (
-                <ReadDetailView post={selectedDetailPost} onClose={() => setSelectedDetailPost(null)} onNavigateToStudy={() => handleNavigateToStudy()} />
-              ) : (<>
-              <div className="bg-white lg:rounded-xl border-t lg:border border-stone-200 overflow-hidden h-[70vh] lg:h-full lg:shadow-none shadow-2xl rounded-t-2xl">
-                {/* Mobile Handle Bar */}
-                <div className="lg:hidden w-full py-2 bg-stone-50 border-b border-stone-200">
-                  <div className="w-12 h-1 bg-stone-300 rounded-full mx-auto" />
-                </div>
-                
-                {/* Header */}
-                <div className="px-4 py-3 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-amber-600" />
-                    <div>
-                      <h3 className="font-bold text-stone-800 text-sm">
-                        {bookInfo?.name} {selectedChapter}:{selectedVerseNum}
-                      </h3>
-                      <p className="text-xs text-stone-500">묵상과 나눔</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowCommunity(false)}
-                    className="lg:hidden p-2 hover:bg-stone-200 rounded-lg"
+          {/* Right Side Panel */}
+          <div className="w-70">
+            <div className="bg-white rounded-xl border border-stone-200 p-4">
+              <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 rounded-lg text-sm text-stone-600 hover:bg-stone-200 transition-colors"
                   >
-                    <X className="w-4 h-4" />
+                    <LogOut className="w-4 h-4" />
+                    로그아웃
                   </button>
                 </div>
-                
-                {/* View Mode Toggle */}
-                <div className="px-4 py-2 bg-white border-b border-stone-200">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-stone-500">보기:</span>
-                    <div className="flex rounded-lg bg-stone-100 p-0.5">
-                      <button
-                        onClick={() => handleViewModeChange('verse')}
-                        className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                          viewMode === 'verse'
-                            ? 'bg-white text-stone-800 shadow-sm'
-                            : 'text-stone-500 hover:text-stone-700'
-                        }`}
-                      >
-                        {selectedVerseNum}절
-                      </button>
-                      <button
-                        onClick={() => handleViewModeChange('chapter')}
-                        className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                          viewMode === 'chapter'
-                            ? 'bg-white text-stone-800 shadow-sm'
-                            : 'text-stone-500 hover:text-stone-700'
-                        }`}
-                      >
-                        {selectedChapter}장 전체
-                      </button>
+              ) : (
+                <a
+                  href="/login"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-stone-800 text-white rounded-lg text-sm hover:bg-stone-700 transition-colors"
+                >
+                  <LogIn className="w-4 h-4" />
+                  로그인
+                </a>
+              )}
+            </div>
+          </header>
+
+          {/* Mobile Menu */}
+          {mobileMenuOpen && (
+            <div className="md:hidden bg-white border-b border-stone-200 px-4 py-3 space-y-3">
+              {/* Mobile Book/Chapter Selector */}
+              <div className="flex gap-2">
+                <select
+                  value={selectedBook}
+                  onChange={(e) => {
+                    setSelectedBook(e.target.value);
+                    setSelectedChapter(1);
+                    setShowCommunity(false);
+                  }}
+                  className="flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg"
+                >
+                  {books.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedChapter}
+                  onChange={(e) => {
+                    setSelectedChapter(parseInt(e.target.value));
+                    setShowCommunity(false);
+                  }}
+                  className="w-24 px-3 py-2 text-sm border border-stone-200 rounded-lg"
+                >
+                  {Array.from({ length: bookInfo?.chapters || 28 }, (_, i) => i + 1).map(ch => (
+                    <option key={ch} value={ch}>{ch}장</option>
+                  ))}
+                </select>
+              </div>
+              
+              {isLoggedIn ? (
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 p-2 text-stone-600 hover:bg-stone-100 rounded-lg"
+                >
+                  <LogOut className="w-5 h-5" />
+                  로그아웃
+                </button>
+              ) : (
+                <a
+                  href="/login"
+                  className="flex items-center gap-2 p-2 text-stone-600 hover:bg-stone-100 rounded-lg"
+                >
+                  <LogIn className="w-5 h-5" />
+                  로그인
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Notice Banner */}
+          {notice && (
+            <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
+              <div className="max-w-6xl mx-auto flex items-start gap-2">
+                <BookOpen className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-xs font-bold text-blue-700">📢 연구소 공지사항</span>
+                  <p className="text-sm text-stone-700 mt-1">{notice.content}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Content */}
+          <main className="max-w-6xl mx-auto p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left: Bible Text */}
+              <div className={`${showCommunity ? 'hidden lg:block' : ''}`}>
+                <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+                  {/* Chapter Header */}
+                  <div className="px-4 py-3 bg-stone-50 border-b border-stone-200">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-serif font-bold text-stone-800">
+                        {bookInfo?.name} {selectedChapter}장
+                      </h2>
+                      <span className="text-xs text-stone-400 hidden sm:block">
+                        💡 절을 클릭하여 묵상 보기
+                      </span>
                     </div>
                   </div>
-                </div>
-                
-                {/* 70/30 Split Layout: Top = Translations + Reflections, Bottom = Commentary */}
-                <div className="flex flex-col h-[calc(70vh-180px)] lg:h-[calc(100vh-340px)]">
-                  {/* Top 70%: Translations (Sticky) + Reflections Feed */}
-                  <div className="h-[70%] overflow-y-auto p-4 space-y-4 border-b border-stone-200">
-                    {/* Translations (Blue - Sticky at top of this section) */}
-                    {verseTranslations.length > 0 && (
-                      <div className="sticky top-0 z-10 bg-white border-b border-stone-200 -mx-4 px-4 py-3 mb-4">
-                        <label className="flex items-center gap-2 text-xs font-bold text-blue-700 mb-2">
-                          <Pin className="w-3 h-3" />
-                          개인 번역 (Translations)
-                        </label>
-                        {verseTranslations.map((trans: any) => (
-                          <div 
-                            key={trans.id} 
-                            onClick={() => setSelectedDetailPost(trans)}
-                            className={`p-3 bg-blue-50 border rounded-lg transition-all cursor-pointer hover:shadow-md ${
-                              highlightedPostId === trans.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-blue-200'
-                            }`}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs font-bold text-blue-700">📝 개인 번역</span>
-                              <span className="text-xs text-stone-500">{getDisplayName(trans.profiles)}</span>
-                              <span className="text-xs text-stone-400">
-                                {new Date(trans.created_at).toLocaleDateString('ko-KR')}
-                              </span>
-                              {viewMode === 'chapter' && trans.verse > 0 && (
-                                <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">
-                                  {trans.verse}절
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-stone-800">{trans.content}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Reflections (Beige) */}
-                    {verseReflections.map((ref: any) => (
-                      <div key={ref.id} className={`p-3 bg-stone-50 border rounded-lg transition-all ${
-                        highlightedPostId === ref.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-stone-200'
-                      }`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <MessageSquare className="w-3 h-3 text-stone-500" />
-                          <span className="text-xs font-medium text-stone-700">{getDisplayName(ref.profiles)}</span>
-                          <span className="text-xs text-stone-400">
-                            {new Date(ref.created_at).toLocaleDateString('ko-KR')}
-                          </span>
-                          {viewMode === 'chapter' && ref.verse > 0 && (
-                            <span className="text-xs bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded">
-                              {ref.verse}절
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-stone-800">{ref.content}</p>
-                      </div>
-                    ))}
-                    
-                    {loadingCommunity && (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
-                      </div>
-                    )}
-                    
-                    {!loadingCommunity && verseReflections.length === 0 && verseTranslations.length === 0 && (
-                      <div className="text-center py-8 text-stone-400">
-                        <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">
-                          {viewMode === 'chapter' 
-                            ? `아직 ${selectedChapter}장에 나눔이 없습니다.` 
-                            : '아직 이 절에 나눔이 없습니다.'}
-                        </p>
-                        {!isGeneral && <p className="text-xs mt-1">첫 번째 묵상을 남겨보세요!</p>}
-                      </div>
-                    )}
+                  
+                  {/* Mobile Hint */}
+                  <div className="sm:hidden px-4 py-2 bg-amber-50/50 border-b border-amber-100">
+                    <p className="text-xs text-amber-700">
+                      👆 본문의 절을 클릭하면 묵상과 나눔을 볼 수 있습니다
+                    </p>
                   </div>
                   
-                  {/* Bottom 30%: Commentary (Admin Notes) */}
-                  <div className="h-[30%] overflow-y-auto p-4 space-y-3 bg-purple-50/30">
-                    <h4 className="text-xs font-bold text-purple-700 flex items-center gap-1 sticky top-0 bg-purple-50/30 py-1">
-                      <Crown className="w-3 h-3" />
-                      주석 (Commentary)
-                    </h4>
-                    {studyNotes.filter((n: any) => n.profiles?.tier === '관리자').length === 0 ? (
-                      <p className="text-xs text-stone-400 text-center py-4">등록된 주석이 없습니다</p>
+                  {/* Verses */}
+                  <div className="p-4 space-y-3">
+                    {loadingBible ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
+                      </div>
+                    ) : verses.length === 0 ? (
+                      <div className="text-center py-12 text-stone-500">
+                        <p>본문을 불러올 수 없습니다.</p>
+                      </div>
                     ) : (
-                      studyNotes.filter((n: any) => n.profiles?.tier === '관리자').map((note: any) => (
+                      verses.map((v) => (
                         <div 
-                          key={note.id} 
-                          onClick={() => setSelectedDetailPost(note)}
-                          className={`p-3 bg-white border rounded-lg transition-all cursor-pointer hover:shadow-md ${
-                            highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg' : 'border-purple-200'
+                          key={v.verse}
+                          onClick={() => handleVerseClick(v.verse)}
+                          className={`group flex gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                            selectedVerseNum === v.verse 
+                              ? 'bg-amber-50 border border-amber-300 shadow-sm' 
+                              : 'hover:bg-stone-50 hover:shadow-sm border border-transparent'
+                          }`}
+                        >
+                          <span className={`text-sm font-bold min-w-[2rem] transition-colors ${
+                            selectedVerseNum === v.verse 
+                              ? 'text-amber-700' 
+                              : 'text-amber-600 group-hover:text-amber-700'
                           }`}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-bold text-purple-700">👑 공식 주석</span>
-                            <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
-                            {viewMode === 'chapter' && note.verse > 0 && (
-                              <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">
-                                {note.verse}절
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-stone-800">{note.content}</p>
-                          {note.commentary && (
-                            <p className="text-xs text-purple-700 mt-2 bg-purple-100 p-2 rounded">
-                              {note.commentary}
-                            </p>
-                          )}
+                            {v.verse}
+                          </span>
+                          <p className={`leading-relaxed flex-1 transition-colors ${
+                            selectedVerseNum === v.verse 
+                              ? 'text-stone-900' 
+                              : 'text-stone-800'
+                          }`}>
+                            {v.text}
+                          </p>
+                          {/* Hover indicator */}
+                          <span className={`text-xs text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity ${
+                            selectedVerseNum === v.verse ? 'hidden' : ''
+                          }`}>
+                            클릭하여 보기 →
+                          </span>
                         </div>
                       ))
                     )}
                   </div>
-                </div>
-                
-                {/* Write Reflection */}
-                {isLoggedIn && !isGeneral && (
-                  <div className="p-4 border-t border-stone-200 bg-stone-50">
-                    <textarea
-                      value={newReflection}
-                      onChange={(e) => setNewReflection(e.target.value)}
-                      placeholder="이 구절에 대한 묵상을 남겨보세요..."
-                      className="w-full h-20 p-3 text-sm bg-white border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-stone-200"
-                    />
+                  
+                  {/* Chapter Navigation */}
+                  <div className="px-4 py-3 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
                     <button
-                      onClick={handleSaveReflection}
-                      disabled={!newReflection.trim() || savingReflection}
-                      className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 text-white rounded-lg text-sm hover:bg-stone-700 disabled:opacity-50 transition-colors"
+                      onClick={() => {
+                        if (selectedChapter > 1) {
+                          setSelectedChapter(selectedChapter - 1);
+                          setShowCommunity(false);
+                        }
+                      }}
+                      disabled={selectedChapter <= 1}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-200 rounded-lg disabled:opacity-50"
                     >
-                      {savingReflection ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                      묵상 나누기
+                      <ChevronDown className="w-4 h-4 rotate-90" />
+                      이전 장
+                    </button>
+                    <span className="text-sm text-stone-500">
+                      {selectedChapter} / {bookInfo?.chapters}장
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (selectedChapter < (bookInfo?.chapters || 28)) {
+                          setSelectedChapter(selectedChapter + 1);
+                          setShowCommunity(false);
+                        }
+                      }}
+                      disabled={selectedChapter >= (bookInfo?.chapters || 28)}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-200 rounded-lg disabled:opacity-50"
+                    >
+                      다음 장
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
-                )}
-                
-                {isLoggedIn && isGeneral && (
-                  <div className="p-4 border-t border-stone-200 bg-amber-50">
-                    <p className="text-sm text-amber-800 text-center">
-                      준회원 등급은 읽기만 가능합니다.<br />
-                      <a href="/login?tab=profile" className="underline">등업 신청</a> 후 글쓰기가 가능합니다.
-                    </p>
-                  </div>
-                )}
+                </div>
               </div>
-              </>)
-            ) : (
-              <div className="hidden lg:flex bg-stone-50 rounded-xl border border-stone-200 p-8 text-center flex-col items-center justify-center h-64">
-                <BookOpen className="w-12 h-12 text-stone-300 mx-auto mb-3" />
-                <p className="text-stone-600">왼쪽에서 절을 클릭하면</p>
-                <p className="text-stone-600">이 곳에 묵상과 나눔이 표시됩니다</p>
-                <p className="text-xs text-stone-400 mt-4">💡 본문의 절 번호를 클릭해보세요</p>
+
+              {/* Mobile Backdrop */}
+              {showCommunity && (
+                <div 
+                  className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+                  onClick={() => setShowCommunity(false)}
+                />
+              )}
+
+              {/* Right: Community Panel */}
+              <div className={`
+                ${showCommunity ? '' : 'hidden lg:block'}
+                lg:static lg:z-auto
+                fixed inset-x-0 bottom-0 z-50 lg:inset-auto
+                transition-transform duration-300 ease-out
+                ${showCommunity ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
+              `}>
+                {selectedVerseNum ? (
+                  studyNotes.filter((n: any) => n.profiles?.tier === '관리자').map((note: any) => (
+                    <div 
+                      key={note.id} 
+                      className="p-3 rounded-lg bg-stone-50 border border-stone-200 cursor-pointer hover:bg-stone-100 transition-colors"
+                      onClick={() => router.push(`/read/${selectedBook.id}/${selectedChapterNum}/${selectedVerseNum || 1}`)}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-bold text-purple-700">👑 공식 주석</span>
+                        <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
+                        {viewMode === 'chapter' && note.verse > 0 && (
+                          <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">
+                            {note.verse}절
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-stone-800">{note.content}</p>
+                      {note.commentary && (
+                        <p className="text-xs text-purple-700 mt-2 bg-purple-100 p-2 rounded">
+                          {note.commentary}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : null}
               </div>
-            )}
-          </div>
+            </div>
+          </main>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

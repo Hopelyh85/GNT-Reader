@@ -169,9 +169,10 @@ export function CommunityPanel({
   const [profileModalActivity, setProfileModalActivity] = useState<{reflections: any[]; studyNotes: any[]} | null>(null);
   const [loadingProfileActivity, setLoadingProfileActivity] = useState(false);
 
-  // Scripture panel filters
+  // Scripture panel filters and sort
   const [scriptureBookFilter, setScriptureBookFilter] = useState<string>('all');
   const [scriptureTagFilter, setScriptureTagFilter] = useState<string | null>(null);
+  const [scriptureSort, setScriptureSort] = useState<'bible' | 'newest' | 'oldest'>('newest');
 
   // Prayer panel state (5 types including 'all')
   const [prayerType, setPrayerType] = useState<'all' | 'world' | 'nation' | 'church' | 'personal'>('all');
@@ -196,21 +197,25 @@ export function CommunityPanel({
     return posts.filter(post => {
       const hasVerseRef = post.verse_ref && post.verse_ref !== '글로벌 게시판' && post.verse_ref !== '';
       const cat = (post as any).category;
-      const isNotPrayer = cat !== 'prayer_general' && cat !== 'prayer_world';
-      
-      let matches = hasVerseRef && isNotPrayer;
-      
-      // Book filter
-      if (matches && scriptureBookFilter !== 'all') {
-        matches = post.book === scriptureBookFilter;
+      // Scripture board: verse_ref exists and not global board
+      return hasVerseRef && cat !== 'prayer_general' && cat !== 'prayer_world' && cat !== 'community_free';
+    });
+  };
+
+  // Get sorted scripture posts for table view
+  const getSortedScripturePosts = () => {
+    const scripturePosts = getScripturePosts();
+    
+    return [...scripturePosts].sort((a, b) => {
+      if (scriptureSort === 'newest') {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      } else if (scriptureSort === 'oldest') {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (scriptureSort === 'bible') {
+        // Bible order: sort by verse_ref
+        return (a.verse_ref || '').localeCompare(b.verse_ref || '', 'ko-KR');
       }
-      
-      // Tag filter
-      if (matches && scriptureTagFilter) {
-        matches = post.content?.includes(scriptureTagFilter) || false;
-      }
-      
-      return matches;
+      return 0;
     });
   };
   
@@ -2043,46 +2048,104 @@ export function CommunityPanel({
                     </div>
                   </div>
                 ) : (
-                  /* List View */
-                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  /* Excel-style Table View */
+                  <div className="flex-1 overflow-y-auto">
+                    {/* Sorting Controls */}
+                    <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-2 py-2 flex items-center gap-2">
+                      <span className="text-xs text-stone-500">정렬:</span>
+                      <button
+                        onClick={() => setScriptureSort('bible')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          scriptureSort === 'bible'
+                            ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                            : 'bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-200'
+                        }`}
+                      >
+                        성경 순서
+                      </button>
+                      <button
+                        onClick={() => setScriptureSort('newest')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          scriptureSort === 'newest'
+                            ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                            : 'bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-200'
+                        }`}
+                      >
+                        최신순
+                      </button>
+                      <button
+                        onClick={() => setScriptureSort('oldest')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          scriptureSort === 'oldest'
+                            ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                            : 'bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-200'
+                        }`}
+                      >
+                        과거순
+                      </button>
+                      <span className="ml-auto text-xs text-stone-400">
+                        {getSortedScripturePosts().length}개
+                      </span>
+                    </div>
+                    
                     {loadingPosts ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
                       </div>
-                    ) : getScripturePosts().length === 0 ? (
+                    ) : getSortedScripturePosts().length === 0 ? (
                       <div className="text-center py-8 text-stone-400">
                         <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
                         <p className="text-xs">말씀 연결된 게시글이 없습니다.</p>
                       </div>
                     ) : (
-                      getScripturePosts().slice(0, 20).map(post => {
-                        const isScriptureHighlighted = highlightedPostId === post.id;
-                        return (
-                        <div key={post.id} id={`post-${post.id}`}>
-                          {/* Simplified card render for scripture posts */}
-                          <div 
-                            className={`p-2 rounded-lg border text-xs cursor-pointer hover:shadow-md hover:border-amber-400 transition-all duration-500 ${
-                              (post as any).is_official ? 'bg-purple-50 border-purple-200' :
-                              (post as any).is_translation ? 'bg-emerald-50 border-emerald-200' :
-                              'bg-white border-stone-200'
-                            } ${isScriptureHighlighted ? 'ring-2 ring-yellow-400 bg-yellow-50 shadow-lg' : ''}`}
-                            onClick={() => {
-                              setSelectedScripturePost(post);
-                              if (!replies[post.id]) {
-                                loadReplies(post.id);
-                              }
-                            }}
-                          >
-                            <div className="flex items-center gap-1 mb-1">
-                              {(post as any).is_official && <Crown className="w-3 h-3 text-purple-600" />}
-                              {(post as any).is_translation && <Sparkles className="w-3 h-3 text-emerald-600" />}
-                              <span className="font-medium text-stone-700 truncate">{post.verse_ref}</span>
-                              <span className="ml-auto text-stone-400">{getDisplayName(post.profiles)}</span>
-                            </div>
-                            <p className="text-stone-600 line-clamp-2 whitespace-pre-wrap">{post.content}</p>
-                          </div>
-                        </div>
-                      )})
+                      <table className="w-full text-xs">
+                        {/* Table Header */}
+                        <thead className="bg-stone-100 sticky top-[36px] z-10">
+                          <tr>
+                            <th className="px-2 py-2 text-left font-medium text-stone-600 w-[120px]">성경 구절</th>
+                            <th className="px-2 py-2 text-left font-medium text-stone-600">내용 요약</th>
+                            <th className="px-2 py-2 text-left font-medium text-stone-600 w-[80px]">작성자</th>
+                            <th className="px-2 py-2 text-left font-medium text-stone-600 w-[70px]">날짜</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100">
+                          {getSortedScripturePosts().map(post => {
+                            const isScriptureHighlighted = highlightedPostId === post.id;
+                            return (
+                              <tr 
+                                key={post.id} 
+                                id={`post-${post.id}`}
+                                className={`cursor-pointer hover:bg-amber-50 transition-colors ${
+                                  isScriptureHighlighted ? 'bg-yellow-100' : ''
+                                } ${(post as any).is_official ? 'bg-purple-50/30' : (post as any).is_translation ? 'bg-emerald-50/30' : ''}`}
+                                onClick={() => {
+                                  setSelectedScripturePost(post);
+                                  if (!replies[post.id]) {
+                                    loadReplies(post.id);
+                                  }
+                                }}
+                              >
+                                <td className="px-2 py-2">
+                                  <div className="flex items-center gap-1">
+                                    {(post as any).is_official && <Crown className="w-3 h-3 text-purple-600 flex-shrink-0" />}
+                                    {(post as any).is_translation && <Sparkles className="w-3 h-3 text-emerald-600 flex-shrink-0" />}
+                                    <span className="font-medium text-stone-700 truncate">{post.verse_ref}</span>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2">
+                                  <p className="text-stone-600 line-clamp-1">{post.content}</p>
+                                </td>
+                                <td className="px-2 py-2 text-stone-500">
+                                  {getDisplayName(post.profiles)}
+                                </td>
+                                <td className="px-2 py-2 text-stone-400">
+                                  {new Date(post.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     )}
                   </div>
                 )}
