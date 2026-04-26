@@ -59,7 +59,6 @@ interface CommunityPanelProps {
   onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
   currentPath?: string; // Current page path for context-aware sharing
   showPrayerTabs?: boolean; // Show prayer category tabs (general/world)
-  onlyScripture?: boolean; // Show only scripture panel (for study page)
 }
 
 interface Post extends StudioReflection {
@@ -70,7 +69,7 @@ interface Post extends StudioReflection {
 }
 
 export function CommunityPanel({ 
-  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath, showPrayerTabs = false, onlyScripture = false 
+  selectedVerse, isLoggedIn, userRole, userName, initialPostId, onNavigateToVerse, currentPath, showPrayerTabs = false
 }: CommunityPanelProps) {
   const router = useRouter();
   
@@ -123,13 +122,11 @@ export function CommunityPanel({
   // Highlight state for deep-linked posts
   const [highlightedPostId, setHighlightedPostState] = useState<string | null>(initialPostId || null);
   
-  // Detail view states for free board, prayer board, and scripture board
+  // Detail view states for free board and prayer board
   const [selectedFreePost, setSelectedFreePost] = useState<Post | null>(null);
   const [selectedPrayerPost, setSelectedPrayerPost] = useState<Post | null>(null);
-  const [selectedScripturePost, setSelectedScripturePost] = useState<Post | null>(null);
-  
   // Full view mode for each board
-  const [fullViewBoard, setFullViewBoard] = useState<'scripture' | 'free' | 'prayer' | null>(null);
+  const [fullViewBoard, setFullViewBoard] = useState<'free' | 'prayer' | null>(null);
   
   // Replies state
   const [replies, setReplies] = useState<Record<string, StudioReflection[]>>({});
@@ -169,11 +166,6 @@ export function CommunityPanel({
   const [profileModalActivity, setProfileModalActivity] = useState<{reflections: any[]; studyNotes: any[]} | null>(null);
   const [loadingProfileActivity, setLoadingProfileActivity] = useState(false);
 
-  // Scripture panel filters and sort
-  const [scriptureBookFilter, setScriptureBookFilter] = useState<string>('all');
-  const [scriptureTagFilter, setScriptureTagFilter] = useState<string | null>(null);
-  const [scriptureSort, setScriptureSort] = useState<'bible' | 'newest' | 'oldest'>('newest');
-
   // Prayer panel state (5 types including 'all')
   const [prayerType, setPrayerType] = useState<'all' | 'world' | 'nation' | 'church' | 'personal'>('all');
   
@@ -194,34 +186,8 @@ export function CommunityPanel({
   const [showPrayerInput, setShowPrayerInput] = useState(false);
   
   // Desktop tab state (for backward compatibility)
-  const [desktopTab, setDesktopTab] = useState<'scripture' | 'free' | 'prayer'>('scripture');
+  const [desktopTab, setDesktopTab] = useState<'free' | 'prayer'>('free');
   
-  // Filter posts for 3-column layout
-  const getScripturePosts = () => {
-    return posts.filter(post => {
-      const hasVerseRef = post.verse_ref && post.verse_ref !== '글로벌 게시판' && post.verse_ref !== '';
-      const cat = (post as any).category;
-      // Scripture board: verse_ref exists and not global board
-      return hasVerseRef && cat !== 'prayer_general' && cat !== 'prayer_world' && cat !== 'community_free';
-    });
-  };
-
-  // Get sorted scripture posts for table view
-  const getSortedScripturePosts = () => {
-    const scripturePosts = getScripturePosts();
-    
-    return [...scripturePosts].sort((a, b) => {
-      if (scriptureSort === 'newest') {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      } else if (scriptureSort === 'oldest') {
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      } else if (scriptureSort === 'bible') {
-        // Bible order: sort by verse_ref
-        return (a.verse_ref || '').localeCompare(b.verse_ref || '', 'ko-KR');
-      }
-      return 0;
-    });
-  };
   
   const getFreeBoardPosts = () => {
     // Simplified: Only show posts with category 'general' (free board posts)
@@ -386,12 +352,10 @@ export function CommunityPanel({
           setSelectedFreePost(post);
         } else if (cat === 'prayer_general' || cat === 'prayer_world') {
           setSelectedPrayerPost(post);
-        } else if (cat === 'translation' || cat === 'ministry' || cat === 'reflection') {
-          setSelectedScripturePost(post);
         }
       }
       
-      // Small delay to ensure DOM is ready (for scripture board scroll)
+      // Small delay to ensure DOM is ready
       setTimeout(() => {
         const element = document.getElementById(`post-${initialPostId}`);
         if (element) {
@@ -1829,8 +1793,8 @@ export function CommunityPanel({
               )}
             </div>
             
-            {/* Desktop View (lg and above) - True 3-Column Grid Layout (or Single Column for onlyScripture or fullViewBoard) */}
-            <div className={`hidden lg:grid ${(onlyScripture || fullViewBoard) ? 'lg:grid-cols-1' : 'lg:grid-cols-3 lg:gap-4'} lg:h-[calc(100vh-280px)]`}>
+            {/* Desktop View (lg and above) - 2-Column Grid Layout */}
+            <div className={`hidden lg:grid ${fullViewBoard ? 'lg:grid-cols-1' : 'lg:grid-cols-2 lg:gap-4'} lg:h-[calc(100vh-280px)]`}>
               
               {/* Full View Mode Back Button */}
               {fullViewBoard && (
@@ -1843,321 +1807,15 @@ export function CommunityPanel({
                     전체 게시판 보기
                   </button>
                   <span className="text-sm text-stone-500">
-                    {fullViewBoard === 'scripture' && '말씀 묵상 게시판'}
                     {fullViewBoard === 'free' && '자유 게시판'}
                     {fullViewBoard === 'prayer' && '기도 게시판'}
                   </span>
                 </div>
               )}
               
-              {/* LEFT PANEL: Scripture Meditation Board - Hidden in other boards' full view */}
-              {(!fullViewBoard || fullViewBoard === 'scripture') && (
-              <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
-                {/* Panel Header */}
-                <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-amber-700" />
-                    <h3 className="text-sm font-serif font-semibold text-amber-800">말씀 묵상 게시판</h3>
-                    <span className="ml-auto text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{getScripturePosts().length}</span>
-                    <button
-                      onClick={() => setFullViewBoard('scripture')}
-                      className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors"
-                      title="크게 보기"
-                    >
-                      <span>🔎</span>
-                      크게 보기
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(window.location.origin + '/community#scripture');
-                        alert('게시판 링크가 복사되었습니다');
-                      }}
-                      className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded transition-colors"
-                      title="게시판 링크 복사"
-                    >
-                      <Link2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-amber-600 mt-1">
-                    '말씀 나눔터'나 '원어 연구소'에서 작성된 글들입니다
-                  </p>
-                </div>
-                
-                {/* Filters */}
-                <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-3 h-3 text-stone-400" />
-                    <select
-                      value={scriptureBookFilter}
-                      onChange={(e) => setScriptureBookFilter(e.target.value)}
-                      className="flex-1 text-xs px-2 py-1 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-amber-300"
-                    >
-                      <option value="all">전체 성경</option>
-                      {books.map(book => (
-                        <option key={book.id} value={book.id}>{book.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {['#묵상', '#번역', '#나눔', '#질문'].map(tag => (
-                      <button
-                        key={tag}
-                        onClick={() => setScriptureTagFilter(scriptureTagFilter === tag ? null : tag)}
-                        className={`text-xs px-2 py-0.5 rounded-full transition-colors ${
-                          scriptureTagFilter === tag
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Read-only Notice */}
-                <div className="px-3 py-2 bg-blue-50 border-b border-blue-100">
-                  <p className="text-xs text-blue-700">
-                    <BookMarked className="w-3 h-3 inline mr-1" />
-                    이곳은 읽기 전용입니다. 글은 성경 본문 패널에서 작성해 주세요.
-                  </p>
-                </div>
-                
-                {/* Scripture Posts List OR Detail View */}
-                {selectedScripturePost ? (
-                  /* Detail View Mode */
-                  <div className="flex-1 overflow-y-auto">
-                    {/* Dual Navigation Buttons */}
-                    <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedScripturePost(null);
-                          setExpandedPostId(null);
-                        }}
-                        className="flex items-center gap-1 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                        목록으로 돌아가기
-                      </button>
-                      <button
-                        onClick={() => handleNavigateToVerse(selectedScripturePost)}
-                        className="flex items-center gap-1 text-sm text-amber-700 hover:text-amber-800 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors ml-auto"
-                      >
-                        <BookOpen className="w-4 h-4" />
-                        해당 구절로 이동
-                      </button>
-                    </div>
-                    
-                    {/* Full Post View */}
-                    <div className="p-6">
-                      {(() => {
-                        const post = selectedScripturePost;
-                        const isOfficial = (post as any).is_official;
-                        const isTranslation = (post as any).is_translation;
-                        const postReplies = replies[post.id] || [];
-                        const isLoading = loadingReplies[post.id];
-                        const replyText = newReply[post.id] || '';
-                        const isSaving = savingReply[post.id];
-                        
-                        return (
-                          <div className={`p-4 rounded-lg border-2 ${
-                            isOfficial ? 'bg-purple-50 border-purple-200' :
-                            isTranslation ? 'bg-emerald-50 border-emerald-200' :
-                            'bg-white border-stone-200'
-                          }`}>
-                            {/* Header */}
-                            <div className="flex items-center gap-2 mb-3">
-                              {isOfficial && <Crown className="w-4 h-4 text-purple-600" />}
-                              {isTranslation && <Sparkles className="w-4 h-4 text-emerald-600" />}
-                              <span className="font-bold text-stone-800">{post.verse_ref}</span>
-                              <span className="ml-auto text-sm text-stone-500">{getDisplayName(post.profiles)}</span>
-                            </div>
-                            
-                            {/* Content */}
-                            <div className="mb-4">
-                              <p className="text-base text-stone-800 whitespace-pre-wrap leading-relaxed">{post.content}</p>
-                            </div>
-                            
-                            {/* Like Button */}
-                            <button
-                              onClick={() => handleToggleLike(post.id, !!(post as any).userHasLiked)}
-                              className={`flex items-center gap-1 px-3 py-2 text-sm rounded transition-colors mb-4 ${
-                                (post as any).userHasLiked 
-                                  ? 'bg-red-50 text-red-600 hover:bg-red-100' 
-                                  : 'text-stone-600 hover:bg-stone-100'
-                              }`}
-                            >
-                              <Heart className={`w-4 h-4 ${(post as any).userHasLiked ? 'fill-current' : ''}`} />
-                              공감 {(post as any).likesCount || 0}
-                            </button>
-                            
-                            {/* Replies Section */}
-                            <div className="mt-4 pt-4 border-t border-stone-200">
-                              <h4 className="font-bold text-stone-700 mb-3 flex items-center gap-2">
-                                <MessageSquare className="w-4 h-4" />
-                                댓글 ({postReplies.length})
-                              </h4>
-                              
-                              {/* Reply Input */}
-                              {currentUserId && (
-                                <div className="flex gap-2 mb-3">
-                                  <input
-                                    type="text"
-                                    value={replyText}
-                                    onChange={(e) => setNewReply({ ...newReply, [post.id]: e.target.value })}
-                                    placeholder="댓글을 입력하세요..."
-                                    className="flex-1 px-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && replyText.trim()) {
-                                        handleSaveReply(post.id);
-                                      }
-                                    }}
-                                  />
-                                  <button
-                                    onClick={() => handleSaveReply(post.id)}
-                                    disabled={!replyText.trim() || isSaving}
-                                    className="px-3 py-2 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-700 disabled:opacity-50"
-                                  >
-                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : '작성'}
-                                  </button>
-                                </div>
-                              )}
-                              
-                              {/* Replies List */}
-                              {isLoading ? (
-                                <div className="flex items-center justify-center py-4">
-                                  <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
-                                </div>
-                              ) : postReplies.length === 0 ? (
-                                <p className="text-sm text-stone-400 text-center py-4">첫 댓글을 남겨보세요</p>
-                              ) : (
-                                <div className="space-y-3">
-                                  {postReplies.map((reply) => (
-                                    <div key={reply.id} className="p-3 bg-white rounded-lg border border-stone-100">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-sm font-medium text-stone-700">{getDisplayName(reply.profiles)}</span>
-                                        <span className="text-xs text-stone-400">
-                                          {new Date(reply.created_at).toLocaleDateString('ko-KR')}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm text-stone-800">{reply.content}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                ) : (
-                  /* Excel-style Table View */
-                  <div className="flex-1 overflow-y-auto">
-                    {/* Sorting Controls */}
-                    <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-2 py-2 flex items-center gap-2">
-                      <span className="text-xs text-stone-500">정렬:</span>
-                      <button
-                        onClick={() => setScriptureSort('bible')}
-                        className={`px-2 py-1 text-xs rounded transition-colors ${
-                          scriptureSort === 'bible'
-                            ? 'bg-amber-100 text-amber-700 border border-amber-300'
-                            : 'bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-200'
-                        }`}
-                      >
-                        성경 순서
-                      </button>
-                      <button
-                        onClick={() => setScriptureSort('newest')}
-                        className={`px-2 py-1 text-xs rounded transition-colors ${
-                          scriptureSort === 'newest'
-                            ? 'bg-amber-100 text-amber-700 border border-amber-300'
-                            : 'bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-200'
-                        }`}
-                      >
-                        최신순
-                      </button>
-                      <button
-                        onClick={() => setScriptureSort('oldest')}
-                        className={`px-2 py-1 text-xs rounded transition-colors ${
-                          scriptureSort === 'oldest'
-                            ? 'bg-amber-100 text-amber-700 border border-amber-300'
-                            : 'bg-stone-100 text-stone-600 border border-stone-200 hover:bg-stone-200'
-                        }`}
-                      >
-                        과거순
-                      </button>
-                      <span className="ml-auto text-xs text-stone-400">
-                        {getSortedScripturePosts().length}개
-                      </span>
-                    </div>
-                    
-                    {loadingPosts ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
-                      </div>
-                    ) : getSortedScripturePosts().length === 0 ? (
-                      <div className="text-center py-8 text-stone-400">
-                        <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                        <p className="text-xs">말씀 연결된 게시글이 없습니다.</p>
-                      </div>
-                    ) : (
-                      <table className="w-full text-xs">
-                        {/* Table Header */}
-                        <thead className="bg-stone-100 sticky top-[36px] z-10">
-                          <tr>
-                            <th className="px-2 py-2 text-left font-medium text-stone-600 w-[120px]">성경 구절</th>
-                            <th className="px-2 py-2 text-left font-medium text-stone-600">내용 요약</th>
-                            <th className="px-2 py-2 text-left font-medium text-stone-600 w-[80px]">작성자</th>
-                            <th className="px-2 py-2 text-left font-medium text-stone-600 w-[70px]">날짜</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stone-100">
-                          {getSortedScripturePosts().map(post => {
-                            const isScriptureHighlighted = highlightedPostId === post.id;
-                            return (
-                              <tr 
-                                key={post.id} 
-                                id={`post-${post.id}`}
-                                className={`cursor-pointer hover:bg-amber-50 transition-colors ${
-                                  isScriptureHighlighted ? 'bg-yellow-100' : ''
-                                } ${(post as any).is_official ? 'bg-purple-50/30' : (post as any).is_translation ? 'bg-emerald-50/30' : ''}`}
-                                onClick={() => {
-                                  setSelectedScripturePost(post);
-                                  if (!replies[post.id]) {
-                                    loadReplies(post.id);
-                                  }
-                                }}
-                              >
-                                <td className="px-2 py-2">
-                                  <div className="flex items-center gap-1">
-                                    {(post as any).is_official && <Crown className="w-3 h-3 text-purple-600 flex-shrink-0" />}
-                                    {(post as any).is_translation && <Sparkles className="w-3 h-3 text-emerald-600 flex-shrink-0" />}
-                                    <span className="font-medium text-stone-700 truncate">{post.verse_ref}</span>
-                                  </div>
-                                </td>
-                                <td className="px-2 py-2">
-                                  <p className="text-stone-600 line-clamp-1">{post.content}</p>
-                                </td>
-                                <td className="px-2 py-2 text-stone-500">
-                                  {getDisplayName(post.profiles)}
-                                </td>
-                                <td className="px-2 py-2 text-stone-400">
-                                  {new Date(post.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-              </div>
-              )}
 
-              {/* CENTER PANEL: Free Community Board - Hidden when onlyScripture or other boards' full view */}
-              {!onlyScripture && (!fullViewBoard || fullViewBoard === 'free') && (
+              {/* LEFT PANEL: Free Community Board */}
+              {(!fullViewBoard || fullViewBoard === 'free') && (
               <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
                 {/* Panel Header */}
                 <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-200">
@@ -2423,8 +2081,8 @@ export function CommunityPanel({
               </div>
               )}
 
-              {/* RIGHT PANEL: Prayer Board - Hidden when onlyScripture or other boards' full view */}
-              {!onlyScripture && (!fullViewBoard || fullViewBoard === 'prayer') && (
+              {/* RIGHT PANEL: Prayer Board */}
+              {(!fullViewBoard || fullViewBoard === 'prayer') && (
               <div className="flex flex-col bg-white rounded-lg border border-stone-200 overflow-hidden">
                 {/* Panel Header */}
                 <div className="px-4 py-3 bg-red-50 border-b border-red-200">
