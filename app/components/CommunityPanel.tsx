@@ -120,9 +120,10 @@ export function CommunityPanel({
   // Highlight state for deep-linked posts
   const [highlightedPostId, setHighlightedPostState] = useState<string | null>(initialPostId || null);
   
-  // Detail view states for free board and prayer board
+  // Detail view states for free board, prayer board, and scripture board
   const [selectedFreePost, setSelectedFreePost] = useState<Post | null>(null);
   const [selectedPrayerPost, setSelectedPrayerPost] = useState<Post | null>(null);
+  const [selectedScripturePost, setSelectedScripturePost] = useState<Post | null>(null);
   
   // Replies state
   const [replies, setReplies] = useState<Record<string, StudioReflection[]>>({});
@@ -347,18 +348,20 @@ export function CommunityPanel({
   }, [expandedPostId]);
 
   // Auto-scroll and highlight initial post when deep-linked
-  // Also auto-enter detail view mode for free/prayer boards
+  // Also auto-enter detail view mode for free/prayer/scripture boards
   useEffect(() => {
     if (initialPostId && posts.length > 0) {
       // Find the post and check its category
       const post = posts.find(p => p.id === initialPostId);
       if (post) {
         const cat = (post as any).category;
-        // Auto-enter detail view for free board and prayer board posts
+        // Auto-enter detail view for different board types
         if (cat === 'general') {
           setSelectedFreePost(post);
         } else if (cat === 'prayer_general' || cat === 'prayer_world') {
           setSelectedPrayerPost(post);
+        } else if (cat === 'translation' || cat === 'ministry' || cat === 'reflection') {
+          setSelectedScripturePost(post);
         }
       }
       
@@ -1820,51 +1823,165 @@ export function CommunityPanel({
                   </p>
                 </div>
                 
-                {/* Scripture Posts List */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {loadingPosts ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                {/* Scripture Posts List OR Detail View */}
+                {selectedScripturePost ? (
+                  /* Detail View Mode */
+                  <div className="flex-1 overflow-y-auto">
+                    {/* Dual Navigation Buttons */}
+                    <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedScripturePost(null);
+                          setExpandedPostId(null);
+                        }}
+                        className="flex items-center gap-1 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        목록으로 돌아가기
+                      </button>
+                      <button
+                        onClick={() => handleNavigateToVerse(selectedScripturePost)}
+                        className="flex items-center gap-1 text-sm text-amber-700 hover:text-amber-800 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors ml-auto"
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        해당 구절로 이동
+                      </button>
                     </div>
-                  ) : getScripturePosts().length === 0 ? (
-                    <div className="text-center py-8 text-stone-400">
-                      <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                      <p className="text-xs">말씀 연결된 게시글이 없습니다.</p>
-                    </div>
-                  ) : (
-                    getScripturePosts().slice(0, 20).map(post => {
-                      const isScriptureHighlighted = highlightedPostId === post.id;
-                      return (
-                      <div key={post.id} id={`post-${post.id}`} className="renderPost(post, false, true)">
-                        {/* Simplified card render for scripture posts */}
-                        <div 
-                          className={`p-2 rounded-lg border text-xs cursor-pointer hover:shadow-md hover:border-amber-400 transition-all duration-500 ${
-                            (post as any).is_official ? 'bg-purple-50 border-purple-200' :
-                            (post as any).is_translation ? 'bg-emerald-50 border-emerald-200' :
+                    
+                    {/* Full Post View */}
+                    <div className="p-6">
+                      {(() => {
+                        const post = selectedScripturePost;
+                        const isOfficial = (post as any).is_official;
+                        const isTranslation = (post as any).is_translation;
+                        const postReplies = replies[post.id] || [];
+                        const isLoading = loadingReplies[post.id];
+                        const replyText = newReply[post.id] || '';
+                        const isSaving = savingReply[post.id];
+                        
+                        return (
+                          <div className={`p-4 rounded-lg border-2 ${
+                            isOfficial ? 'bg-purple-50 border-purple-200' :
+                            isTranslation ? 'bg-emerald-50 border-emerald-200' :
                             'bg-white border-stone-200'
-                          } ${isScriptureHighlighted ? 'ring-2 ring-yellow-400 bg-yellow-50 shadow-lg' : ''}`}
-                          onClick={() => {
-                            toggleExpand(post.id);
-                            handleNavigateToVerse(post);
-                          }}
-                        >
-                          <div className="flex items-center gap-1 mb-1">
-                            {(post as any).is_official && <Crown className="w-3 h-3 text-purple-600" />}
-                            {(post as any).is_translation && <Sparkles className="w-3 h-3 text-emerald-600" />}
-                            <span className="font-medium text-stone-700 truncate">{post.verse_ref}</span>
-                            <span className="ml-auto text-stone-400">{getDisplayName(post.profiles)}</span>
-                          </div>
-                          <p className="text-stone-600 line-clamp-2 whitespace-pre-wrap">{post.content}</p>
-                          {expandedPostId === post.id && (
-                            <div className="mt-2 pt-2 border-t border-stone-100">
-                              <p className="text-stone-700 whitespace-pre-wrap">{post.content}</p>
+                          }`}>
+                            {/* Header */}
+                            <div className="flex items-center gap-2 mb-3">
+                              {isOfficial && <Crown className="w-4 h-4 text-purple-600" />}
+                              {isTranslation && <Sparkles className="w-4 h-4 text-emerald-600" />}
+                              <span className="font-bold text-stone-800">{post.verse_ref}</span>
+                              <span className="ml-auto text-sm text-stone-500">{getDisplayName(post.profiles)}</span>
                             </div>
-                          )}
-                        </div>
+                            
+                            {/* Content */}
+                            <div className="mb-4">
+                              <p className="text-base text-stone-800 whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                            </div>
+                            
+                            {/* Replies Section */}
+                            <div className="mt-4 pt-4 border-t border-stone-200">
+                              <h4 className="font-bold text-stone-700 mb-3 flex items-center gap-2">
+                                <MessageSquare className="w-4 h-4" />
+                                댓글 ({postReplies.length})
+                              </h4>
+                              
+                              {/* Reply Input */}
+                              {currentUserId && (
+                                <div className="flex gap-2 mb-3">
+                                  <input
+                                    type="text"
+                                    value={replyText}
+                                    onChange={(e) => setNewReply({ ...newReply, [post.id]: e.target.value })}
+                                    placeholder="댓글을 입력하세요..."
+                                    className="flex-1 px-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && replyText.trim()) {
+                                        handleSaveReply(post.id);
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => handleSaveReply(post.id)}
+                                    disabled={!replyText.trim() || isSaving}
+                                    className="px-3 py-2 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-700 disabled:opacity-50"
+                                  >
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : '작성'}
+                                  </button>
+                                </div>
+                              )}
+                              
+                              {/* Replies List */}
+                              {isLoading ? (
+                                <div className="flex items-center justify-center py-4">
+                                  <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                                </div>
+                              ) : postReplies.length === 0 ? (
+                                <p className="text-sm text-stone-400 text-center py-4">첫 댓글을 남겨보세요</p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {postReplies.map((reply) => (
+                                    <div key={reply.id} className="p-3 bg-white rounded-lg border border-stone-100">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-sm font-medium text-stone-700">{getDisplayName(reply.profiles)}</span>
+                                        <span className="text-xs text-stone-400">
+                                          {new Date(reply.created_at).toLocaleDateString('ko-KR')}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm text-stone-800">{reply.content}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                ) : (
+                  /* List View */
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {loadingPosts ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
                       </div>
-                    )})
-                  )}
-                </div>
+                    ) : getScripturePosts().length === 0 ? (
+                      <div className="text-center py-8 text-stone-400">
+                        <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-xs">말씀 연결된 게시글이 없습니다.</p>
+                      </div>
+                    ) : (
+                      getScripturePosts().slice(0, 20).map(post => {
+                        const isScriptureHighlighted = highlightedPostId === post.id;
+                        return (
+                        <div key={post.id} id={`post-${post.id}`}>
+                          {/* Simplified card render for scripture posts */}
+                          <div 
+                            className={`p-2 rounded-lg border text-xs cursor-pointer hover:shadow-md hover:border-amber-400 transition-all duration-500 ${
+                              (post as any).is_official ? 'bg-purple-50 border-purple-200' :
+                              (post as any).is_translation ? 'bg-emerald-50 border-emerald-200' :
+                              'bg-white border-stone-200'
+                            } ${isScriptureHighlighted ? 'ring-2 ring-yellow-400 bg-yellow-50 shadow-lg' : ''}`}
+                            onClick={() => {
+                              setSelectedScripturePost(post);
+                              if (!replies[post.id]) {
+                                loadReplies(post.id);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-1 mb-1">
+                              {(post as any).is_official && <Crown className="w-3 h-3 text-purple-600" />}
+                              {(post as any).is_translation && <Sparkles className="w-3 h-3 text-emerald-600" />}
+                              <span className="font-medium text-stone-700 truncate">{post.verse_ref}</span>
+                              <span className="ml-auto text-stone-400">{getDisplayName(post.profiles)}</span>
+                            </div>
+                            <p className="text-stone-600 line-clamp-2 whitespace-pre-wrap">{post.content}</p>
+                          </div>
+                        </div>
+                      )})
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* CENTER PANEL: Free Community Board - Hidden when onlyScripture */}
@@ -2240,7 +2357,7 @@ export function CommunityPanel({
                         className="flex items-center gap-1 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 px-3 py-1.5 rounded-lg transition-colors"
                       >
                         <ArrowLeft className="w-4 h-4" />
-                        목록으로 돌아가기
+                        전체 기도 목록으로
                       </button>
                     </div>
                     
@@ -2343,6 +2460,62 @@ export function CommunityPanel({
                                 >
                                   기도 응답 상태 변경
                                 </button>
+                              )}
+                            </div>
+                            
+                            {/* Replies Section - Intercessory Prayers */}
+                            <div className="mt-6 pt-4 border-t border-stone-200">
+                              <h4 className="font-bold text-stone-700 mb-4 flex items-center gap-2 text-lg">
+                                <Heart className="w-5 h-5 text-red-500" />
+                                중보 기도 ({(replies[post.id] || []).length})
+                              </h4>
+                              
+                              {/* Reply Input */}
+                              {currentUserId && (
+                                <div className="flex gap-2 mb-4">
+                                  <input
+                                    type="text"
+                                    value={newReply[post.id] || ''}
+                                    onChange={(e) => setNewReply({ ...newReply, [post.id]: e.target.value })}
+                                    placeholder="중보 기도를 남겨주세요..."
+                                    className="flex-1 px-4 py-3 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-200"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && (newReply[post.id] || '').trim()) {
+                                        handleSaveReply(post.id);
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => handleSaveReply(post.id)}
+                                    disabled={!(newReply[post.id] || '').trim() || savingReply[post.id]}
+                                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
+                                  >
+                                    {savingReply[post.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : '기도하기'}
+                                  </button>
+                                </div>
+                              )}
+                              
+                              {/* Replies List */}
+                              {loadingReplies[post.id] ? (
+                                <div className="flex items-center justify-center py-4">
+                                  <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                                </div>
+                              ) : (replies[post.id] || []).length === 0 ? (
+                                <p className="text-sm text-stone-400 text-center py-6 bg-stone-50 rounded-lg">첫 중보 기도를 남겨보세요</p>
+                              ) : (
+                                <div className="space-y-4">
+                                  {(replies[post.id] || []).map((reply) => (
+                                    <div key={reply.id} className="p-4 bg-red-50/50 rounded-lg border border-red-100">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className="font-medium text-stone-700">{getDisplayName(reply.profiles)}</span>
+                                        <span className="text-xs text-stone-400">
+                                          {new Date(reply.created_at).toLocaleDateString('ko-KR')}
+                                        </span>
+                                      </div>
+                                      <p className="text-stone-800 whitespace-pre-wrap">{reply.content}</p>
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           </div>
