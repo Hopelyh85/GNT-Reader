@@ -719,7 +719,7 @@ export async function addPublicReflection(
   if (error) throw error;
 }
 
-// Save translation to reflections table (migrated from study_notes)
+// Save translation to reflections table (migrated from study_notes) with upsert
 export async function saveTranslation(
   verseRef: string,
   book: string,
@@ -732,25 +732,9 @@ export async function saveTranslation(
   const user = await getCurrentUser();
   if (!user) throw new Error('Not authenticated');
   
-  // Check if translation already exists for this user and verse
-  const { data: existing } = await supabase
-    .from('reflections')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('verse_ref', verseRef)
-    .eq('category', category)
-    .maybeSingle();
-  
-  if (existing) {
-    // Update existing translation
-    const { error } = await supabase
-      .from('reflections')
-      .update({ content, updated_at: new Date().toISOString() })
-      .eq('id', existing.id);
-    if (error) throw error;
-  } else {
-    // Insert new translation
-    const { error } = await supabase.from('reflections').insert({
+  // Upsert: user_id + verse_ref + category 조합이 유일키
+  const { error } = await supabase.from('reflections').upsert(
+    {
       user_id: user.id,
       verse_ref: verseRef,
       book,
@@ -760,9 +744,12 @@ export async function saveTranslation(
       is_public: true,
       category: category,
       is_admin_approved: true,
-    });
-    if (error) throw error;
-  }
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,verse_ref,category' }
+  );
+  
+  if (error) throw error;
 }
 
 // Get user's translation for a specific verse

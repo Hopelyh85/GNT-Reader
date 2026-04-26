@@ -53,6 +53,9 @@ interface Comment {
   created_at: string;
   is_translation: boolean;
   is_official: boolean;
+  is_best?: boolean;
+  is_pinned?: boolean;
+  category?: string;
   profiles: {
     display_name: string;
     tier: string;
@@ -179,7 +182,7 @@ function VersePageContent() {
         const { data: reflections, error } = await supabase
           .from('reflections')
           .select(`
-            id, user_id, verse_ref, content, created_at, is_translation, is_official,
+            id, user_id, verse_ref, content, created_at, is_translation, is_official, is_best, is_pinned, category,
             book, chapter, verse,
             profiles(display_name, tier)
           `)
@@ -316,19 +319,13 @@ function VersePageContent() {
   };
   
   const formatTime = (date: string) => {
-    const now = new Date();
-    const past = new Date(date);
-    const diff = now.getTime() - past.getTime();
-    
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-    
-    if (minutes < 1) return '방금';
-    if (minutes < 60) return `${minutes}분 전`;
-    if (hours < 24) return `${hours}시간 전`;
-    if (days < 7) return `${days}일 전`;
-    return past.toLocaleDateString('ko-KR');
+    return new Date(date).toLocaleString('ko-KR', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   };
   
   const shareComment = (commentId: string) => {
@@ -458,7 +455,7 @@ function VersePageContent() {
             </div>
           )}
           
-          {/* Comments List */}
+          {/* Comments List - New Hierarchy */}
           <div className="divide-y divide-stone-200">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -473,139 +470,187 @@ function VersePageContent() {
                 </p>
               </div>
             ) : (
-              comments.map((comment) => (
-                <div
-                  key={comment.id}
-                  ref={(el) => { commentRefs.current[comment.id] = el; }}
-                  className={`transition-all duration-500 ${
-                    highlightedId === comment.id 
-                      ? 'bg-amber-100 ring-2 ring-amber-300' 
-                      : comment.is_translation 
-                        ? 'bg-emerald-50/30' 
-                        : 'bg-white'
-                  }`}
-                >
-                  <div className="p-4">
-                    {/* Comment Header - Simple: Name, Date, Badge */}
-                    <div className="flex items-center gap-2 mb-2">
-                      {comment.is_official && <Crown className="w-3.5 h-3.5 text-amber-600" />}
-                      {comment.is_translation && <Sparkles className="w-3.5 h-3.5 text-emerald-600" />}
-                      <span className="font-medium text-sm text-stone-800">
-                        {comment.profiles?.display_name || '익명'}
-                      </span>
-                      <span className="text-xs text-stone-400">·</span>
-                      <span className="text-xs text-stone-400">{formatTime(comment.created_at)}</span>
-                      {comment.is_translation && (
-                        <span className="ml-auto text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
-                          번역
+              (() => {
+                // 1. Personal Translations (사역)
+                const translations = comments.filter(c => c.is_translation || c.category === 'translation');
+                // 2. Admin Picks (is_best or is_pinned)
+                const adminPicks = comments.filter(c => (c.is_best || c.is_pinned) && !c.is_translation && c.category !== 'translation');
+                // 3. Top 10 Liked (general reflections)
+                const generalReflections = comments.filter(c => !c.is_translation && c.category !== 'translation' && !c.is_best && !c.is_pinned);
+                const topLiked = [...generalReflections].sort((a, b) => b.likesCount - a.likesCount).slice(0, 10);
+                
+                const renderCommentItem = (comment: Comment, sectionLabel?: string) => (
+                  <div
+                    key={comment.id}
+                    ref={(el) => { commentRefs.current[comment.id] = el; }}
+                    className={`transition-all duration-500 ${
+                      highlightedId === comment.id 
+                        ? 'bg-amber-100 ring-2 ring-amber-300' 
+                        : comment.is_translation || comment.category === 'translation'
+                          ? 'bg-emerald-50/30' 
+                          : comment.is_best || comment.is_pinned
+                            ? 'bg-amber-50/50'
+                            : 'bg-white'
+                    }`}
+                  >
+                    <div className="p-4">
+                      {/* Comment Header with Section Label */}
+                      <div className="flex items-center gap-2 mb-2">
+                        {comment.is_official && <Crown className="w-3.5 h-3.5 text-amber-600" />}
+                        {comment.is_translation || comment.category === 'translation' ? (
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : comment.is_best || comment.is_pinned ? (
+                          <span className="text-xs px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded">⭐ 선정</span>
+                        ) : null}
+                        <span className="font-medium text-sm text-stone-800">
+                          {comment.profiles?.display_name || '익명'}
                         </span>
-                      )}
+                        <span className="text-xs text-stone-400">·</span>
+                        <span className="text-xs text-stone-400">{formatTime(comment.created_at)}</span>
+                        {sectionLabel && (
+                          <span className="ml-auto text-[10px] px-2 py-0.5 bg-stone-100 text-stone-600 rounded-full">
+                            {sectionLabel}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Comment Content */}
+                      <p className="text-stone-800 text-sm leading-relaxed whitespace-pre-wrap mb-3">
+                        {comment.content}
+                      </p>
+                      
+                      {/* Comment Actions */}
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => handleToggleLike(comment.id, comment.userHasLiked)}
+                          className={`flex items-center gap-1 text-sm transition-colors ${
+                            comment.userHasLiked 
+                              ? 'text-red-600' 
+                              : 'text-stone-500 hover:text-stone-700'
+                          }`}
+                        >
+                          <span className="text-lg">🙏</span>
+                          <span className="text-xs">기도합니다</span>
+                          {comment.likesCount > 0 && (
+                            <span className="text-xs font-medium">{comment.likesCount}</span>
+                          )}
+                        </button>
+                        
+                        <button
+                          onClick={() => toggleReplies(comment.id)}
+                          className="flex items-center gap-1 text-sm text-stone-500 hover:text-stone-700 transition-colors"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span className="text-xs">답글 달기</span>
+                          {comment.replies.length > 0 && (
+                            <span className="text-xs font-medium">{comment.replies.length}</span>
+                          )}
+                        </button>
+                        
+                        <button
+                          onClick={() => shareComment(comment.id)}
+                          className="flex items-center gap-1 text-sm text-stone-400 hover:text-stone-600 transition-colors ml-auto"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     
-                    {/* Comment Content */}
-                    <p className="text-stone-800 text-sm leading-relaxed whitespace-pre-wrap mb-3">
-                      {comment.content}
-                    </p>
-                    
-                    {/* Comment Actions - Only Two Buttons */}
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => handleToggleLike(comment.id, comment.userHasLiked)}
-                        className={`flex items-center gap-1 text-sm transition-colors ${
-                          comment.userHasLiked 
-                            ? 'text-red-600' 
-                            : 'text-stone-500 hover:text-stone-700'
-                        }`}
-                      >
-                        <span className="text-lg">🙏</span>
-                        <span className="text-xs">기도합니다</span>
-                        {comment.likesCount > 0 && (
-                          <span className="text-xs font-medium">{comment.likesCount}</span>
-                        )}
-                      </button>
-                      
-                      <button
-                        onClick={() => toggleReplies(comment.id)}
-                        className="flex items-center gap-1 text-sm text-stone-500 hover:text-stone-700 transition-colors"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        <span className="text-xs">답글 달기</span>
+                    {/* Replies Section */}
+                    {expandedReplies.has(comment.id) && (
+                      <div className="px-4 pb-4 bg-stone-100/50">
                         {comment.replies.length > 0 && (
-                          <span className="text-xs font-medium">{comment.replies.length}</span>
-                        )}
-                      </button>
-                      
-                      <button
-                        onClick={() => shareComment(comment.id)}
-                        className="flex items-center gap-1 text-sm text-stone-400 hover:text-stone-600 transition-colors ml-auto"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* Replies Section */}
-                  {expandedReplies.has(comment.id) && (
-                    <div className="px-4 pb-4 bg-stone-100/50">
-                      {/* Reply List */}
-                      {comment.replies.length > 0 && (
-                        <div className="space-y-3 mb-3 pl-2 border-l-2 border-stone-200">
-                          {comment.replies.map((reply) => (
-                            <div key={reply.id} className="flex gap-3 p-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-medium text-stone-700">
-                                    {reply.profiles?.display_name || '익명'}
-                                  </span>
-                                  <span className="text-xs text-stone-400">
-                                    {new Date(reply.created_at).toLocaleDateString('ko-KR')}
-                                  </span>
-                                  <button 
-                                    onClick={() => handleToggleLike(reply.id, (reply as any).liked || false)}
-                                    className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${(reply as any).liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
-                                  >
-                                    🙏 기도합니다 ({(reply as any).likes || 0})
-                                  </button>
+                          <div className="space-y-3 mb-3 pl-2 border-l-2 border-stone-200">
+                            {comment.replies.map((reply) => (
+                              <div key={reply.id} className="flex gap-3 p-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-medium text-stone-700">
+                                      {reply.profiles?.display_name || '익명'}
+                                    </span>
+                                    <span className="text-xs text-stone-400">
+                                      {new Date(reply.created_at).toLocaleDateString('ko-KR')}
+                                    </span>
+                                    <button 
+                                      onClick={() => handleToggleLike(reply.id, (reply as any).liked || false)}
+                                      className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${(reply as any).liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                                    >
+                                      🙏 기도합니다 ({(reply as any).likes || 0})
+                                    </button>
+                                  </div>
+                                  <p className="text-sm text-stone-800">{reply.content}</p>
                                 </div>
-                                <p className="text-sm text-stone-800">{reply.content}</p>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+                        )}
+                        
+                        {user && (
+                          <div className="flex gap-2 pl-2">
+                            <input
+                              type="text"
+                              value={replyInputs[comment.id] || ''}
+                              onChange={(e) => setReplyInputs(prev => ({ ...prev, [comment.id]: e.target.value }))}
+                              placeholder="답글을 입력하세요..."
+                              className="flex-1 px-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && replyInputs[comment.id]?.trim()) {
+                                  handleSaveReply(comment.id);
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={() => handleSaveReply(comment.id)}
+                              disabled={!replyInputs[comment.id]?.trim() || savingReply[comment.id]}
+                              className="px-3 py-2 bg-stone-700 text-white text-sm rounded-lg hover:bg-stone-800 disabled:opacity-50"
+                            >
+                              {savingReply[comment.id] ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+                
+                return (
+                  <>
+                    {/* Section 1: Personal Translations */}
+                    {translations.length > 0 && (
+                      <div className="bg-emerald-50/20">
+                        <div className="px-4 py-2 bg-emerald-100/50 border-b border-emerald-200">
+                          <span className="text-xs font-semibold text-emerald-800">📝 개인 번역 (사역)</span>
                         </div>
-                      )}
-                      
-                      {/* Reply Input */}
-                      {user && (
-                        <div className="flex gap-2 pl-2">
-                          <input
-                            type="text"
-                            value={replyInputs[comment.id] || ''}
-                            onChange={(e) => setReplyInputs(prev => ({ ...prev, [comment.id]: e.target.value }))}
-                            placeholder="답글을 입력하세요..."
-                            className="flex-1 px-3 py-2 text-sm bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && replyInputs[comment.id]?.trim()) {
-                                handleSaveReply(comment.id);
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={() => handleSaveReply(comment.id)}
-                            disabled={!replyInputs[comment.id]?.trim() || savingReply[comment.id]}
-                            className="px-3 py-2 bg-stone-700 text-white text-sm rounded-lg hover:bg-stone-800 disabled:opacity-50"
-                          >
-                            {savingReply[comment.id] ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Send className="w-4 h-4" />
-                            )}
-                          </button>
+                        {translations.map(c => renderCommentItem(c))}
+                      </div>
+                    )}
+                    
+                    {/* Section 2: Admin Picks */}
+                    {adminPicks.length > 0 && (
+                      <div className="bg-amber-50/20">
+                        <div className="px-4 py-2 bg-amber-100/50 border-b border-amber-200">
+                          <span className="text-xs font-semibold text-amber-800">⭐ 관리자 선정 글</span>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
+                        {adminPicks.map(c => renderCommentItem(c))}
+                      </div>
+                    )}
+                    
+                    {/* Section 3: Top 10 Liked */}
+                    {topLiked.length > 0 && (
+                      <div>
+                        <div className="px-4 py-2 bg-stone-100 border-b border-stone-200">
+                          <span className="text-xs font-semibold text-stone-700">🔥 좋아요 인기 글 Top 10</span>
+                        </div>
+                        {topLiked.map((c, idx) => renderCommentItem(c, `${idx + 1}위`))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()
             )}
           </div>
         </div>

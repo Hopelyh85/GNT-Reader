@@ -901,27 +901,7 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
         </div>
         )}
 
-        {/* 4. 개인 번역 (Translation) - Available in both Verse and Chapter Mode */}
-        <div className="border-t border-stone-200 pt-4 space-y-2">
-          <label className="flex items-center gap-2 text-sm font-serif font-medium text-blue-700">
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-            {isChapterMode ? '장별 개요 (Overview)' : '개인 번역 (Translation)'}
-            {!canWrite && <span className="text-xs text-blue-600">(로그인 필요)</span>}
-          </label>
-          <textarea
-            value={ministryNote}
-            onChange={(e) => canWrite && setMinistryNote(e.target.value)}
-            disabled={!canWrite}
-            placeholder={canWrite 
-              ? isChapterMode 
-                ? "이 장의 주요 내용과 핵심 메시지를 정리해보세요..." 
-                : "성경 본문을 직접 번역해보세요..." 
-              : "로그인 후 작성할 수 있습니다."}
-            className="w-full h-32 p-3 text-sm leading-relaxed bg-blue-50/30 border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 placeholder:text-stone-400 disabled:bg-stone-100"
-          />
-        </div>
-
-        {/* 5. 주석 (Commentary) - Admin Only */}
+        {/* 4. 주석 (Commentary) - Admin Only */}
         {isAdmin && selectedVerse && (
           <div className="border-t border-stone-200 pt-4 space-y-2">
             <label className="flex items-center gap-2 text-sm font-serif font-medium text-purple-700">
@@ -938,51 +918,6 @@ export function StudyPanel({ selectedVerse, selectedWord, isLoggedIn, userRole, 
           </div>
         )}
 
-        {/* 6. 커뮤니티 묵상 (Community Reflections from reflections table) */}
-        {selectedVerse && (
-          <div className="border-t border-stone-200 pt-4 space-y-3">
-            <label className="flex items-center gap-2 text-sm font-serif font-medium text-stone-700">
-              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-              커뮤니티 묵상 ({verseReflections.length})
-            </label>
-            
-            {loadingVerseContent ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
-              </div>
-            ) : verseReflections.length === 0 ? (
-              <div className="text-center py-4 text-stone-400 text-xs">
-                <p>아직 이 구절에 대한 커뮤니티 묵상이 없습니다.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {verseReflections.map((reflection) => (
-                  <div 
-                    key={reflection.id} 
-                    className="p-3 rounded-lg bg-amber-50 border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors"
-                    onClick={() => router.push(`/read/${selectedVerse?.book || 'John'}/${selectedVerse?.chapter || 1}/${selectedVerse?.verse || 1}`)}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-amber-700">묵상</span>
-                      <span className="text-xs text-stone-500">
-                        {reflection.profile?.nickname || reflection.profile?.email}
-                      </span>
-                    </div>
-                    <p className="text-sm text-stone-800">{reflection.content}</p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleToggleLike(reflection.id, reflection.liked || false); }}
-                        className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${reflection.liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
-                      >
-                        🙏 기도합니다 ({reflection.likes || 0})
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
       </div>
     </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   BookOpen, LogOut, LogIn, Menu, X, ArrowLeft, ChevronDown, ChevronRight,
-  Loader2, Heart
+  Loader2, Heart, Link2, FileText
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { 
@@ -64,16 +64,32 @@ function ReadContent() {
   const [studyNotes, setStudyNotes] = useState<any[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   
+  // User role for permission-based labeling
+  const [userRole, setUserRole] = useState<string>('');
+  
+  // Accordion state for expanded verses
+  const [expandedVerses, setExpandedVerses] = useState<Set<number>>(new Set());
+  
   // Derived data
   const bookInfo = books.find(b => b.id === selectedBook);
   const verses = krvData[selectedBook]?.[selectedChapter.toString()] || [];
   
-  // Check auth
+  // Check auth and get user role
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = getSupabase();
       const { data: { user } } = await supabase.auth.getUser();
       setIsLoggedIn(!!user);
+      
+      // Get user profile for role/tier
+      if (user) {
+        try {
+          const profile = await getMyProfile();
+          setUserRole(profile?.tier || '');
+        } catch (err) {
+          console.error('Error loading profile:', err);
+        }
+      }
     };
     checkAuth();
   }, [user]);
@@ -82,17 +98,28 @@ function ReadContent() {
   useEffect(() => {
     const loadKRV = async () => {
       try {
+        console.log('[DEBUG] Loading KRV Bible data...');
         const response = await fetch('/data/krv_bible.json');
         const data = await response.json();
+        console.log('[DEBUG] KRV data loaded, keys:', Object.keys(data).slice(0, 5));
+        console.log('[DEBUG] Sample Matt 1:', data['Matt']?.['1']?.slice(0, 3));
         setKrvData(data);
       } catch (err) {
-        console.error('Error loading KRV:', err);
+        console.error('[DEBUG] Error loading KRV:', err);
       } finally {
         setLoadingBible(false);
       }
     };
     loadKRV();
   }, []);
+  
+  // Debug verses data
+  useEffect(() => {
+    console.log('[DEBUG] Selected book:', selectedBook, 'chapter:', selectedChapter);
+    console.log('[DEBUG] krvData keys:', Object.keys(krvData).slice(0, 5));
+    console.log('[DEBUG] verses data:', verses.slice(0, 3));
+    console.log('[DEBUG] verses.length:', verses.length);
+  }, [selectedBook, selectedChapter, krvData, verses]);
   
   // Load community content (translations, reflections, study notes)
   useEffect(() => {
@@ -167,6 +194,49 @@ function ReadContent() {
       setReflections([...reflections]);
     } catch (err) {
       console.error('Error toggling like:', err);
+    }
+  };
+
+  // Check if user can write 'translation' (사역) label - requires elevated permissions
+  const canWriteTranslation = (tier?: string): boolean => {
+    if (!tier) return false;
+    const allowedTiers = ['열심회원', '스태프', '관리자', 'Admin', '⭐⭐⭐⭐⭐'];
+    return allowedTiers.includes(tier) || tier.includes('⭐');
+  };
+
+  // Format timestamp with time
+  const formatDateTime = (dateString: string): string => {
+    return new Date(dateString).toLocaleString('ko-KR', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  // Toggle verse accordion
+  const toggleVerseAccordion = (verseNum: number) => {
+    setExpandedVerses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(verseNum)) {
+        newSet.delete(verseNum);
+      } else {
+        newSet.add(verseNum);
+      }
+      return newSet;
+    });
+  };
+
+  // Copy verse link to clipboard
+  const copyVerseLink = async (verseNum: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/read/${selectedBook}/${selectedChapter}/${verseNum}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('링크가 복사되었습니다!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
   };
   
@@ -326,7 +396,7 @@ function ReadContent() {
               </div>
               
               {/* Verses */}
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-1">
                 {loadingBible ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
@@ -336,23 +406,107 @@ function ReadContent() {
                     <p>본문을 불러올 수 없습니다.</p>
                   </div>
                 ) : (
-                  verses.map((v) => (
-                    <div 
-                      key={v.verse}
-                      onClick={() => navigateToVerse(v.verse)}
-                      className="group flex gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-stone-50 hover:shadow-sm border border-transparent hover:border-stone-200"
-                    >
-                      <span className="text-sm font-bold min-w-[2rem] text-amber-600 group-hover:text-amber-700">
-                        {v.verse}
-                      </span>
-                      <p className="leading-relaxed flex-1 text-stone-800">
-                        {v.text}
-                      </p>
-                      <span className="text-xs text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                        클릭하여 보기 →
-                      </span>
-                    </div>
-                  ))
+                  verses.map((v) => {
+                    const isExpanded = expandedVerses.has(v.verse);
+                    // Get comments for this verse
+                    const verseComments = [...translations, ...reflections].filter(
+                      (item: any) => item.verse === v.verse
+                    ).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                    
+                    return (
+                      <div key={v.verse} className="border-b border-stone-100 last:border-b-0">
+                        {/* Verse Row with Right-side Buttons */}
+                        <div 
+                          onClick={() => toggleVerseAccordion(v.verse)}
+                          className="group flex gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-stone-50 hover:shadow-sm border border-transparent hover:border-stone-200"
+                        >
+                          <span className="text-sm font-bold min-w-[2rem] text-amber-600 group-hover:text-amber-700">
+                            {v.verse}
+                          </span>
+                          <p className="text-lg text-stone-800 leading-relaxed flex-1">
+                            <span className="font-bold text-amber-700 mr-2">{v.verse}</span>
+                            {v.text}
+                          </p>
+                          
+                          {/* Right-side Action Buttons */}
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Copy Link Button */}
+                            <button
+                              onClick={(e) => copyVerseLink(v.verse, e)}
+                              className="p-1.5 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="링크 복사"
+                            >
+                              <Link2 className="w-4 h-4" />
+                            </button>
+                            {/* Navigate to Page Button */}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigateToVerse(v.verse); }}
+                              className="p-1.5 text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                              title="페이지로 이동"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          </div>
+                          
+                          {/* Expand Indicator */}
+                          <span className={`text-xs text-stone-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                            ▼
+                          </span>
+                        </div>
+                        
+                        {/* Accordion Content - Comments for this verse */}
+                        {isExpanded && verseComments.length > 0 && (
+                          <div className="px-3 pb-3 pl-12">
+                            <div className="space-y-2 border-l-2 border-stone-200 pl-3">
+                              {verseComments.map((item: any) => (
+                                <div 
+                                  key={item.id}
+                                  className="py-2 border-b border-stone-100 last:border-b-0"
+                                >
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                      item.category === 'translation' && canWriteTranslation(item.profiles?.tier)
+                                        ? 'bg-emerald-100 text-emerald-700' 
+                                        : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                      {item.category === 'translation' && canWriteTranslation(item.profiles?.tier) 
+                                        ? '개인 번역(사역)' 
+                                        : '묵상'}
+                                    </span>
+                                    <span className="text-[11px] font-medium text-stone-700">
+                                      {item.profiles?.nickname || '성도'}
+                                    </span>
+                                    <span className="text-[10px] text-stone-400">
+                                      {formatDateTime(item.created_at)}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-stone-800 leading-relaxed">{item.content}</p>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleToggleLike(item.id, item.liked || false); }}
+                                      className={`text-[11px] flex items-center gap-0.5 transition-colors ${item.liked ? 'text-red-600' : 'text-stone-400 hover:text-stone-600'}`}
+                                    >
+                                      <Heart className="w-3 h-3" fill={item.liked ? 'currentColor' : 'none'} />
+                                      {item.likes || 0}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Empty State when expanded but no comments */}
+                        {isExpanded && verseComments.length === 0 && (
+                          <div className="px-3 pb-3 pl-12">
+                            <div className="py-2 pl-3 border-l-2 border-stone-200">
+                              <p className="text-xs text-stone-400">이 구절에 등록된 나눔이 없습니다.</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
               
@@ -423,55 +577,46 @@ function ReadContent() {
                     </div>
                   )}
                   
-                  {/* Personal Translations */}
-                  {translations.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wide">개인 번역</h4>
-                      {translations.map((t: any, i: number) => (
+                  {/* Inline Comments - Translations & Reflections merged as comments */}
+                  {[...translations, ...reflections].sort((a: any, b: any) => (a.verse || 0) - (b.verse || 0)).length > 0 && (
+                    <div className="space-y-0 border-t border-stone-200">
+                      {[...translations, ...reflections].sort((a: any, b: any) => (a.verse || 0) - (b.verse || 0)).map((item: any, i: number, arr: any[]) => (
                         <div
-                          key={i}
-                          onClick={() => navigateToVerse(t.verse || 1)}
-                          className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 cursor-pointer hover:bg-emerald-100 transition-colors"
+                          key={item.id || i}
+                          onClick={() => navigateToVerse(item.verse || 1)}
+                          className="py-3 border-b border-stone-100 last:border-b-0 cursor-pointer hover:bg-stone-50 transition-colors"
                         >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-semibold text-emerald-700">{t.verse}절</span>
-                            <span className="text-xs text-stone-500">{t.profiles?.nickname || '성도'}</span>
+                          {/* Comment Header - Small, inline style */}
+                          <div className="flex items-center gap-2 mb-1.5">
+                            {/* Label based on category and permission */}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                              item.category === 'translation' && canWriteTranslation(item.profiles?.tier)
+                                ? 'bg-emerald-100 text-emerald-700' 
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {item.category === 'translation' && canWriteTranslation(item.profiles?.tier) 
+                                ? '개인 번역(사역)' 
+                                : '묵상'}
+                            </span>
+                            <span className="text-[11px] font-medium text-stone-700">
+                              {item.profiles?.nickname || '성도'}
+                            </span>
+                            <span className="text-[10px] text-stone-400">
+                              {formatDateTime(item.created_at)}
+                            </span>
                           </div>
-                          <p className="text-sm text-stone-800">{t.content}</p>
-                          <div className="mt-2 flex items-center justify-end">
+                          
+                          {/* Comment Content */}
+                          <p className="text-sm text-stone-800 leading-relaxed pl-0.5">{item.content}</p>
+                          
+                          {/* Comment Footer - Like button */}
+                          <div className="mt-1.5 flex items-center gap-2">
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleToggleLike(t.id, t.liked || false); }}
-                              className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${t.liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                              onClick={(e) => { e.stopPropagation(); handleToggleLike(item.id, item.liked || false); }}
+                              className={`text-[11px] flex items-center gap-0.5 transition-colors ${item.liked ? 'text-red-600' : 'text-stone-400 hover:text-stone-600'}`}
                             >
-                              🙏 기도합니다 ({t.likes || 0})
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Reflections (Meditations) */}
-                  {reflections.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wide">묵상</h4>
-                      {reflections.map((r: any, i: number) => (
-                        <div
-                          key={i}
-                          onClick={() => navigateToVerse(r.verse || 1)}
-                          className="p-3 rounded-lg bg-blue-50 border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-semibold text-blue-700">{r.verse}절</span>
-                            <span className="text-xs text-stone-500">{r.profiles?.nickname || '성도'}</span>
-                          </div>
-                          <p className="text-sm text-stone-800">{r.content}</p>
-                          <div className="mt-2 flex items-center justify-end">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleToggleLike(r.id, r.liked || false); }}
-                              className={`text-xs px-2 py-1 rounded flex items-center gap-1 transition-colors ${r.liked ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
-                            >
-                              🙏 기도합니다 ({r.likes || 0})
+                              <Heart className="w-3 h-3" fill={item.liked ? 'currentColor' : 'none'} />
+                              {item.likes || 0}
                             </button>
                           </div>
                         </div>
