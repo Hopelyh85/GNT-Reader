@@ -173,8 +173,8 @@ export function CommunityPanel({
   const [scriptureBookFilter, setScriptureBookFilter] = useState<string>('all');
   const [scriptureTagFilter, setScriptureTagFilter] = useState<string | null>(null);
 
-  // Prayer panel state (4 types for new UI)
-  const [prayerType, setPrayerType] = useState<'world' | 'nation' | 'church' | 'personal'>('personal');
+  // Prayer panel state (5 types including 'all')
+  const [prayerType, setPrayerType] = useState<'all' | 'world' | 'nation' | 'church' | 'personal'>('all');
   
   // Prayer status states
   const [prayerStatusModal, setPrayerStatusModal] = useState<{open: boolean, postId: string | null, currentStatus: string}>({open: false, postId: null, currentStatus: 'wait'});
@@ -223,9 +223,20 @@ export function CommunityPanel({
   };
   
   const getPrayerPosts = () => {
-    return posts.filter(post => {
+    // First filter by category (prayer posts only)
+    const prayerPosts = posts.filter(post => {
       const cat = (post as any).category;
       return cat === 'prayer_general' || cat === 'prayer_world';
+    });
+    
+    // Then filter by prayerType if not 'all'
+    if (prayerType === 'all') {
+      return prayerPosts;
+    }
+    
+    return prayerPosts.filter(post => {
+      const postType = getPrayerType(post);
+      return postType === prayerType;
     });
   };
 
@@ -2362,6 +2373,7 @@ export function CommunityPanel({
                     {/* Prayer Type Selector */}
                     <div className="flex gap-1 mb-2">
                       {[
+                        { type: 'all', label: '전체', icon: BookOpen, color: 'stone' },
                         { type: 'world', label: '세계', icon: Globe, color: 'blue' },
                         { type: 'nation', label: '나라', icon: MapPin, color: 'purple' },
                         { type: 'church', label: '교회', icon: Church, color: 'emerald' },
@@ -2372,7 +2384,9 @@ export function CommunityPanel({
                           onClick={() => setPrayerType(type as any)}
                           className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs rounded transition-colors ${
                             prayerType === type
-                              ? `bg-${color}-100 text-${color}-700 border border-${color}-300`
+                              ? color === 'stone' 
+                                ? 'bg-stone-200 text-stone-800 border border-stone-400'
+                                : `bg-${color}-100 text-${color}-700 border border-${color}-300`
                               : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-100'
                           }`}
                         >
