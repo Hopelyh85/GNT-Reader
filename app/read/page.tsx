@@ -663,122 +663,111 @@ function ReadContent() {
                   </div>
                 </div>
                 
-                <div className="p-4 space-y-4 max-h-[calc(70vh-180px)] lg:max-h-[calc(100vh-340px)] overflow-y-auto">
-                  {/* Admin Notes (Purple) */}
-                  {studyNotes.filter((n: any) => 
-                    n.profiles?.tier === '관리자'
-                  ).map((note: any) => (
-                    <div key={note.id} className={`p-3 bg-purple-50 border rounded-lg transition-all ${
-                      highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-purple-200'
-                    }`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Crown className="w-4 h-4 text-purple-600" />
-                        <span className="text-xs font-bold text-purple-700">👑 공식 주석</span>
-                        <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
-                        {viewMode === 'chapter' && note.verse > 0 && (
-                          <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">
-                            {note.verse}절
-                          </span>
-                        )}
+                {/* 70/30 Split Layout: Top = Translations + Reflections, Bottom = Commentary */}
+                <div className="flex flex-col h-[calc(70vh-180px)] lg:h-[calc(100vh-340px)]">
+                  {/* Top 70%: Translations (Sticky) + Reflections Feed */}
+                  <div className="h-[70%] overflow-y-auto p-4 space-y-4 border-b border-stone-200">
+                    {/* Translations (Blue - Sticky at top of this section) */}
+                    {verseTranslations.length > 0 && (
+                      <div className="sticky top-0 z-10 bg-white border-b border-stone-200 -mx-4 px-4 py-3 mb-4">
+                        <label className="flex items-center gap-2 text-xs font-bold text-blue-700 mb-2">
+                          <Pin className="w-3 h-3" />
+                          개인 번역 (Translations)
+                        </label>
+                        {verseTranslations.map((trans: any) => (
+                          <div key={trans.id} className={`p-3 bg-blue-50 border rounded-lg transition-all ${
+                            highlightedPostId === trans.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-blue-200'
+                          }`}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-bold text-blue-700">📝 개인 번역</span>
+                              <span className="text-xs text-stone-500">{getDisplayName(trans.profiles)}</span>
+                              <span className="text-xs text-stone-400">
+                                {new Date(trans.created_at).toLocaleDateString('ko-KR')}
+                              </span>
+                              {viewMode === 'chapter' && trans.verse > 0 && (
+                                <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">
+                                  {trans.verse}절
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-stone-800">{trans.content}</p>
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-sm text-stone-800">{note.content}</p>
-                      {note.commentary && (
-                        <p className="text-xs text-purple-700 mt-2 bg-purple-100 p-2 rounded">
-                          {note.commentary}
+                    )}
+                    
+                    {/* Reflections (Beige) */}
+                    {verseReflections.map((ref: any) => (
+                      <div key={ref.id} className={`p-3 bg-stone-50 border rounded-lg transition-all ${
+                        highlightedPostId === ref.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-stone-200'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquare className="w-3 h-3 text-stone-500" />
+                          <span className="text-xs font-medium text-stone-700">{getDisplayName(ref.profiles)}</span>
+                          <span className="text-xs text-stone-400">
+                            {new Date(ref.created_at).toLocaleDateString('ko-KR')}
+                          </span>
+                          {viewMode === 'chapter' && ref.verse > 0 && (
+                            <span className="text-xs bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded">
+                              {ref.verse}절
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-stone-800">{ref.content}</p>
+                      </div>
+                    ))}
+                    
+                    {loadingCommunity && (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                      </div>
+                    )}
+                    
+                    {!loadingCommunity && verseReflections.length === 0 && verseTranslations.length === 0 && (
+                      <div className="text-center py-8 text-stone-400">
+                        <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">
+                          {viewMode === 'chapter' 
+                            ? `아직 ${selectedChapter}장에 나눔이 없습니다.` 
+                            : '아직 이 절에 나눔이 없습니다.'}
                         </p>
-                      )}
-                    </div>
-                  ))}
-                  
-                  {/* Study Notes (Blue) */}
-                  {studyNotes.filter((n: any) => {
-                    const isAdminNote = n.profiles?.tier === '관리자';
-                    return !isAdminNote;
-                  }).map((note: any) => (
-                    <div key={note.id} className={`p-3 bg-blue-50 border rounded-lg transition-all ${
-                      highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-blue-200'
-                    }`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Pin className="w-3 h-3 text-blue-600" />
-                        <span className="text-xs font-bold text-blue-700">동역자 사역</span>
-                        <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
-                        {viewMode === 'chapter' && note.verse > 0 && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">
-                            {note.verse}절
-                          </span>
-                        )}
+                        {!isGeneral && <p className="text-xs mt-1">첫 번째 묵상을 남겨보세요!</p>}
                       </div>
-                      <p className="text-sm text-stone-800">{note.content}</p>
-                    </div>
-                  ))}
+                    )}
+                  </div>
                   
-                  {/* Translations (Blue - Sticky at top) */}
-                  {verseTranslations.length > 0 && (
-                    <div className="sticky top-0 z-10 bg-white border-b border-stone-200 -mx-4 px-4 py-3 mb-4">
-                      <label className="flex items-center gap-2 text-xs font-bold text-blue-700 mb-2">
-                        <Pin className="w-3 h-3" />
-                        개인 번역 (Translations)
-                      </label>
-                      {verseTranslations.map((trans: any) => (
-                        <div key={trans.id} className={`p-3 bg-blue-50 border rounded-lg transition-all ${
-                          highlightedPostId === trans.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-blue-200'
+                  {/* Bottom 30%: Commentary (Admin Notes) */}
+                  <div className="h-[30%] overflow-y-auto p-4 space-y-3 bg-purple-50/30">
+                    <h4 className="text-xs font-bold text-purple-700 flex items-center gap-1 sticky top-0 bg-purple-50/30 py-1">
+                      <Crown className="w-3 h-3" />
+                      주석 (Commentary)
+                    </h4>
+                    {studyNotes.filter((n: any) => n.profiles?.tier === '관리자').length === 0 ? (
+                      <p className="text-xs text-stone-400 text-center py-4">등록된 주석이 없습니다</p>
+                    ) : (
+                      studyNotes.filter((n: any) => n.profiles?.tier === '관리자').map((note: any) => (
+                        <div key={note.id} className={`p-3 bg-white border rounded-lg transition-all ${
+                          highlightedPostId === note.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg' : 'border-purple-200'
                         }`}>
                           <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-bold text-blue-700">📝 개인 번역</span>
-                            <span className="text-xs text-stone-500">{getDisplayName(trans.profiles)}</span>
-                            <span className="text-xs text-stone-400">
-                              {new Date(trans.created_at).toLocaleDateString('ko-KR')}
-                            </span>
-                            {viewMode === 'chapter' && trans.verse > 0 && (
-                              <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">
-                                {trans.verse}절
+                            <span className="text-xs font-bold text-purple-700">👑 공식 주석</span>
+                            <span className="text-xs text-stone-500">{getDisplayName(note.profiles)}</span>
+                            {viewMode === 'chapter' && note.verse > 0 && (
+                              <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">
+                                {note.verse}절
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-stone-800">{trans.content}</p>
+                          <p className="text-sm text-stone-800">{note.content}</p>
+                          {note.commentary && (
+                            <p className="text-xs text-purple-700 mt-2 bg-purple-100 p-2 rounded">
+                              {note.commentary}
+                            </p>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Reflections (Beige) */}
-                  {verseReflections.map((ref: any) => (
-                    <div key={ref.id} className={`p-3 bg-stone-50 border rounded-lg transition-all ${
-                      highlightedPostId === ref.id ? 'ring-2 ring-amber-400 border-amber-400 shadow-lg scale-[1.02]' : 'border-stone-200'
-                    }`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <MessageSquare className="w-3 h-3 text-stone-500" />
-                        <span className="text-xs font-medium text-stone-700">{getDisplayName(ref.profiles)}</span>
-                        <span className="text-xs text-stone-400">
-                          {new Date(ref.created_at).toLocaleDateString('ko-KR')}
-                        </span>
-                        {viewMode === 'chapter' && ref.verse > 0 && (
-                          <span className="text-xs bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded">
-                            {ref.verse}절
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-stone-800">{ref.content}</p>
-                    </div>
-                  ))}
-                  
-                  {loadingCommunity && (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
-                    </div>
-                  )}
-                  
-                  {!loadingCommunity && verseReflections.length === 0 && verseTranslations.length === 0 && studyNotes.filter((n: any) => n.profiles?.tier === '관리자').length === 0 && (
-                    <div className="text-center py-8 text-stone-400">
-                      <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">
-                        {viewMode === 'chapter' 
-                          ? `아직 ${selectedChapter}장에 나눔이 없습니다.` 
-                          : '아직 이 절에 나눔이 없습니다.'}
-                      </p>
-                      {!isGeneral && <p className="text-xs mt-1">첫 번째 묵상을 남겨보세요!</p>}
-                    </div>
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
                 
                 {/* Write Reflection */}
