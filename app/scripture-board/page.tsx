@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   BookOpen, LogOut, LogIn, Menu, X, ArrowLeft, Loader2, Heart,
-  Search, ChevronDown, ChevronRight
+  Search, ChevronDown, ChevronRight, Eye
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { 
@@ -52,6 +52,7 @@ interface ScripturePost {
   verse?: number;
   category?: string;
   created_at: string;
+  views?: number;
   profiles?: {
     nickname?: string;
     email?: string;
@@ -234,17 +235,22 @@ function ScriptureBoardContent() {
   };
   
   // Navigate to verse detail
-  const navigateToVerse = (post: ScripturePost) => {
+  const navigateToVerse = async (post: ScripturePost) => {
     if (!post.verse_ref) return;
     
+    // Increment views via RPC
+    try {
+      const { error } = await getSupabase().rpc('increment_views', { post_id: post.id });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error incrementing views:', err);
+    }
+    
     // Parse verse_ref to extract book, chapter, verse
-    const match = post.verse_ref.match(/^(.+)\s+(\d+):(\d+)$/);
+    const match = post.verse_ref.match(/^([A-Za-z0-9]+)_(\d+)_(\d+)$/);
     if (match) {
-      const bookName = match[1];
-      const chapter = parseInt(match[2]);
-      const verse = parseInt(match[3]);
-      const bookId = Object.entries(bookNameMapReverse).find(([k, v]) => v === bookName)?.[0] || 'John';
-      router.push(`/read/${bookId}/${chapter}/${verse}`);
+      const [, bookCode, chapter, verse] = match;
+      router.push(`/read/${bookCode}/${chapter}/${verse}`);
     }
   };
   
@@ -520,6 +526,7 @@ function ScriptureBoardContent() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600">내용</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600 w-40">작성자</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600 w-24">날짜</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 w-20">조회수</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 w-24">반응</th>
                   </tr>
                 </thead>
@@ -559,8 +566,14 @@ function ScriptureBoardContent() {
                         <td className="px-4 py-4">
                           <span className="text-sm text-stone-600">{getDisplayName(post.profiles)}</span>
                         </td>
-                        <td className="px-4 py-4">
-                          <span className="text-sm text-stone-400">{formatDate(post.created_at)}</span>
+                        <td className="px-4 py-4 text-sm text-stone-500">
+                          {new Date(post.created_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-4 py-4 text-center text-xs text-stone-500">
+                          <div className="flex items-center justify-center gap-1">
+                            <Eye className="w-3 h-3" />
+                            {post.views || 0}
+                          </div>
                         </td>
                         <td className="px-4 py-4 text-center">
                           <div className="flex items-center justify-center gap-1">

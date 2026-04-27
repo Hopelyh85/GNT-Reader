@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
-  ArrowLeft, LogOut, LogIn, MessageSquare, Heart, Loader2, User, Megaphone
+  ArrowLeft, LogOut, LogIn, MessageSquare, Heart, Loader2, User, Megaphone, Eye
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { 
@@ -21,6 +21,7 @@ interface Post {
   category: string;
   likes: number;
   liked?: boolean;
+  views?: number;
   profiles?: {
     nickname: string;
     email: string;
@@ -138,11 +139,28 @@ function CommunityContent() {
   };
 
   // Toggle accordion for post
-  const toggleAccordion = (postId: string) => {
+  const toggleAccordion = async (postId: string) => {
+    const isExpanding = expandedPostId !== postId;
     setExpandedPostId(prev => prev === postId ? null : postId);
-    // Load comments when expanding
-    if (expandedPostId !== postId) {
+    
+    if (isExpanding) {
+      // Load comments when expanding
       loadPostComments(postId);
+      
+      // Increment views via RPC
+      try {
+        const { error } = await getSupabase().rpc('increment_views', { post_id: postId });
+        if (error) throw error;
+        
+        // Update local views count immediately
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? { ...post, views: (post.views || 0) + 1 }
+            : post
+        ));
+      } catch (err) {
+        console.error('Error incrementing views:', err);
+      }
     }
   };
 
@@ -223,7 +241,7 @@ function CommunityContent() {
             </button>
             <div>
               <h1 className="text-lg font-bold text-stone-800">커뮤니티 게시판</h1>
-              <p className="text-xs text-stone-500">성경 묵상과 나눔의 공간</p>
+              <p className="text-xs text-stone-500">성도들의 자유로운 소통과 나눔의 공간입니다</p>
             </div>
           </div>
 
@@ -318,6 +336,12 @@ function CommunityContent() {
                       <p className="text-sm text-stone-800 truncate text-left hover:text-stone-600 transition-colors">
                         {post.title || post.content.substring(0, 60) + (post.content.length > 60 ? '...' : '')}
                       </p>
+                    </div>
+
+                    {/* Views */}
+                    <div className="w-16 flex-shrink-0 flex items-center justify-center gap-1 text-xs text-stone-400">
+                      <Eye className="w-3 h-3" />
+                      {post.views || 0}
                     </div>
 
                     {/* Date - Right aligned */}
