@@ -9,7 +9,21 @@ import {
   Home as HomeIcon, AlertTriangle, Globe, Clock, Scroll
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
-import { getMyProfile, signOut, Profile, getNotice, getUrgentPrayers, StudioReflection } from '@/app/lib/supabase';
+import { getMyProfile, signOut, Profile, getNotice, getUrgentPrayers, StudioReflection, getSupabase } from '@/app/lib/supabase';
+
+// Prayer Post type for home dashboard
+interface PrayerPost {
+  id: string;
+  title: string | null;
+  content: string;
+  created_at: string;
+  user_id: string;
+  profiles: {
+    id: string;
+    nickname: string | null;
+    tier: string | null;
+  }[];
+}
 
 function HomeContent() {
   const router = useRouter();
@@ -17,6 +31,7 @@ function HomeContent() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [notice, setNotice] = useState<{ id: number; content: string; updated_at: string } | null>(null);
   const [urgentPrayers, setUrgentPrayers] = useState<StudioReflection[]>([]);
+  const [prayers, setPrayers] = useState<PrayerPost[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -31,6 +46,18 @@ function HomeContent() {
       ]);
       setNotice(noticeData);
       setUrgentPrayers(urgentData);
+      
+      // Load prayers from prayer board
+      const supabase = getSupabase();
+      const { data: prayersData } = await supabase
+        .from('posts')
+        .select('id, title, content, created_at, user_id, profiles!inner(id, nickname, tier)')
+        .eq('category', 'prayer')
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      setPrayers((prayersData || []) as PrayerPost[]);
+      
       setLoading(false);
     }
     loadData();
@@ -46,14 +73,13 @@ function HomeContent() {
     router.push('/');
   };
 
-  // Portal menu items - Community split into free and prayer boards
+  // Portal menu items - Home Dashboard
   const portalItems = [
-    { id: 'read', title: '말씀 나눔터(한글)', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
-    { id: 'study', title: '성경 원어 연구소(신약)', subtitle: '헬라어 원문 성경을 깊이 연구하고 주석을 작성합니다', href: '/study', icon: Search, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
-    { id: 'community', title: '커뮤니티', subtitle: '성경 묵상과 나눔의 공간', href: '/community', icon: MessageSquare, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
-    { id: 'prayer', title: '기도 제목', subtitle: '함께 기도하며 중보하는 공간', href: '/community/prayer', icon: Heart, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
+    { id: 'read', title: '한글 성경', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
+    { id: 'study', title: '성경 원어 연구소', subtitle: '헬라어 원문 성경을 깊이 연구하고 주석을 작성합니다', href: '/study', icon: Search, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
+    { id: 'community', title: '커뮤니티 게시판', subtitle: '성경 묵상과 나눔의 공간', href: '/community', icon: MessageSquare, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
+    { id: 'prayer', title: '기도 제목 게시판', subtitle: '함께 기도하며 중보하는 공간', href: '/community/prayer', icon: Heart, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
     { id: 'scripture', title: '묵상 데이터 저장 공간', subtitle: '모바일에 최적화되어 있지 않습니다', href: '/scripture-board', icon: Scroll, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
-    { id: 'sermon', title: '설교 아카이브', subtitle: '과거 설교를 다시 듣고 은혜를 되새깁니다', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700' },
   ];
 
   // Navigation items - Community split into free and prayer boards
@@ -88,8 +114,6 @@ function HomeContent() {
               <a
                 key={item.id}
                 href={item.href}
-                target={item.external ? '_blank' : undefined}
-                rel={item.external ? 'noopener noreferrer' : undefined}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   item.active 
                     ? 'bg-stone-100 text-stone-800 font-medium' 
@@ -98,7 +122,6 @@ function HomeContent() {
               >
                 <item.icon className="w-4 h-4" />
                 {item.title}
-                {item.external && <ExternalLink className="w-3 h-3" />}
               </a>
             ))}
             {isAdmin && (
@@ -223,8 +246,6 @@ function HomeContent() {
               <a
                 key={item.id}
                 href={item.href}
-                target={item.external ? '_blank' : undefined}
-                rel={item.external ? 'noopener noreferrer' : undefined}
                 className={`group relative p-4 md:p-6 rounded-xl border-2 transition-all duration-200 ${item.color}`}
               >
                 <div className="flex flex-col items-center text-center gap-2">
@@ -236,9 +257,6 @@ function HomeContent() {
                     <p className="text-xs opacity-70 mt-0.5">{item.subtitle}</p>
                   </div>
                 </div>
-                {item.external && (
-                  <ExternalLink className="absolute top-2 right-2 w-3 h-3 opacity-40" />
-                )}
               </a>
             ))}
           </div>
@@ -249,7 +267,10 @@ function HomeContent() {
             <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                 <Megaphone className="w-4 h-4 text-amber-600" />
-                <h3 className="font-bold text-sm text-amber-800">공지사항</h3>
+                <div>
+                  <h3 className="font-bold text-sm text-amber-800">공지사항</h3>
+                  <p className="text-xs text-amber-600">기독교 커뮤니티 성경 연구소의 공지 사항 및 규칙입니다</p>
+                </div>
               </div>
               <div className="p-4">
                 {loading ? (
@@ -267,14 +288,17 @@ function HomeContent() {
               </div>
             </div>
 
-            {/* Urgent Prayers Card */}
-            <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-red-50 to-rose-50 border-b border-red-100">
-                <AlertTriangle className="w-4 h-4 text-red-600" />
-                <h3 className="font-bold text-sm text-red-800">긴급 기도제목</h3>
+            {/* 모두의 기도 Card */}
+            <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-50 to-sky-50 border-b border-blue-100">
+                <Heart className="w-4 h-4 text-blue-600" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-sm text-blue-800">모두의 기도</h3>
+                  <p className="text-xs text-blue-600">기도 제목 게시판입니다</p>
+                </div>
                 <a 
                   href="/community/prayer" 
-                  className="ml-auto text-xs text-red-600 hover:text-red-700 flex items-center gap-1"
+                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
                 >
                   전체보기 <ChevronRight className="w-3 h-3" />
                 </a>
@@ -284,15 +308,15 @@ function HomeContent() {
                   <div className="h-16 flex items-center justify-center">
                     <div className="w-5 h-5 border-2 border-stone-200 border-t-stone-400 rounded-full animate-spin" />
                   </div>
-                ) : urgentPrayers.length > 0 ? (
+                ) : prayers.length > 0 ? (
                   <ul className="space-y-1">
-                    {urgentPrayers.map((prayer, idx) => (
+                    {prayers.map((prayer, idx) => (
                       <li 
                         key={prayer.id} 
-                        className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-red-50/50 transition-colors cursor-pointer"
+                        className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-blue-50/50 transition-colors cursor-pointer"
                         onClick={() => router.push(`/community/prayer/${prayer.id}`)}
                       >
-                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs flex items-center justify-center font-bold mt-0.5">
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs flex items-center justify-center font-bold mt-0.5">
                           {idx + 1}
                         </span>
                         <div className="flex-1 min-w-0">
@@ -300,7 +324,13 @@ function HomeContent() {
                             {prayer.title || prayer.content.substring(0, 60) + '...'}
                           </p>
                           <p className="text-xs text-stone-400 mt-0.5">
-                            {prayer.profiles?.nickname || '익명'} · {new Date(prayer.created_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {(() => {
+                              const profiles = prayer.profiles;
+                              if (Array.isArray(profiles) && profiles.length > 0 && profiles[0].nickname) {
+                                return profiles[0].nickname;
+                              }
+                              return '익명';
+                            })()} · {new Date(prayer.created_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </li>
@@ -309,9 +339,9 @@ function HomeContent() {
                 ) : (
                   <div className="text-center py-6">
                     <Heart className="w-8 h-8 text-stone-200 mx-auto mb-2" />
-                    <p className="text-sm text-stone-500 font-medium">현재 올라온 긴급 기도 제목이 없습니다.</p>
-                    <p className="text-xs text-stone-400 mt-1">새로운 긴급 기도 제목을 기도 게시판에 올려주세요.</p>
-                    <a href="/community/prayer" className="text-xs text-amber-600 hover:text-amber-700 underline mt-2 inline-block font-medium">
+                    <p className="text-sm text-stone-500 font-medium">현재 올라온 기도 제목이 없습니다.</p>
+                    <p className="text-xs text-stone-400 mt-1">새로운 기도 제목을 게시판에 올려주세요.</p>
+                    <a href="/community/prayer" className="text-xs text-blue-600 hover:text-blue-700 underline mt-2 inline-block font-medium">
                       기도 게시판에서 작성하기 →
                     </a>
                   </div>

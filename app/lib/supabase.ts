@@ -45,6 +45,7 @@ export function getSupabase() {
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     
     if (!supabaseUrl || !supabaseKey) {
+      console.error('[Supabase] Missing credentials:', { url: !!supabaseUrl, key: !!supabaseKey });
       throw new Error('Supabase credentials not found. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
     }
     
@@ -52,6 +53,11 @@ export function getSupabase() {
       realtime: {
         params: {
           eventsPerSecond: 10,
+        },
+      },
+      global: {
+        headers: {
+          'apikey': supabaseKey,
         },
       },
     });

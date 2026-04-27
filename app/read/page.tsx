@@ -79,6 +79,7 @@ function ReadContent() {
   const [translations, setTranslations] = useState<any[]>([]);
   const [reflections, setReflections] = useState<any[]>([]);
   const [studyNotes, setStudyNotes] = useState<any[]>([]);
+  const [verseComments, setVerseComments] = useState<Record<number, any[]>>({});
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   
   // User role for permission-based labeling
@@ -86,6 +87,10 @@ function ReadContent() {
   
   // Accordion state for expanded verses
   const [expandedVerses, setExpandedVerses] = useState<Set<number>>(new Set());
+  
+  // Reply inputs state for each verse
+  const [replyInputs, setReplyInputs] = useState<Record<number, string>>({});
+  const [submittingReply, setSubmittingReply] = useState<Record<number, boolean>>({});
   
   // Derived data - filter raw Bible data directly
   const bookInfo = books.find(b => b.id === selectedBook);
@@ -244,6 +249,62 @@ function ReadContent() {
     return allowedTiers.includes(tier) || tier.includes('⭐');
   };
 
+  // Add reply to a verse
+  const addReply = async (verseNum: number) => {
+    const content = replyInputs[verseNum]?.trim();
+    if (!content) return;
+    if (!user) {
+      alert('로그인 후 이용해주세요.');
+      return;
+    }
+
+    setSubmittingReply(prev => ({ ...prev, [verseNum]: true }));
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase.from('comments').insert({
+        post_id: null,
+        user_id: user.id,
+        content: content,
+        book: selectedBook,
+        chapter: selectedChapter,
+        verse: verseNum,
+        is_deleted: false
+      });
+
+      if (error) throw error;
+
+      // Clear input and refresh comments
+      setReplyInputs(prev => ({ ...prev, [verseNum]: '' }));
+      await loadVerseComments(verseNum);
+    } catch (err) {
+      console.error('Error adding reply:', err);
+      alert('댓글 등록에 실패했습니다.');
+    } finally {
+      setSubmittingReply(prev => ({ ...prev, [verseNum]: false }));
+    }
+  };
+
+  // Load comments for a specific verse
+  const loadVerseComments = async (verseNum: number) => {
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('comments')
+        .select('id, content, created_at, user_id, verse, profiles!inner(id, nickname, tier)')
+        .eq('book', selectedBook)
+        .eq('chapter', selectedChapter)
+        .eq('verse', verseNum)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      
+      setVerseComments(prev => ({ ...prev, [verseNum]: data || [] }));
+    } catch (err) {
+      console.error('Error loading verse comments:', err);
+    }
+  };
+
   // Format timestamp with time
   const formatDateTime = (dateString: string): string => {
     return new Date(dateString).toLocaleString('ko-KR', { 
@@ -263,6 +324,8 @@ function ReadContent() {
         newSet.delete(verseNum);
       } else {
         newSet.add(verseNum);
+        // Load comments when expanding
+        loadVerseComments(verseNum);
       }
       return newSet;
     });
@@ -474,8 +537,8 @@ function ReadContent() {
                 ) : (
                   (console.log('[DEBUG] RENDERING VERSES:', verses.length, 'verses'), verses.map((v) => {
                     const isExpanded = expandedVerses.has(v.verse);
-                    // Get comments for this verse
-                    const verseComments = [...translations, ...reflections].filter(
+                    // Get comments for this verse from posts table (translations/reflections)
+                    const verseCommentsFromPosts = [...translations, ...reflections].filter(
                       (item: any) => item.verse === v.verse
                     ).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                     
@@ -521,10 +584,32 @@ function ReadContent() {
                         </div>
                         
                         {/* Accordion Content - Comments for this verse */}
-                        {isExpanded && verseComments.length > 0 && (
+                        {isExpanded && (
                           <div className="px-3 pb-3 pl-12">
                             <div className="space-y-2 border-l-2 border-stone-200 pl-3">
-                              {verseComments.map((item: any) => (
+                              {/* Comments from comments table */}
+                              {(verseComments[v.verse] || []).map((item: any) => (
+                                <div 
+                                  key={item.id}
+                                  className="py-2 border-b border-stone-100 last:border-b-0"
+                                >
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                      댓글
+                                    </span>
+                                    <span className="text-[11px] font-medium text-stone-700">
+                                      {Array.isArray(item.profiles) ? item.profiles[0]?.nickname : item.profiles?.nickname || '성도'}
+                                    </span>
+                                    <span className="text-[10px] text-stone-400">
+                                      {formatDateTime(item.created_at)}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-stone-800 leading-relaxed">{item.content}</p>
+                                </div>
+                              ))}
+                              
+                              {/* Comments from translations/reflections (posts table) */}
+                              {verseCommentsFromPosts.map((item: any) => (
                                 <div 
                                   key={item.id}
                                   className="py-2 border-b border-stone-100 last:border-b-0"
@@ -558,15 +643,40 @@ function ReadContent() {
                                   </div>
                                 </div>
                               ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Empty State when expanded but no comments */}
-                        {isExpanded && verseComments.length === 0 && (
-                          <div className="px-3 pb-3 pl-12">
-                            <div className="py-2 pl-3 border-l-2 border-stone-200">
-                              <p className="text-xs text-stone-400">이 구절에 등록된 나눔이 없습니다.</p>
+                              
+                              {/* Empty State */}
+                              {verseCommentsFromPosts.length === 0 && (verseComments[v.verse] || []).length === 0 && (
+                                <div className="py-2">
+                                  <p className="text-xs text-stone-400">이 구절에 등록된 나눔이 없습니다.</p>
+                                </div>
+                              )}
+                              
+                              {/* Reply Input Form - Only for logged in users */}
+                              {user && (
+                                <div className="pt-2 border-t border-stone-100">
+                                  <div className="flex gap-2">
+                                    <textarea
+                                      value={replyInputs[v.verse] || ''}
+                                      onChange={(e) => setReplyInputs(prev => ({ ...prev, [v.verse]: e.target.value }))}
+                                      placeholder="이 구절에 대한 댓글을 작성하세요..."
+                                      className="flex-1 min-h-[60px] p-2 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  </div>
+                                  <div className="flex justify-end mt-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        addReply(v.verse);
+                                      }}
+                                      disabled={!replyInputs[v.verse]?.trim() || submittingReply[v.verse]}
+                                      className="px-4 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                      {submittingReply[v.verse] ? '등록 중...' : '댓글 등록'}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
