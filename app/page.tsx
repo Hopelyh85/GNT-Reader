@@ -50,8 +50,8 @@ function HomeContent() {
   const portalItems = [
     { id: 'read', title: '말씀 나눔터(한글)', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
     { id: 'study', title: '성경 원어 연구소(신약)', subtitle: '헬라어 원문 성경을 깊이 연구하고 주석을 작성합니다', href: '/study', icon: Search, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
-    { id: 'free', title: '자유 게시판', subtitle: '자유롭게 나누고 교제하는 공간', href: '/community/free', icon: MessageSquare, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
-    { id: 'prayer', title: '기도 게시판', subtitle: '함께 기도하며 중보하는 공간', href: '/community/prayer', icon: Heart, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
+    { id: 'community', title: '커뮤니티', subtitle: '성경 묵상과 나눔의 공간', href: '/community', icon: MessageSquare, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
+    { id: 'prayer', title: '기도 제목', subtitle: '함께 기도하며 중보하는 공간', href: '/community/prayer', icon: Heart, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
     { id: 'sermon', title: '설교 아카이브', subtitle: '과거 설교를 다시 듣고 은혜를 되새깁니다', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700' },
     { id: 'scripture', title: '묵상 데이터 저장 공간', subtitle: '모바일에 최적화되어 있지 않습니다', href: '/scripture-board', icon: Scroll, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
   ];
@@ -62,8 +62,8 @@ function HomeContent() {
     { id: 'read', title: '한글 성경', href: '/read', icon: BookOpen },
     { id: 'scripture', title: '묵상 데이터', href: '/scripture-board', icon: Scroll },
     { id: 'study', title: '원어 연구', href: '/study', icon: Search },
-    { id: 'free', title: '자유 게시판', href: '/community/free', icon: MessageSquare },
-    { id: 'prayer', title: '기도 게시판', href: '/community/prayer', icon: Heart },
+    { id: 'community', title: '커뮤니티', href: '/community', icon: MessageSquare },
+    { id: 'prayer', title: '기도 제목', href: '/community/prayer', icon: Heart },
     { id: 'cafe', title: '기독교 커뮤니티', href: 'https://naver.me/xXnPSav8', icon: ExternalLink, external: true },
   ];
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  ArrowLeft, Heart, Loader2, User, AlertCircle
+  ArrowLeft, Heart, Loader2, User, AlertCircle, Megaphone
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { getSupabase, addLike, removeLike, hasUserLiked, getLikesCount } from '@/app/lib/supabase';
@@ -26,15 +26,44 @@ interface PrayerPost {
   };
 }
 
+interface Notice {
+  id: number;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function PrayerBoardPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [posts, setPosts] = useState<PrayerPost[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingNotices, setLoadingNotices] = useState(true);
 
   useEffect(() => {
     loadPrayers();
+    loadNotices();
   }, []);
+
+  const loadNotices = async () => {
+    setLoadingNotices(true);
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('notices')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(3);
+      if (!error) {
+        setNotices(data || []);
+      }
+    } catch (err) {
+      console.error('Error loading notices:', err);
+    } finally {
+      setLoadingNotices(false);
+    }
+  };
 
   const loadPrayers = async () => {
     setLoading(true);
@@ -115,6 +144,24 @@ export default function PrayerBoardPage() {
 
       {/* Content */}
       <main className="max-w-4xl mx-auto p-4">
+        {/* Notice Section - Yellow for prayer board */}
+        {!loadingNotices && notices.length > 0 && (
+          <div className="mb-6 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Megaphone className="w-5 h-5 text-amber-600" />
+              <h2 className="font-bold text-amber-800">📢 공지사항</h2>
+            </div>
+            <div className="space-y-2">
+              {notices.map((notice) => (
+                <div key={notice.id} className="bg-white/70 rounded-lg p-3 border border-amber-100">
+                  <p className="text-sm text-stone-800 whitespace-pre-wrap">{notice.content}</p>
+                  <p className="text-xs text-stone-400 mt-2">{formatTime(notice.created_at)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-stone-400" />
