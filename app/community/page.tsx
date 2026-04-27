@@ -14,6 +14,7 @@ import {
 interface Post {
   id: string;
   user_id: string;
+  title?: string;
   content: string;
   created_at: string;
   verse_ref: string;
@@ -43,6 +44,12 @@ function CommunityContent() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingNotices, setLoadingNotices] = useState(true);
+  
+  // Accordion state for expanded posts
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [postComments, setPostComments] = useState<Record<string, any[]>>({});
+  const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
+  const [newComment, setNewComment] = useState<Record<string, string>>({});
 
   // Get post ID from URL for deep linking
   const postId = searchParams.get('post');
@@ -128,6 +135,64 @@ function CommunityContent() {
   const handleLogout = async () => {
     await signOut();
     router.push('/');
+  };
+
+  // Toggle accordion for post
+  const toggleAccordion = (postId: string) => {
+    setExpandedPostId(prev => prev === postId ? null : postId);
+    // Load comments when expanding
+    if (expandedPostId !== postId) {
+      loadPostComments(postId);
+    }
+  };
+
+  // Load comments for a post
+  const loadPostComments = async (postId: string) => {
+    if (loadingComments[postId]) return;
+    
+    setLoadingComments(prev => ({ ...prev, [postId]: true }));
+    try {
+      const { data, error } = await getSupabase()
+        .from('comments')
+        .select('id, content, created_at, user_id, profiles!inner(id, nickname, tier)')
+        .eq('post_id', postId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setPostComments(prev => ({ ...prev, [postId]: data || [] }));
+    } catch (err) {
+      console.error('Error loading comments:', err);
+    } finally {
+      setLoadingComments(prev => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  // Add comment to post
+  const addComment = async (postId: string) => {
+    const content = newComment[postId]?.trim();
+    if (!content) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const { error } = await getSupabase().from('comments').insert({
+        post_id: postId,
+        user_id: user.id,
+        content: content,
+        is_deleted: false
+      });
+
+      if (error) throw error;
+
+      setNewComment(prev => ({ ...prev, [postId]: '' }));
+      await loadPostComments(postId);
+    } catch (err) {
+      console.error('Error adding comment:', err);
+      alert('댓글 등록에 실패했습니다.');
+    }
   };
 
   const formatTime = (dateString: string) => {
@@ -224,43 +289,118 @@ function CommunityContent() {
             <p>아직 게시글이 없습니다.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {posts.map((post) => (
-              <div
-                key={post.id}
-                className="bg-white rounded-xl border border-stone-200 p-4 hover:shadow-md transition-shadow"
-              >
-                {/* Author */}
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-stone-400" />
-                  </div>
-                  <div className="flex-1">
+          <div className="border-t border-stone-200">
+            {posts.map((post) => {
+              const isExpanded = expandedPostId === post.id;
+              return (
+                <div
+                  key={post.id}
+                  className="border-b border-stone-200 last:border-b-0"
+                >
+                  {/* Row Header - Clickable */}
+                  <div
+                    onClick={() => toggleAccordion(post.id)}
+                    className="flex items-center py-3 px-4 hover:bg-stone-50 cursor-pointer transition-colors"
+                  >
+                    {/* Author Nickname - Fixed width with truncate */}
                     <button
-                      onClick={() => router.push(`/profile/${post.user_id}`)}
-                      className="text-sm font-medium text-stone-700 hover:text-blue-600 hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/profile/${post.user_id}`);
+                      }}
+                      className="w-24 flex-shrink-0 text-sm font-medium text-stone-700 hover:text-blue-600 hover:underline truncate text-left"
                     >
                       {post.profiles?.nickname || post.profiles?.email?.split('@')[0] || '익명'}
                     </button>
-                    <p className="text-xs text-stone-400">{formatTime(post.created_at)}</p>
+
+                    {/* Title - Flex grow with truncate */}
+                    <div className="flex-1 px-3 min-w-0">
+                      <p className="text-sm text-stone-800 truncate text-left hover:text-stone-600 transition-colors">
+                        {post.title || post.content.substring(0, 60) + (post.content.length > 60 ? '...' : '')}
+                      </p>
+                    </div>
+
+                    {/* Date - Right aligned */}
+                    <p className="w-32 flex-shrink-0 text-xs text-stone-400 text-right">
+                      {formatTime(post.created_at)}
+                    </p>
                   </div>
-                </div>
 
-                {/* Content */}
-                <p className="text-stone-800 leading-relaxed mb-3 whitespace-pre-wrap">{post.content}</p>
+                  {/* Accordion Content */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 bg-stone-50/50 border-t border-stone-100">
+                      {/* Post Content */}
+                      <p className="text-stone-800 leading-relaxed py-3 whitespace-pre-wrap">{post.content}</p>
 
-                {/* Actions */}
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => handleToggleLike(post.id, post.liked || false)}
-                    className={`flex items-center gap-1 text-sm ${post.liked ? 'text-red-600' : 'text-stone-500'}`}
-                  >
-                    <Heart className="w-4 h-4" fill={post.liked ? 'currentColor' : 'none'} />
-                    {post.likes || 0}
-                  </button>
+                      {/* Like Button */}
+                      <div className="flex items-center gap-4 py-2 border-t border-stone-200">
+                        <button
+                          onClick={() => handleToggleLike(post.id, post.liked || false)}
+                          className={`flex items-center gap-1 text-sm ${post.liked ? 'text-red-600' : 'text-stone-500'}`}
+                        >
+                          <Heart className="w-4 h-4" fill={post.liked ? 'currentColor' : 'none'} />
+                          {post.likes || 0}
+                        </button>
+                      </div>
+
+                      {/* Comments Section */}
+                      <div className="mt-3 pt-3 border-t border-stone-200">
+                        <h4 className="text-xs font-semibold text-stone-600 mb-2">댓글</h4>
+                        
+                        {/* Comments List */}
+                        {loadingComments[post.id] ? (
+                          <div className="py-2 text-xs text-stone-400">댓글 로딩 중...</div>
+                        ) : (postComments[post.id] || []).length > 0 ? (
+                          <div className="space-y-2">
+                            {(postComments[post.id] || []).map((comment) => (
+                              <div key={comment.id} className="py-2 border-b border-stone-100 last:border-b-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-medium text-stone-700">
+                                    {comment.profiles?.nickname || '익명'}
+                                  </span>
+                                  <span className="text-xs text-stone-400">
+                                    {formatTime(comment.created_at)}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-stone-800">{comment.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-stone-400 py-2">아직 댓글이 없습니다.</p>
+                        )}
+
+                        {/* Comment Input */}
+                        {user && (
+                          <div className="mt-3 pt-2">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={newComment[post.id] || ''}
+                                onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                placeholder="댓글을 작성하세요..."
+                                className="flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addComment(post.id);
+                                }}
+                                disabled={!newComment[post.id]?.trim()}
+                                className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                등록
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
