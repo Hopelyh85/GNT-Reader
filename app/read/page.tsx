@@ -12,6 +12,37 @@ import {
   getPublicReflections, getVerseContent, addLike, removeLike, hasUserLiked, getLikesCount
 } from '@/app/lib/supabase';
 
+// Book code mapping (from JSON keys like "MAT_1_1" to book IDs like "Matt")
+const bookCodeMap: Record<string, string> = {
+  'MAT': 'Matt',
+  'MRK': 'Mark',
+  'LUK': 'Luke',
+  'JHN': 'John',
+  'ACT': 'Acts',
+  'ROM': 'Rom',
+  'CO1': '1Cor',
+  'CO2': '2Cor',
+  'GAL': 'Gal',
+  'EPH': 'Eph',
+  'PHP': 'Phil',
+  'COL': 'Col',
+  'TH1': '1Thess',
+  'TH2': '2Thess',
+  'TI1': '1Tim',
+  'TI2': '2Tim',
+  'TIT': 'Titus',
+  'PHM': 'Phlm',
+  'HEB': 'Heb',
+  'JAS': 'Jas',
+  'PE1': '1Pet',
+  'PE2': '2Pet',
+  'JN1': '1John',
+  'JN2': '2John',
+  'JN3': '3John',
+  'JUD': 'Jude',
+  'REV': 'Rev',
+};
+
 // Book list
 const books = [
   { id: 'Matt', name: '마태복음', chapters: 28 },
@@ -94,16 +125,50 @@ function ReadContent() {
     checkAuth();
   }, [user]);
   
-  // Load KRV Bible data
+  // Load KRV Bible data and transform from flat to nested structure
   useEffect(() => {
     const loadKRV = async () => {
       try {
         console.log('[DEBUG] Loading KRV Bible data...');
         const response = await fetch('/data/krv_bible.json');
-        const data = await response.json();
-        console.log('[DEBUG] KRV data loaded, keys:', Object.keys(data).slice(0, 5));
-        console.log('[DEBUG] Sample Matt 1:', data['Matt']?.['1']?.slice(0, 3));
-        setKrvData(data);
+        const flatData = await response.json();
+        console.log('[DEBUG] Raw data keys:', Object.keys(flatData).slice(0, 5));
+        
+        // Transform flat structure (MAT_1_1: text) to nested structure (Matt: { 1: [{verse, text}] })
+        const nestedData: KRVBibleData = {};
+        
+        Object.entries(flatData).forEach(([key, text]) => {
+          // Parse key like "MAT_1_1" or "JOH_3_16"
+          const match = key.match(/^([A-Z\d]+)_(\d+)_(\d+)$/);
+          if (match) {
+            const [, bookCode, chapter, verse] = match;
+            // Map book code to book ID (e.g., MAT -> Matt, JOH -> John)
+            const bookId = bookCodeMap[bookCode] || bookCode;
+            
+            if (!nestedData[bookId]) {
+              nestedData[bookId] = {};
+            }
+            if (!nestedData[bookId][chapter]) {
+              nestedData[bookId][chapter] = [];
+            }
+            nestedData[bookId][chapter].push({
+              verse: parseInt(verse, 10),
+              text: text as string
+            });
+          }
+        });
+        
+        // Sort verses by verse number
+        Object.keys(nestedData).forEach(bookId => {
+          Object.keys(nestedData[bookId]).forEach(chapter => {
+            nestedData[bookId][chapter].sort((a, b) => a.verse - b.verse);
+          });
+        });
+        
+        console.log('[DEBUG] Transformed data keys:', Object.keys(nestedData).slice(0, 5));
+        console.log('[DEBUG] Sample Matt 1:', nestedData['Matt']?.['1']?.slice(0, 3));
+        console.log('[DEBUG] Total books:', Object.keys(nestedData).length);
+        setKrvData(nestedData);
       } catch (err) {
         console.error('[DEBUG] Error loading KRV:', err);
       } finally {
@@ -402,8 +467,34 @@ function ReadContent() {
                     <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
                   </div>
                 ) : verses.length === 0 ? (
-                  <div className="text-center py-12 text-stone-500">
-                    <p>본문을 불러올 수 없습니다.</p>
+                  <div className="text-center py-12">
+                    {loadingBible ? (
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
+                        <span className="ml-2 text-stone-500">성경 데이터 로딩 중...</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-stone-500 font-medium">본문을 불러올 수 없습니다.</p>
+                        <p className="text-xs text-stone-400">
+                          책: {selectedBook}, 장: {selectedChapter}
+                        </p>
+                        <p className="text-xs text-stone-400">
+                          데이터 상태: {Object.keys(krvData).length > 0 ? '로드됨' : '미로드'}
+                        </p>
+                        {Object.keys(krvData).length > 0 && (
+                          <p className="text-xs text-stone-400">
+                            사용 가능한 책: {Object.keys(krvData).slice(0, 5).join(', ')}...
+                          </p>
+                        )}
+                        <button
+                          onClick={() => window.location.reload()}
+                          className="mt-3 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg text-sm hover:bg-amber-200"
+                        >
+                          새로고침
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   verses.map((v) => {
