@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { 
   ArrowLeft, Crown, Church, Briefcase, BookOpen, Heart,
-  Loader2, User
+  Loader2, User, Edit, Save, X
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { 
@@ -22,6 +22,11 @@ export default function UserProfilePage() {
   const [activity, setActivity] = useState<{reflections: any[]; studyNotes: any[]} | null>(null);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [isCurrentUser, setIsCurrentUser] = useState(false);
+  
+  // Bio editing states
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [bioText, setBioText] = useState('');
+  const [savingBio, setSavingBio] = useState(false);
 
   useEffect(() => {
     if (userId) {
@@ -66,6 +71,66 @@ export default function UserProfilePage() {
       hour: '2-digit', 
       minute: '2-digit' 
     });
+  };
+
+  // Tier mapping - English to Korean
+  const getKoreanTier = (tier?: string | null): string => {
+    const tierMap: Record<string, string> = {
+      'General': '정회원',
+      'Regular': '정회원',
+      'Associate': '준회원',
+      'Dedicated': '열심회원',
+      'Staff': '스태프',
+      'Manager': '매니저',
+      'ViceDirector': '부소장',
+      'Director': '소장',
+      'Admin': '소장',
+      'admin': '소장',
+    };
+    return tier ? (tierMap[tier] || tier) : '준회원';
+  };
+
+  // Check if user has staff level or above
+  const isStaffOrAbove = (tier?: string | null): boolean => {
+    const staffTiers = ['스태프', '매니저', '부소장', '소장', 'Staff', 'Manager', 'ViceDirector', 'Director', 'Admin'];
+    if (!tier) return false;
+    return staffTiers.includes(tier) || tier.includes('⭐');
+  };
+
+  // Activity category mapping
+  const getKoreanCategory = (category?: string | null): string => {
+    const categoryMap: Record<string, string> = {
+      'general': '자유글',
+      'reflection': '묵상',
+      'translation': '사역',
+      'prayer': '기도',
+      'notice': '공지',
+    };
+    return category ? (categoryMap[category] || category) : '';
+  };
+
+  // Handle bio save
+  const handleSaveBio = async () => {
+    if (!user || !isCurrentUser) return;
+    
+    setSavingBio(true);
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: bioText, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      setProfile(prev => prev ? { ...prev, bio: bioText } : null);
+      setIsEditingBio(false);
+    } catch (err) {
+      console.error('Error saving bio:', err);
+      alert('자기소개 저장에 실패했습니다.');
+    } finally {
+      setSavingBio(false);
+    }
   };
 
   if (loading) {
@@ -151,14 +216,66 @@ export default function UserProfilePage() {
                     </span>
                   )}
                   <span className="inline-flex items-center px-3 py-1 bg-stone-100 text-stone-600 text-sm rounded-full">
-                    {profile.tier || '준회원'}
+                    {getKoreanTier(profile.tier)}
                   </span>
                 </div>
                 
-                {/* Bio */}
-                {profile.bio && (
-                  <p className="text-stone-600 leading-relaxed">{profile.bio}</p>
-                )}
+                {/* Bio Section */}
+                <div className="mb-4">
+                  {isEditingBio ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={bioText}
+                        onChange={(e) => setBioText(e.target.value)}
+                        placeholder="자기소개를 작성하세요..."
+                        className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        rows={3}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveBio}
+                          disabled={savingBio}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                        >
+                          {savingBio ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          저장
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsEditingBio(false);
+                            setBioText(profile.bio || '');
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-stone-200 text-stone-700 text-sm rounded-lg hover:bg-stone-300"
+                        >
+                          <X className="w-4 h-4" />
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <p className={`text-sm flex-1 ${profile.bio ? 'text-stone-700' : 'text-stone-400 italic'}`}>
+                        {profile.bio || '아직 자기소개가 없습니다.'}
+                      </p>
+                      {isCurrentUser && (
+                        <button
+                          onClick={() => {
+                            setBioText(profile.bio || '');
+                            setIsEditingBio(true);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-stone-500 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                        >
+                          <Edit className="w-3 h-3" />
+                          수정
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 
                 <p className="text-xs text-stone-400 mt-3">
                   가입일: {formatDateTime(profile.created_at)}
@@ -194,9 +311,23 @@ export default function UserProfilePage() {
                   </h3>
                   <div className="space-y-2">
                     {activity.reflections.slice(0, 5).map((ref) => (
-                      <div key={ref.id} className="p-2 bg-stone-50 rounded text-sm">
+                      <div 
+                        key={ref.id} 
+                        className="p-2 bg-stone-50 rounded text-sm cursor-pointer hover:bg-stone-100 transition-colors"
+                        onClick={() => router.push(`/community/post/${ref.id}`)}
+                      >
                         <div className="text-xs text-stone-500 mb-1 flex justify-between">
-                          <span>{ref.verse_ref || '글로벌'}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                              ref.category === 'translation' ? 'bg-emerald-100 text-emerald-700' : 
+                              ref.category === 'prayer' ? 'bg-blue-100 text-blue-700' :
+                              ref.category === 'general' ? 'bg-stone-100 text-stone-600' :
+                              'bg-amber-100 text-amber-700'
+                            }`}>
+                              {getKoreanCategory(ref.category)}
+                            </span>
+                            <span>{ref.verse_ref || '글로벌'}</span>
+                          </div>
                           <span>{formatDateTime(ref.created_at)}</span>
                         </div>
                         <p className="text-stone-700 line-clamp-2">{ref.content}</p>

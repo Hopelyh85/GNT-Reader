@@ -939,9 +939,9 @@ export async function togglePinPost(reflectionId: string, isPinned: boolean): Pr
     .eq('id', user.id)
     .maybeSingle();
     
-  const isAdmin = profile?.tier?.includes('관리자') || 
-                  profile?.tier?.includes('Admin') || 
-                  profile?.tier?.includes('⭐⭐⭐⭐⭐');
+  const staffTiers = ['스태프', '매니저', '부소장', '소장', 'Staff', 'Manager', 'ViceDirector', 'Director', 'Admin'];
+  const isAdmin = staffTiers.includes(profile?.tier || '') || 
+                  profile?.tier?.includes('⭐');
   if (profileError || !isAdmin) {
     throw new Error('Admin access required');
   }
@@ -996,9 +996,9 @@ export async function deleteReflection(reflectionId: string): Promise<void> {
     
   if (profileError) console.error('Error fetching profile:', profileError.message);
     
-  const isAdminOrStaff = profile?.tier?.includes('관리자') || profile?.tier?.includes('Admin') ||
-                         profile?.tier?.includes('스태프') || profile?.tier?.includes('Staff') ||
-                         profile?.tier?.includes('⭐⭐⭐⭐⭐');
+  const staffTiers = ['스태프', '매니저', '부소장', '소장', 'Staff', 'Manager', 'ViceDirector', 'Director', 'Admin'];
+  const isAdminOrStaff = staffTiers.includes(profile?.tier || '') || 
+                         profile?.tier?.includes('⭐');
   const canDelete = reflection.user_id === user.id || isAdminOrStaff;
     
   if (!canDelete) throw new Error('Not authorized to delete');
@@ -1011,10 +1011,7 @@ export async function deleteReflection(reflectionId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function markReflectionAsBest(
-  reflectionId: string,
-  isBest: boolean
-): Promise<void> {
+export async function markReflectionAsBest(reflectionId: string, isBest: boolean): Promise<void> {
   const supabase = getSupabase();
   const user = await getCurrentUser();
   if (!user) throw new Error('Not authenticated');
@@ -1026,8 +1023,8 @@ export async function markReflectionAsBest(
     .eq('id', user.id)
     .maybeSingle();
     
-  const isAdmin = profile?.tier?.includes('관리자') || 
-                  profile?.tier?.includes('Admin') || 
+  const staffTiers = ['스태프', '매니저', '부소장', '소장', 'Staff', 'Manager', 'ViceDirector', 'Director', 'Admin'];
+  const isAdmin = staffTiers.includes(profile?.tier || '') || 
                   profile?.tier?.includes('⭐⭐⭐⭐⭐');
   if (profileError || !isAdmin) {
     throw new Error('Admin access required');
@@ -1224,8 +1221,8 @@ export async function updateNotice(content: string): Promise<boolean> {
     .eq('id', user.id)
     .maybeSingle();
     
-  const isAdmin = profile?.tier?.includes('관리자') || 
-                  profile?.tier?.includes('Admin') || 
+  const staffTiers = ['스태프', '매니저', '부소장', '소장', 'Staff', 'Manager', 'ViceDirector', 'Director', 'Admin'];
+  const isAdmin = staffTiers.includes(profile?.tier || '') || 
                   profile?.tier?.includes('⭐⭐⭐⭐⭐');
   if (profileError || !isAdmin) {
     throw new Error('Admin access required');
