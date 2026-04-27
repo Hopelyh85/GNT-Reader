@@ -41,6 +41,16 @@ const englishToKoreanMap: Record<string, string> = {
   '3John': '요한삼서', 'Jude': '유다서', 'Rev': '요한계시록',
 };
 
+// Book ID to 3-letter code mapping (for JSON keys like "MAT_1_1")
+const bookIdToCode: Record<string, string> = {
+  'Matt': 'MAT', 'Mark': 'MRK', 'Luke': 'LUK', 'John': 'JHN', 'Acts': 'ACT',
+  'Rom': 'ROM', '1Cor': 'CO1', '2Cor': 'CO2', 'Gal': 'GAL', 'Eph': 'EPH',
+  'Phil': 'PHP', 'Col': 'COL', '1Thess': 'TH1', '2Thess': 'TH2', '1Tim': 'TI1',
+  '2Tim': 'TI2', 'Titus': 'TIT', 'Phlm': 'PHM', 'Heb': 'HEB', 'Jas': 'JAS',
+  '1Pet': 'PE1', '2Pet': 'PE2', '1John': 'JN1', '2John': 'JN2', '3John': 'JN3',
+  'Jude': 'JUD', 'Rev': 'REV',
+};
+
 interface BibleData {
   [key: string]: string;
 }
@@ -120,13 +130,18 @@ function VersePageContent() {
     }
   }, [user]);
   
-  // Load Bible text
+  // Load Bible text using 3-letter book code (e.g., "MAT_1_1")
   useEffect(() => {
     const loadBible = async () => {
       try {
+        console.log('[DEBUG] Loading Bible text for:', bookId, chapterNum, verseNum);
         const response = await fetch('/data/krv_bible.json');
         const data: BibleData = await response.json();
-        const key = `${bookId}_${chapterNum}_${verseNum}`;
+        const bookCode = bookIdToCode[bookId] || bookId;
+        const key = `${bookCode}_${chapterNum}_${verseNum}`;
+        console.log('[DEBUG] Looking up key:', key);
+        console.log('[DEBUG] Key exists:', key in data);
+        console.log('[DEBUG] Available keys for book:', Object.keys(data).filter(k => k.startsWith(bookCode)).slice(0, 5));
         setBibleText(data[key] || '성경 텍스트를 불러올 수 없습니다.');
       } catch (err) {
         console.error('Error loading Bible:', err);

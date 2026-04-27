@@ -12,36 +12,20 @@ import {
   getPublicReflections, getVerseContent, addLike, removeLike, hasUserLiked, getLikesCount
 } from '@/app/lib/supabase';
 
-// Book code mapping (from JSON keys like "MAT_1_1" to book IDs like "Matt")
+// Book code mapping: JSON key prefix (e.g., "MAT_1_1") -> book ID (e.g., "Matt")
 const bookCodeMap: Record<string, string> = {
-  'MAT': 'Matt',
-  'MRK': 'Mark',
-  'LUK': 'Luke',
-  'JHN': 'John',
-  'ACT': 'Acts',
-  'ROM': 'Rom',
-  'CO1': '1Cor',
-  'CO2': '2Cor',
-  'GAL': 'Gal',
-  'EPH': 'Eph',
-  'PHP': 'Phil',
-  'COL': 'Col',
-  'TH1': '1Thess',
-  'TH2': '2Thess',
-  'TI1': '1Tim',
-  'TI2': '2Tim',
-  'TIT': 'Titus',
-  'PHM': 'Phlm',
-  'HEB': 'Heb',
-  'JAS': 'Jas',
-  'PE1': '1Pet',
-  'PE2': '2Pet',
-  'JN1': '1John',
-  'JN2': '2John',
-  'JN3': '3John',
-  'JUD': 'Jude',
-  'REV': 'Rev',
+  'MAT': 'Matt', 'MRK': 'Mark', 'LUK': 'Luke', 'JHN': 'John', 'ACT': 'Acts',
+  'ROM': 'Rom', 'CO1': '1Cor', 'CO2': '2Cor', 'GAL': 'Gal', 'EPH': 'Eph',
+  'PHP': 'Phil', 'COL': 'Col', 'TH1': '1Thess', 'TH2': '2Thess', 'TI1': '1Tim',
+  'TI2': '2Tim', 'TIT': 'Titus', 'PHM': 'Phlm', 'HEB': 'Heb', 'JAS': 'Jas',
+  'PE1': '1Pet', 'PE2': '2Pet', 'JN1': '1John', 'JN2': '2John', 'JN3': '3John',
+  'JUD': 'Jude', 'REV': 'Rev',
 };
+
+// Reverse mapping: book ID -> JSON key prefix
+const bookIdToCode: Record<string, string> = Object.fromEntries(
+  Object.entries(bookCodeMap).map(([code, id]) => [id, code])
+);
 
 // Book list
 const books = [
@@ -74,17 +58,19 @@ const books = [
   { id: 'Rev', name: '요한계시록', chapters: 22 },
 ];
 
-type KRVBibleData = Record<string, Record<string, Array<{ verse: number; text: string }>>>;
+// Raw Bible data: flat key-value pairs like "MAT_1_1": "text"
+type RawBibleData = Record<string, string>;
 
 function ReadContent() {
   const router = useRouter();
+  console.log('[DEBUG] ReadContent component mounted');
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   
   // State
   const [selectedBook, setSelectedBook] = useState('Matt');
   const [selectedChapter, setSelectedChapter] = useState(1);
-  const [krvData, setKrvData] = useState<KRVBibleData>({});
+  const [rawBibleData, setRawBibleData] = useState<RawBibleData>({});
   const [loadingBible, setLoadingBible] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -101,9 +87,25 @@ function ReadContent() {
   // Accordion state for expanded verses
   const [expandedVerses, setExpandedVerses] = useState<Set<number>>(new Set());
   
-  // Derived data
+  // Derived data - filter raw Bible data directly
   const bookInfo = books.find(b => b.id === selectedBook);
-  const verses = krvData[selectedBook]?.[selectedChapter.toString()] || [];
+  const bookCode = bookIdToCode[selectedBook]; // e.g., 'Matt' -> 'MAT'
+  const chapterKey = `${bookCode}_${selectedChapter}_`; // e.g., 'MAT_1_'
+  
+  // Filter verses for current book and chapter, then parse verse numbers
+  const verses = bookCode 
+    ? Object.entries(rawBibleData)
+        .filter(([key]) => key.startsWith(chapterKey))
+        .map(([key, text]) => {
+          const verseMatch = key.match(/_(\d+)$/);
+          const verseNum = verseMatch ? parseInt(verseMatch[1], 10) : 0;
+          return { verse: verseNum, text };
+        })
+        .sort((a, b) => a.verse - b.verse)
+    : [];
+  
+  console.log('[DEBUG] Rendering verses count:', verses.length);
+  console.log('[DEBUG] selectedBook:', selectedBook, 'bookCode:', bookCode, 'chapter:', selectedChapter);
   
   // Check auth and get user role
   useEffect(() => {
@@ -125,50 +127,17 @@ function ReadContent() {
     checkAuth();
   }, [user]);
   
-  // Load KRV Bible data and transform from flat to nested structure
+  // Load KRV Bible data - store raw flat data directly
   useEffect(() => {
     const loadKRV = async () => {
       try {
-        console.log('[DEBUG] Loading KRV Bible data...');
+        console.log('[DEBUG] Loading KRV Bible data from /data/krv_bible.json...');
         const response = await fetch('/data/krv_bible.json');
-        const flatData = await response.json();
-        console.log('[DEBUG] Raw data keys:', Object.keys(flatData).slice(0, 5));
-        
-        // Transform flat structure (MAT_1_1: text) to nested structure (Matt: { 1: [{verse, text}] })
-        const nestedData: KRVBibleData = {};
-        
-        Object.entries(flatData).forEach(([key, text]) => {
-          // Parse key like "MAT_1_1" or "JOH_3_16"
-          const match = key.match(/^([A-Z\d]+)_(\d+)_(\d+)$/);
-          if (match) {
-            const [, bookCode, chapter, verse] = match;
-            // Map book code to book ID (e.g., MAT -> Matt, JOH -> John)
-            const bookId = bookCodeMap[bookCode] || bookCode;
-            
-            if (!nestedData[bookId]) {
-              nestedData[bookId] = {};
-            }
-            if (!nestedData[bookId][chapter]) {
-              nestedData[bookId][chapter] = [];
-            }
-            nestedData[bookId][chapter].push({
-              verse: parseInt(verse, 10),
-              text: text as string
-            });
-          }
-        });
-        
-        // Sort verses by verse number
-        Object.keys(nestedData).forEach(bookId => {
-          Object.keys(nestedData[bookId]).forEach(chapter => {
-            nestedData[bookId][chapter].sort((a, b) => a.verse - b.verse);
-          });
-        });
-        
-        console.log('[DEBUG] Transformed data keys:', Object.keys(nestedData).slice(0, 5));
-        console.log('[DEBUG] Sample Matt 1:', nestedData['Matt']?.['1']?.slice(0, 3));
-        console.log('[DEBUG] Total books:', Object.keys(nestedData).length);
-        setKrvData(nestedData);
+        const rawData = await response.json();
+        console.log('[DEBUG] Raw data loaded, total keys:', Object.keys(rawData).length);
+        console.log('[DEBUG] Sample keys:', Object.keys(rawData).slice(0, 5));
+        console.log('[DEBUG] Sample value:', Object.values(rawData)[0]);
+        setRawBibleData(rawData);
       } catch (err) {
         console.error('[DEBUG] Error loading KRV:', err);
       } finally {
@@ -180,11 +149,17 @@ function ReadContent() {
   
   // Debug verses data
   useEffect(() => {
-    console.log('[DEBUG] Selected book:', selectedBook, 'chapter:', selectedChapter);
-    console.log('[DEBUG] krvData keys:', Object.keys(krvData).slice(0, 5));
-    console.log('[DEBUG] verses data:', verses.slice(0, 3));
-    console.log('[DEBUG] verses.length:', verses.length);
-  }, [selectedBook, selectedChapter, krvData, verses]);
+    console.log('[DEBUG] ==== VERSE DEBUG ====');
+    console.log('[DEBUG] selectedBook:', selectedBook, 'chapter:', selectedChapter);
+    console.log('[DEBUG] bookCode:', bookCode);
+    console.log('[DEBUG] chapterKey:', chapterKey);
+    console.log('[DEBUG] rawBibleData keys count:', Object.keys(rawBibleData).length);
+    console.log('[DEBUG] verses count:', verses.length);
+    if (verses.length > 0) {
+      console.log('[DEBUG] First verse:', verses[0]);
+    }
+    console.log('[DEBUG] ====================');
+  }, [selectedBook, selectedChapter, rawBibleData, verses, bookCode, chapterKey]);
   
   // Load community content (translations, reflections, study notes)
   useEffect(() => {
@@ -480,11 +455,11 @@ function ReadContent() {
                           책: {selectedBook}, 장: {selectedChapter}
                         </p>
                         <p className="text-xs text-stone-400">
-                          데이터 상태: {Object.keys(krvData).length > 0 ? '로드됨' : '미로드'}
+                          데이터 상태: {Object.keys(rawBibleData).length > 0 ? '로드됨' : '미로드'}
                         </p>
-                        {Object.keys(krvData).length > 0 && (
+                        {Object.keys(rawBibleData).length > 0 && (
                           <p className="text-xs text-stone-400">
-                            사용 가능한 책: {Object.keys(krvData).slice(0, 5).join(', ')}...
+                            원본 키 샘플: {Object.keys(rawBibleData).slice(0, 3).join(', ')}...
                           </p>
                         )}
                         <button
@@ -497,7 +472,7 @@ function ReadContent() {
                     )}
                   </div>
                 ) : (
-                  verses.map((v) => {
+                  (console.log('[DEBUG] RENDERING VERSES:', verses.length, 'verses'), verses.map((v) => {
                     const isExpanded = expandedVerses.has(v.verse);
                     // Get comments for this verse
                     const verseComments = [...translations, ...reflections].filter(
@@ -597,7 +572,7 @@ function ReadContent() {
                         )}
                       </div>
                     );
-                  })
+                  }))
                 )}
               </div>
               
