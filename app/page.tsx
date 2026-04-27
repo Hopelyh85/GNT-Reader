@@ -46,22 +46,24 @@ function HomeContent() {
     router.push('/');
   };
 
-  // Portal menu items - '묵상 데이터 저장 공간' moved to 5th position
+  // Portal menu items - Community split into free and prayer boards
   const portalItems = [
     { id: 'read', title: '말씀 나눔터(한글)', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
     { id: 'study', title: '성경 원어 연구소(신약)', subtitle: '헬라어 원문 성경을 깊이 연구하고 주석을 작성합니다', href: '/study', icon: Search, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
-    { id: 'community', title: '커뮤니티 게시판', subtitle: '자유롭게 나누고 기도하며 함께 성장하는 공간', href: '/community', icon: Users, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
-    { id: 'sermon', title: '설교 아카이브', subtitle: '과거 설교를 다시 듣고 은혜를 되새깁니다', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
+    { id: 'free', title: '자유 게시판', subtitle: '자유롭게 나누고 교제하는 공간', href: '/community/free', icon: MessageSquare, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
+    { id: 'prayer', title: '기도 게시판', subtitle: '함께 기도하며 중보하는 공간', href: '/community/prayer', icon: Heart, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
+    { id: 'sermon', title: '설교 아카이브', subtitle: '과거 설교를 다시 듣고 은혜를 되새깁니다', href: 'https://sermon-archive.vercel.app/', icon: GraduationCap, external: true, color: 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700' },
     { id: 'scripture', title: '묵상 데이터 저장 공간', subtitle: '모바일에 최적화되어 있지 않습니다', href: '/scripture-board', icon: Scroll, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
   ];
 
-  // Navigation items
+  // Navigation items - Community split into free and prayer boards
   const navItems = [
     { id: 'home', title: '홈', href: '/', icon: HomeIcon, active: true },
     { id: 'read', title: '한글 성경', href: '/read', icon: BookOpen },
     { id: 'scripture', title: '묵상 데이터', href: '/scripture-board', icon: Scroll },
     { id: 'study', title: '원어 연구', href: '/study', icon: Search },
-    { id: 'community', title: '커뮤니티', href: '/community', icon: Users },
+    { id: 'free', title: '자유 게시판', href: '/community/free', icon: MessageSquare },
+    { id: 'prayer', title: '기도 게시판', href: '/community/prayer', icon: Heart },
     { id: 'cafe', title: '기독교 커뮤니티', href: 'https://naver.me/xXnPSav8', icon: ExternalLink, external: true },
   ];
 
@@ -271,7 +273,7 @@ function HomeContent() {
                 <AlertTriangle className="w-4 h-4 text-red-600" />
                 <h3 className="font-bold text-sm text-red-800">긴급 기도제목</h3>
                 <a 
-                  href="/community" 
+                  href="/community/prayer" 
                   className="ml-auto text-xs text-red-600 hover:text-red-700 flex items-center gap-1"
                 >
                   전체보기 <ChevronRight className="w-3 h-3" />
@@ -288,7 +290,7 @@ function HomeContent() {
                       <li 
                         key={prayer.id} 
                         className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-red-50/50 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/community?post=${prayer.id}`)}
+                        onClick={() => router.push(`/community/prayer/${prayer.id}`)}
                       >
                         <span className="flex-shrink-0 w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs flex items-center justify-center font-bold mt-0.5">
                           {idx + 1}
@@ -307,9 +309,10 @@ function HomeContent() {
                 ) : (
                   <div className="text-center py-6">
                     <Heart className="w-8 h-8 text-stone-200 mx-auto mb-2" />
-                    <p className="text-sm text-stone-400">긴급 기도제목이 없습니다.</p>
-                    <a href="/community" className="text-xs text-stone-500 hover:text-stone-700 underline mt-1 inline-block">
-                      커뮤니티에서 기도제목 작성하기
+                    <p className="text-sm text-stone-500 font-medium">현재 올라온 긴급 기도 제목이 없습니다.</p>
+                    <p className="text-xs text-stone-400 mt-1">새로운 긴급 기도 제목을 기도 게시판에 올려주세요.</p>
+                    <a href="/community/prayer" className="text-xs text-amber-600 hover:text-amber-700 underline mt-2 inline-block font-medium">
+                      기도 게시판에서 작성하기 →
                     </a>
                   </div>
                 )}

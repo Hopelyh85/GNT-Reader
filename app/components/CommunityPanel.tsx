@@ -1413,9 +1413,15 @@ export function CommunityPanel({
                       <div className="flex-1 bg-white rounded-lg p-3 border border-stone-100">
                         <div className="flex items-center gap-2 mb-1">
                           <Avatar url={reply.profiles?.avatar_url} tier={reply.profiles?.tier} size="sm" />
-                          <span className="text-xs font-medium text-stone-700">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/profile/${reply.user_id}`);
+                            }}
+                            className="text-xs font-medium text-stone-700 hover:text-blue-600 hover:underline cursor-pointer"
+                          >
                             {getDisplayName(reply.profiles)}
-                          </span>
+                          </button>
                           <span className="text-xs text-stone-400">{formatTime(reply.created_at)}</span>
                         </div>
                         <p className="text-sm text-stone-700 leading-relaxed break-words whitespace-pre-wrap pl-8">
@@ -2243,9 +2249,15 @@ export function CommunityPanel({
                                               <CornerDownRight className="w-4 h-4 text-stone-400 flex-shrink-0 mt-0.5" />
                                               <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-0.5">
-                                                  <span className="text-xs font-medium text-stone-700">
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      router.push(`/profile/${reply.user_id}`);
+                                                    }}
+                                                    className="text-xs font-medium text-stone-700 hover:text-blue-600 hover:underline cursor-pointer"
+                                                  >
                                                     {getDisplayName(reply.profiles)}
-                                                  </span>
+                                                  </button>
                                                   <span className="text-xs text-stone-400">
                                                     {formatTime(reply.created_at)}
                                                   </span>
@@ -2654,7 +2666,15 @@ export function CommunityPanel({
                                   {(replies[post.id] || []).map((reply) => (
                                     <div key={reply.id} className="p-4 bg-red-50/50 rounded-lg border border-red-100">
                                       <div className="flex items-center gap-2 mb-2">
-                                        <span className="font-medium text-stone-700">{getDisplayName(reply.profiles)}</span>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            router.push(`/profile/${reply.user_id}`);
+                                          }}
+                                          className="font-medium text-stone-700 hover:text-blue-600 hover:underline cursor-pointer"
+                                        >
+                                          {getDisplayName(reply.profiles)}
+                                        </button>
                                         <span className="text-xs text-stone-400">
                                           {formatTime(reply.created_at)}
                                         </span>
