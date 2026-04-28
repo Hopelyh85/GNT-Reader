@@ -569,6 +569,13 @@ export default function StudyPage() {
               </div>
             ) : error ? (
               <div className="text-red-500 text-center p-8">{error}</div>
+            ) : !bibleData || !bibleData[selectedBook] || !bibleData[selectedBook][selectedChapter] ? (
+              <div className="flex items-center justify-center h-full text-stone-500">
+                <div className="text-center">
+                  <p className="text-lg mb-2">데이터를 불러오는 중이거나</p>
+                  <p className="text-lg">해당 장의 데이터가 없습니다.</p>
+                </div>
+              </div>
             ) : (
               <div className="max-w-4xl mx-auto space-y-6">
                 {Object.entries(getVerses()).map(([verseNum, words]) => {

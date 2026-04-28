@@ -47,6 +47,7 @@ export default function PrayerBoardPage() {
   const [linkedPrayerId, setLinkedPrayerId] = useState<string | null>(null);
   const [userPreviousPrayers, setUserPreviousPrayers] = useState<PrayerPost[]>([]);
   const [submittingPrayer, setSubmittingPrayer] = useState(false);
+  const [newPrayerCategory, setNewPrayerCategory] = useState('prayer_personal');
   
   // Category tabs state
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -191,9 +192,6 @@ export default function PrayerBoardPage() {
       minute: '2-digit' 
     });
   };
-
-  // New prayer category state
-  const [newPrayerCategory, setNewPrayerCategory] = useState('prayer_personal');
 
   const handleAddPrayer = async () => {
     if (!user) {

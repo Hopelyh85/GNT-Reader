@@ -12,6 +12,14 @@ import {
   getUserActivity
 } from '@/app/lib/supabase';
 
+const TIER_MAP: Record<string, string> = { 
+  general: '일반', 
+  staff: '스태프', 
+  manager: '매니저', 
+  sub_director: '부소장', 
+  director: '소장' 
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -121,31 +129,8 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  // Tier mapping - English to Korean
-  const getKoreanTier = (tier?: string | null): string => {
-    const tierMap: Record<string, string> = {
-      'General': '정회원',
-      'general': '정회원',
-      'Regular': '정회원',
-      'regular': '정회원',
-      'Associate': '준회원',
-      'associate': '준회원',
-      'Staff': '스태프',
-      'staff': '스태프',
-      'Manager': '매니저',
-      'manager': '매니저',
-      'ViceDirector': '부소장',
-      'vice_director': '부소장',
-      'Director': '소장',
-      'director': '소장',
-      'Admin': '소장',
-      'admin': '소장',
-    };
-    return tier ? (tierMap[tier] || tier) : '준회원';
-  };
-
-  const isGeneral = profile?.tier === '준회원' || profile?.tier === 'associate' || !profile?.tier;
-  const userRole = getKoreanTier(profile?.tier);
+  const userRole = TIER_MAP[profile?.tier || ''] || profile?.tier || '일반';
+  const isGeneral = profile?.tier === 'general' || !profile?.tier;
   const isAdmin = userRole === '소장' || profile?.tier?.toLowerCase().includes('admin');
 
   if (authLoading || loading) {

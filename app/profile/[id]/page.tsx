@@ -11,6 +11,14 @@ import {
   getProfile, Profile, getUserActivity, getSupabase
 } from '@/app/lib/supabase';
 
+const TIER_MAP: Record<string, string> = { 
+  general: '일반', 
+  staff: '스태프', 
+  manager: '매니저', 
+  sub_director: '부소장', 
+  director: '소장' 
+};
+
 export default function UserProfilePage() {
   const router = useRouter();
   const params = useParams();
@@ -71,23 +79,6 @@ export default function UserProfilePage() {
       hour: '2-digit', 
       minute: '2-digit' 
     });
-  };
-
-  // Tier mapping - English to Korean
-  const getKoreanTier = (tier?: string | null): string => {
-    const tierMap: Record<string, string> = {
-      'General': '정회원',
-      'Regular': '정회원',
-      'Associate': '준회원',
-      'Dedicated': '열심회원',
-      'Staff': '스태프',
-      'Manager': '매니저',
-      'ViceDirector': '부소장',
-      'Director': '소장',
-      'Admin': '소장',
-      'admin': '소장',
-    };
-    return tier ? (tierMap[tier] || tier) : '준회원';
   };
 
   // Check if user has staff level or above
@@ -291,7 +282,7 @@ export default function UserProfilePage() {
                     </span>
                   )}
                   <span className="inline-flex items-center px-3 py-1 bg-stone-100 text-stone-600 text-sm rounded-full">
-                    {getKoreanTier(profile.tier)}
+                    {TIER_MAP[profile.tier || ''] || profile.tier || '일반'}
                   </span>
                 </div>
                 
