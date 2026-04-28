@@ -222,7 +222,7 @@ export default function StudyPage() {
 
   // Get chapters for selected book (hierarchical structure)
   const getChapters = () => {
-    const bookData = bibleData[selectedBook];
+    const bookData = bibleData[selectedBook] as Record<string, any>;
     if (!bookData) return [];
     const chapters = Object.keys(bookData).map(ch => parseInt(ch));
     return Array.from(new Set(chapters)).sort((a, b) => a - b);
@@ -231,7 +231,8 @@ export default function StudyPage() {
   // Get verses for selected book and chapter (hierarchical structure: bibleData[book][chapter][verse])
   const getVerses = () => {
     const verses: Record<number, any[]> = {};
-    const chapterData = bibleData[selectedBook]?.[selectedChapter.toString()];
+    const bookData = bibleData[selectedBook] as Record<string, any>;
+    const chapterData = bookData ? bookData[selectedChapter.toString()] : null;
     if (chapterData) {
       Object.entries(chapterData).forEach(([verseNum, words]) => {
         verses[parseInt(verseNum)] = words as any[];
@@ -661,7 +662,7 @@ export default function StudyPage() {
               </div>
             ) : error ? (
               <div className="text-red-500 text-center p-8">{error}</div>
-            ) : !bibleData || !bibleData[selectedBook] || !bibleData[selectedBook][selectedChapter] ? (
+            ) : !bibleData ? (
               <div className="flex items-center justify-center h-full text-stone-500">
                 <div className="text-center">
                   <p className="text-lg mb-2">데이터를 불러오는 중이거나</p>
