@@ -9,7 +9,7 @@ import {
 } from '@/app/lib/supabase';
 import { 
   BookOpen, LogOut, LogIn, Menu, X, ArrowLeft, Search, BookMarked, 
-  ChevronDown, ChevronUp, XCircle, Info, BookmarkPlus, ExternalLink,
+  ChevronDown, XCircle, Info, BookmarkPlus, ExternalLink,
   Heart, MessageSquare, Send, Crown
 } from 'lucide-react';
 
@@ -149,6 +149,7 @@ export default function StudyPage() {
   const [bibleData, setBibleData] = useState<Record<string, any[]>>({});
   const [koreanBibleData, setKoreanBibleData] = useState<Record<string, string>>({});
   const [lexiconData, setLexiconData] = useState<{ lexicon: Record<string, any>, morphology: Record<string, string> }>({ lexicon: {}, morphology: {} });
+  const [koreanDict, setKoreanDict] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -158,8 +159,6 @@ export default function StudyPage() {
   const [selectedChapter, setSelectedChapter] = useState<number>(1);
   const [expandedBooks, setExpandedBooks] = useState<Set<string>>(new Set());
   const [selectedWord, setSelectedWord] = useState<any>(null);
-  const [lexiconModalOpen, setLexiconModalOpen] = useState(false);
-  const [fullDefExpanded, setFullDefExpanded] = useState(false);
   
   // Verse detail modal states
   const [selectedVerse, setSelectedVerse] = useState<number | null>(null);
@@ -178,15 +177,16 @@ export default function StudyPage() {
   const [globalNotice, setGlobalNotice] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Load bible and lexicon data
+  // Load bible, lexicon, and korean dictionary data
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [bibleRes, koreanRes, lexiconRes] = await Promise.all([
+        const [bibleRes, koreanRes, lexiconRes, koreanDictRes] = await Promise.all([
           fetch('/data/parsed_original_bible.json'),
           fetch('/data/nkrv.json'),
-          fetch('/data/step_lexicon.json')
+          fetch('/data/step_lexicon.json'),
+          fetch('/data/korean_strongs_dict.json')
         ]);
         
         if (!bibleRes.ok || !lexiconRes.ok) {
@@ -203,6 +203,13 @@ export default function StudyPage() {
         if (koreanRes.ok) {
           const koreanJson = await koreanRes.json();
           setKoreanBibleData(koreanJson);
+        }
+        
+        // Load Korean Strongs dictionary
+        if (koreanDictRes.ok) {
+          const koreanDictJson = await koreanDictRes.json();
+          setKoreanDict(koreanDictJson);
+          console.log('✅ Korean Strongs dictionary loaded:', Object.keys(koreanDictJson).length, 'entries');
         }
         
         // Default to first NT book
@@ -241,11 +248,9 @@ export default function StudyPage() {
     return verses;
   };
 
-  // Handle word click - open lexicon modal
+  // Handle word click - show in right panel
   const handleWordClick = (word: any) => {
     setSelectedWord(word);
-    setFullDefExpanded(false);
-    setLexiconModalOpen(true);
   };
 
   // Get lexicon entry for a word
@@ -439,7 +444,7 @@ export default function StudyPage() {
           </a>
           <div>
             <h1 className="text-lg font-serif font-bold text-stone-800">
-              원어 성경 연구소
+              성경 원어 연구소
             </h1>
             <p className="text-xs text-stone-500">
               헬라어 신약 성경 연구와 묵상
@@ -729,21 +734,57 @@ export default function StudyPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Selected Word Info */}
-                <div className="bg-stone-50 rounded-lg p-4">
-                  <h3 className="font-bold text-stone-800 text-lg mb-2">
-                    {selectedWord.word}
-                  </h3>
-                  <p className="text-stone-500 text-sm mb-3">
-                    {selectedWord.translit && `발음: [${selectedWord.translit}]`}
-                  </p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                {/* Word Card */}
+                <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
+                  {/* Card Header */}
+                  <div className="p-4 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-greek text-xl font-bold text-stone-800">
+                        {selectedWord.word}
+                      </span>
+                      {selectedWord.translit && (
+                        <span className="text-sm text-stone-500">
+                          [{selectedWord.translit}]
+                        </span>
+                      )}
+                    </div>
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium">
                       {selectedWord.strong}
                     </span>
-                    <span className="text-stone-600">
-                      {selectedWord.translation}
-                    </span>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-4 space-y-4">
+                    {/* Korean Meaning (Main) */}
+                    <div>
+                      <p className="text-lg font-medium text-blue-600 leading-relaxed">
+                        {koreanDict[selectedWord.strong] || '사전 데이터 없음'}
+                      </p>
+                    </div>
+
+                    {/* Grammar & Lemma (Side by Side) */}
+                    <div className="flex items-center gap-4 text-sm text-stone-600">
+                      {selectedWord.grammar && (
+                        <span>
+                          문법: <span className="font-medium">{selectedWord.grammar}</span>
+                        </span>
+                      )}
+                      {selectedWord.lemma && (
+                        <span>
+                          원형: <span className="font-greek font-medium text-stone-700">{selectedWord.lemma}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* English Translation (Gray Box at Bottom) */}
+                    {selectedWord.translation && (
+                      <div className="bg-stone-50 rounded-lg p-3 border border-stone-100">
+                        <p className="text-sm text-stone-600">
+                          <span className="text-stone-400">🇬🇧 영문 의미/직역:</span>{' '}
+                          <span className="text-stone-700">{selectedWord.translation}</span>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -752,7 +793,6 @@ export default function StudyPage() {
                   <button
                     className="w-full py-2 px-4 bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors flex items-center justify-center gap-2"
                     onClick={() => {
-                      // TODO: Implement vocabulary save
                       alert('단어장 저장 기능은 곧 추가됩니다!');
                     }}
                   >
@@ -778,126 +818,6 @@ export default function StudyPage() {
         </div>
       </main>
 
-      {/* Lexicon Modal */}
-      {lexiconModalOpen && selectedWord && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
-            {/* Modal Header */}
-            <div className="p-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
-              <div>
-                <h2 className="text-2xl font-serif font-bold text-stone-800">
-                  {selectedWord.word}
-                </h2>
-                {selectedWord.translit && (
-                  <p className="text-stone-500 text-sm">
-                    [{selectedWord.translit}]
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => setLexiconModalOpen(false)}
-                className="p-2 hover:bg-stone-200 rounded-full transition-colors"
-              >
-                <XCircle className="w-6 h-6 text-stone-500" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {/* Basic Info */}
-              <div className="mb-4 flex items-center gap-3">
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                  {selectedWord.strong}
-                </span>
-                <span className="text-stone-700">
-                  {selectedWord.translation}
-                </span>
-              </div>
-
-              {/* Morphology */}
-              {selectedWord.grammar && (
-                <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-100">
-                  <h3 className="font-medium text-amber-800 mb-1 flex items-center gap-1">
-                    <span>문법</span>
-                  </h3>
-                  <p className="text-amber-900 text-sm">
-                    {decodeMorphology(selectedWord.grammar)}
-                  </p>
-                  <p className="text-amber-600 text-xs mt-1">
-                    원본: {selectedWord.grammar}
-                  </p>
-                </div>
-              )}
-
-              {/* Lexicon Data */}
-              {(() => {
-                const entry = getLexiconEntry(selectedWord.strong);
-                if (!entry) return (
-                  <div className="text-stone-500 text-center py-4">
-                    사전 데이터를 찾을 수 없습니다.
-                  </div>
-                );
-                return (
-                  <div className="space-y-4">
-                    {/* Brief Definition */}
-                    {entry.brief_def && (
-                      <div className="p-3 bg-green-50 rounded-lg border border-green-100">
-                        <h3 className="font-medium text-green-800 mb-1">짧은 뜻</h3>
-                        <p className="text-green-900">{entry.brief_def}</p>
-                      </div>
-                    )}
-
-                    {/* Full Definition (Accordion) */}
-                    {entry.full_def && (
-                      <div className="border border-stone-200 rounded-lg overflow-hidden">
-                        <button
-                          onClick={() => setFullDefExpanded(!fullDefExpanded)}
-                          className="w-full p-3 bg-stone-50 flex items-center justify-between hover:bg-stone-100 transition-colors"
-                        >
-                          <span className="font-medium text-stone-700">상세 정의</span>
-                          {fullDefExpanded ? (
-                            <ChevronUp className="w-5 h-5 text-stone-500" />
-                          ) : (
-                            <ChevronDown className="w-5 h-5 text-stone-500" />
-                          )}
-                        </button>
-                        {fullDefExpanded && (
-                          <div className="p-3 bg-white">
-                            <p className="text-stone-700 text-sm leading-relaxed whitespace-pre-wrap">
-                              {entry.full_def}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-stone-200 bg-stone-50 flex gap-2">
-              <button
-                onClick={() => setLexiconModalOpen(false)}
-                className="flex-1 py-2 px-4 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors"
-              >
-                닫기
-              </button>
-              {user && (
-                <button
-                  onClick={() => {
-                    alert('단어장 저장 기능은 곧 추가됩니다!');
-                  }}
-                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  <BookmarkPlus className="w-4 h-4" />
-                  저장
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Verse Detail Modal */}
       {verseDetailOpen && selectedVerse && (
