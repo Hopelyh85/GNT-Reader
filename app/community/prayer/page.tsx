@@ -133,12 +133,12 @@ export default function PrayerBoardPage() {
       <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <button
-            onClick={() => router.push('/community')}
+            onClick={() => router.push('/')}
             className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-lg font-bold text-stone-800">기도 게시판</h1>
+          <h1 className="text-lg font-bold text-stone-800">기도 제목 게시판</h1>
         </div>
       </header>
 
@@ -171,57 +171,57 @@ export default function PrayerBoardPage() {
             <p>아직 기도 제목이 없습니다.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {posts.map((post) => (
               <div
                 key={post.id}
-                className={`bg-white rounded-xl border p-4 hover:shadow-md transition-shadow cursor-pointer ${
+                className={`bg-white rounded-lg border hover:shadow-md transition-shadow overflow-hidden ${
                   post.is_urgent ? 'border-red-300 bg-red-50/30' : 'border-stone-200'
                 }`}
-                onClick={() => router.push(`/community/prayer/${post.id}`)}
               >
-                {/* Urgent Badge */}
-                {post.is_urgent && (
-                  <div className="flex items-center gap-1 text-red-600 text-xs font-medium mb-2">
-                    <AlertCircle className="w-4 h-4" />
-                    🚨 긴급 기도
-                  </div>
-                )}
-
-                {/* Author */}
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-stone-400" />
-                  </div>
-                  <div className="flex-1">
+                {/* Row Header - Click to navigate */}
+                <div
+                  className="flex items-center px-4 py-3 cursor-pointer hover:bg-stone-50 transition-colors"
+                  onClick={() => router.push(`/community/prayer/${post.id}`)}
+                >
+                  {/* Urgent Badge + Author */}
+                  <div className="w-24 flex-shrink-0 flex items-center gap-2">
+                    {post.is_urgent && (
+                      <span className="text-red-600" title="긴급 기도">🚨</span>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         router.push(`/profile/${post.user_id}`);
                       }}
-                      className="text-sm font-medium text-stone-700 hover:text-blue-600 hover:underline"
+                      className="text-sm text-stone-700 hover:text-blue-600 truncate text-left"
                     >
                       {post.profiles?.nickname || post.profiles?.email?.split('@')[0] || '익명'}
                     </button>
-                    <p className="text-xs text-stone-400">{formatTime(post.created_at)}</p>
                   </div>
-                </div>
 
-                {/* Content */}
-                <p className="text-stone-800 leading-relaxed mb-3 line-clamp-3">{post.content}</p>
+                  {/* Content/Title - Flex grow with truncate */}
+                  <div className="flex-1 px-3 min-w-0">
+                    <p className="text-sm text-stone-800 truncate text-left">
+                      {post.content?.substring(0, 60) || ''}
+                      {post.content?.length > 60 ? '...' : ''}
+                    </p>
+                  </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleLike(post.id, post.liked || false);
-                    }}
-                    className={`flex items-center gap-1 text-sm ${post.liked ? 'text-red-600' : 'text-stone-500'}`}
-                  >
-                    <Heart className="w-4 h-4" fill={post.liked ? 'currentColor' : 'none'} />
+                  {/* Likes */}
+                  <div className="w-14 flex-shrink-0 flex items-center justify-center gap-1 text-xs text-stone-400">
+                    <Heart className="w-3 h-3" />
                     {post.likes || 0}
-                  </button>
+                  </div>
+
+                  {/* Time - HH:mm format */}
+                  <p className="w-14 flex-shrink-0 text-xs text-stone-400 text-right">
+                    {new Date(post.created_at).toLocaleTimeString('ko-KR', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: false 
+                    })}
+                  </p>
                 </div>
               </div>
             ))}

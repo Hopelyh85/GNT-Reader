@@ -91,19 +91,25 @@ function CommunityContent() {
   const loadPosts = async () => {
     setLoading(true);
     try {
-      const result = await getPublicReflections(undefined, 1, 100);
-      const allPosts = result.data || [];
+      const supabase = getSupabase();
+      // Only get general category posts (no reflection, translation, or prayer)
+      const { data, error } = await supabase
+        .from('reflections')
+        .select(`
+          id, user_id, title, content, created_at, verse_ref, category, views,
+          profiles:profiles(nickname, email, tier)
+        `)
+        .eq('category', 'general')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
       
-      // Filter only community posts (not prayer, not translation)
-      const communityPosts = allPosts.filter((p: any) => 
-        p.category !== 'prayer_general' && 
-        p.category !== 'prayer_world' && 
-        p.category !== 'translation'
-      );
+      const allPosts = data || [];
       
       // Load likes for each post
       const postsWithLikes = await Promise.all(
-        communityPosts.map(async (post: any) => {
+        allPosts.map(async (post: any) => {
           const likes = await getLikesCount(post.id);
           const liked = user ? await hasUserLiked(post.id) : false;
           return { ...post, likes, liked } as Post;
@@ -438,14 +444,20 @@ function CommunityContent() {
                       </p>
                     </div>
 
+                    {/* Likes */}
+                    <div className="w-14 flex-shrink-0 flex items-center justify-center gap-1 text-xs text-stone-400">
+                      <Heart className="w-3 h-3" />
+                      {post.likes || 0}
+                    </div>
+
                     {/* Views */}
-                    <div className="w-16 flex-shrink-0 flex items-center justify-center gap-1 text-xs text-stone-400">
+                    <div className="w-14 flex-shrink-0 flex items-center justify-center gap-1 text-xs text-stone-400">
                       <Eye className="w-3 h-3" />
                       {post.views || 0}
                     </div>
 
                     {/* Date - Right aligned */}
-                    <p className="w-32 flex-shrink-0 text-xs text-stone-400 text-right">
+                    <p className="w-24 flex-shrink-0 text-xs text-stone-400 text-right">
                       {formatTime(post.created_at)}
                     </p>
                   </div>

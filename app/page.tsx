@@ -78,7 +78,7 @@ function HomeContent() {
     { id: 'read', title: '카시키아쿰 말씀 나눔터', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
     { id: 'study', title: '성경 원어 연구소', subtitle: '헬라어 원문 성경을 깊이 연구하고 주석을 작성합니다', href: '/study', icon: Search, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
     { id: 'community', title: '커뮤니티 게시판', subtitle: '성경 묵상과 나눔의 공간', href: '/community', icon: MessageSquare, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
-    { id: 'prayer', title: '기도 제목 게시판', subtitle: '함께 기도하며 중보하는 공간', href: '/community/prayer', icon: Heart, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
+    { id: 'prayer', title: '모두의 기도', subtitle: '기도를 요청하고 기도 응답을 나누는 공간', href: '/community/prayer', icon: Heart, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
     { id: 'scripture', title: '묵상 데이터 저장 공간', subtitle: '모바일에 최적화되어 있지 않습니다', href: '/scripture-board', icon: Scroll, color: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700' },
   ];
 
@@ -288,12 +288,12 @@ function HomeContent() {
               </div>
             </div>
 
-            {/* 모두의 기도 Card */}
+            {/* 긴급 기도 제목 Card */}
             <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-50 to-sky-50 border-b border-blue-100">
                 <Heart className="w-4 h-4 text-blue-600" />
                 <div className="flex-1">
-                  <h3 className="font-bold text-sm text-blue-800">모두의 기도</h3>
+                  <h3 className="font-bold text-sm text-blue-800">긴급 기도 제목</h3>
                   <p className="text-xs text-blue-600">기도 제목 게시판입니다</p>
                 </div>
                 <a 
