@@ -129,9 +129,9 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  const userRole = TIER_MAP[profile?.tier || ''] || profile?.tier || '일반';
-  const isGeneral = profile?.tier === 'general' || !profile?.tier;
-  const isAdmin = userRole === '소장' || profile?.tier?.toLowerCase().includes('admin');
+  const userRole = TIER_MAP[(profile?.tier as string) || ''] || profile?.tier || '일반';
+  const isGeneral = (profile?.tier as string) === 'general' || !profile?.tier;
+  const isAdmin = userRole === '소장' || (profile?.tier as string)?.toLowerCase().includes('admin');
 
   if (authLoading || loading) {
     return (
