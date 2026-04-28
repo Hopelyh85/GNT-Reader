@@ -47,6 +47,16 @@ export default function PrayerBoardPage() {
   const [linkedPrayerId, setLinkedPrayerId] = useState<string | null>(null);
   const [userPreviousPrayers, setUserPreviousPrayers] = useState<PrayerPost[]>([]);
   const [submittingPrayer, setSubmittingPrayer] = useState(false);
+  
+  // Category tabs state
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const categories = [
+    { id: 'all', label: '전체' },
+    { id: 'prayer_personal', label: '개인' },
+    { id: 'prayer_church', label: '교회' },
+    { id: 'prayer_nation', label: '나라' },
+    { id: 'prayer_world', label: '세계' }
+  ];
 
   useEffect(() => {
     loadPrayers();
@@ -102,31 +112,53 @@ export default function PrayerBoardPage() {
     setLoading(true);
     try {
       const supabase = getSupabase();
-      const { data: prayers, error } = await supabase
+      
+      let query = supabase
         .from('reflections')
-        .select('*, profiles(nickname, email, tier)')
+        .select(`
+          id, user_id, content, created_at, verse_ref, category, 
+          is_urgent, is_answered, is_public,
+          profiles:profiles(nickname, email, tier)
+        `)
+        .or('category.eq.prayer_personal,category.eq.prayer_church,category.eq.prayer_nation,category.eq.prayer_world,category.eq.prayer_general')
         .eq('is_public', true)
-        .in('category', ['prayer_general', 'prayer_world'])
-        .order('is_urgent', { ascending: false })
+        .order('is_urgent', { ascending: false }) // Urgent first
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      const { data, error } = await query;
       
-      // Load likes for each post
-      const postsWithLikes = await Promise.all(
-        (prayers || []).map(async (post: any) => {
+      if (error) {
+        console.error('Error loading prayers:', error);
+        return;
+      }
+      
+      const prayersWithLikes = await Promise.all(
+        (data || []).map(async (post: PrayerPost) => {
           const likes = await getLikesCount(post.id);
           const liked = user ? await hasUserLiked(post.id) : false;
-          return { ...post, likes, liked } as PrayerPost;
+          return { ...post, likes, liked };
         })
       );
       
-      setPosts(postsWithLikes);
+      setPosts(prayersWithLikes);
     } catch (err) {
       console.error('Error loading prayers:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Filter posts by category
+  const getFilteredPosts = () => {
+    if (selectedCategory === 'all') {
+      return posts.filter(p => !p.is_urgent); // Exclude urgent from regular list
+    }
+    return posts.filter(p => p.category === selectedCategory);
+  };
+
+  // Get urgent posts
+  const getUrgentPosts = () => {
+    return posts.filter(p => p.is_urgent);
   };
 
   const handleToggleLike = async (postId: string, currentlyLiked: boolean) => {
@@ -160,6 +192,9 @@ export default function PrayerBoardPage() {
     });
   };
 
+  // New prayer category state
+  const [newPrayerCategory, setNewPrayerCategory] = useState('prayer_personal');
+
   const handleAddPrayer = async () => {
     if (!user) {
       router.push('/login');
@@ -179,7 +214,7 @@ export default function PrayerBoardPage() {
           user_id: user.id,
           content: newPrayerContent.trim(),
           verse_ref: '기도제목',
-          category: 'prayer_general',
+          category: newPrayerCategory,
           is_public: true,
           linked_post_id: linkedPrayerId
         });
@@ -189,6 +224,7 @@ export default function PrayerBoardPage() {
       // Reset form and reload
       setNewPrayerContent('');
       setLinkedPrayerId(null);
+      setNewPrayerCategory('prayer_personal');
       setIsWritingPrayer(false);
       await loadPrayers();
       alert('기도 제목이 등록되었습니다.');
@@ -204,15 +240,15 @@ export default function PrayerBoardPage() {
     <div className="min-h-screen bg-stone-50">
       {/* Header */}
       <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
-        {/* New Prayer Button */}
+        {/* 🙏 기도 요청 Button */}
         {user && !isWritingPrayer && (
           <div className="mb-6">
             <button
               onClick={() => setIsWritingPrayer(true)}
-              className="w-full py-3 px-4 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 text-lg"
             >
-              <Pencil className="w-4 h-4" />
-              ✏️ 새 기도 제목 작성
+              <span className="text-2xl">🙏</span>
+              기도 요청
             </button>
           </div>
         )}
@@ -235,6 +271,23 @@ export default function PrayerBoardPage() {
               >
                 <X className="w-4 h-4 text-stone-500" />
               </button>
+            </div>
+
+            {/* Category Selection */}
+            <div className="mb-3">
+              <label className="text-sm text-stone-600 flex items-center gap-1 mb-1">
+                📂 카테고리
+              </label>
+              <select
+                value={newPrayerCategory}
+                onChange={(e) => setNewPrayerCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="prayer_personal">🙏 개인 기도</option>
+                <option value="prayer_church">⛪ 교회 기도</option>
+                <option value="prayer_nation">🇰🇷 나라 기도</option>
+                <option value="prayer_world">🌍 세계 기도</option>
+              </select>
             </div>
 
             {/* Linked Previous Prayer Dropdown */}
@@ -296,7 +349,7 @@ export default function PrayerBoardPage() {
           >
             <ArrowLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-lg font-bold text-stone-800">기도 제목 게시판</h1>
+          <h1 className="text-lg font-bold text-stone-800">모두의 기도</h1>
         </div>
       </header>
 
@@ -329,60 +382,137 @@ export default function PrayerBoardPage() {
             <p>아직 기도 제목이 없습니다.</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {posts.map((post) => (
-              <div
-                key={post.id}
-                className={`bg-white rounded-lg border hover:shadow-md transition-shadow overflow-hidden ${
-                  post.is_urgent ? 'border-red-300 bg-red-50/30' : 'border-stone-200'
-                }`}
-              >
-                {/* Row Header - Click to navigate */}
-                <div
-                  className="flex items-center px-4 py-3 cursor-pointer hover:bg-stone-50 transition-colors"
-                  onClick={() => router.push(`/community/prayer/${post.id}`)}
-                >
-                  {/* Urgent Badge + Author */}
-                  <div className="w-24 flex-shrink-0 flex items-center gap-2">
-                    {post.is_urgent && (
-                      <span className="text-red-600" title="긴급 기도">🚨</span>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/profile/${post.user_id}`);
-                      }}
-                      className="text-sm text-stone-700 hover:text-blue-600 truncate text-left"
+          <div className="space-y-6">
+            {/* 🚨 Urgent Prayers Section */}
+            {getUrgentPosts().length > 0 && (
+              <div className="bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-2xl">🚨</span>
+                  <h3 className="font-bold text-red-800">긴급 기도 제목</h3>
+                  <span className="px-2 py-1 bg-red-200 text-red-800 text-xs font-bold rounded-full">
+                    {getUrgentPosts().length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {getUrgentPosts().map((post) => (
+                    <div
+                      key={`urgent-${post.id}`}
+                      className="bg-white rounded-lg border border-red-200 hover:shadow-md transition-shadow overflow-hidden"
                     >
-                      {post.profiles?.nickname || post.profiles?.email?.split('@')[0] || '익명'}
-                    </button>
-                  </div>
-
-                  {/* Content/Title - Flex grow with truncate */}
-                  <div className="flex-1 px-3 min-w-0">
-                    <p className="text-sm text-stone-800 truncate text-left">
-                      {post.content?.substring(0, 60) || ''}
-                      {post.content?.length > 60 ? '...' : ''}
-                    </p>
-                  </div>
-
-                  {/* Likes */}
-                  <div className="w-14 flex-shrink-0 flex items-center justify-center gap-1 text-xs text-stone-400">
-                    <Heart className="w-3 h-3" />
-                    {post.likes || 0}
-                  </div>
-
-                  {/* Time - HH:mm format */}
-                  <p className="w-14 flex-shrink-0 text-xs text-stone-400 text-right">
-                    {new Date(post.created_at).toLocaleTimeString('ko-KR', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      hour12: false 
-                    })}
-                  </p>
+                      <div
+                        className="flex items-center px-4 py-3 cursor-pointer hover:bg-red-50/50 transition-colors"
+                        onClick={() => router.push(`/community/prayer/${post.id}`)}
+                      >
+                        <div className="w-24 flex-shrink-0 flex items-center gap-2">
+                          <span className="text-red-600" title="긴급 기도">🚨</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/profile/${post.user_id}`);
+                            }}
+                            className="text-sm text-stone-700 hover:text-blue-600 truncate text-left"
+                          >
+                            {post.profiles?.nickname || post.profiles?.email?.split('@')[0] || '익명'}
+                          </button>
+                        </div>
+                        <div className="flex-1 px-3 min-w-0">
+                          <p className="text-sm text-stone-800 truncate text-left font-medium">
+                            {post.content?.substring(0, 60) || ''}
+                            {post.content?.length > 60 ? '...' : ''}
+                          </p>
+                        </div>
+                        <div className="w-14 flex-shrink-0 flex items-center justify-center gap-1 text-xs text-stone-400">
+                          <Heart className="w-3 h-3" />
+                          {post.likes || 0}
+                        </div>
+                        <p className="w-14 flex-shrink-0 text-xs text-stone-400 text-right">
+                          {new Date(post.created_at).toLocaleTimeString('ko-KR', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: false 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Category Tabs */}
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedCategory === cat.id
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Filtered Posts List */}
+            <div className="space-y-2">
+              {getFilteredPosts().length === 0 ? (
+                <div className="text-center py-8 text-stone-400">
+                  <p>이 카테고리에 기도 제목이 없습니다.</p>
+                </div>
+              ) : (
+                getFilteredPosts().map((post) => (
+                  <div
+                    key={post.id}
+                    className="bg-white rounded-lg border border-stone-200 hover:shadow-md transition-shadow overflow-hidden"
+                  >
+                    {/* Row Header - Click to navigate */}
+                    <div
+                      className="flex items-center px-4 py-3 cursor-pointer hover:bg-stone-50 transition-colors"
+                      onClick={() => router.push(`/community/prayer/${post.id}`)}
+                    >
+                      {/* Author */}
+                      <div className="w-24 flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/profile/${post.user_id}`);
+                          }}
+                          className="text-sm text-stone-700 hover:text-blue-600 truncate text-left"
+                        >
+                          {post.profiles?.nickname || post.profiles?.email?.split('@')[0] || '익명'}
+                        </button>
+                      </div>
+
+                      {/* Content/Title - Flex grow with truncate */}
+                      <div className="flex-1 px-3 min-w-0">
+                        <p className="text-sm text-stone-800 truncate text-left">
+                          {post.content?.substring(0, 60) || ''}
+                          {post.content?.length > 60 ? '...' : ''}
+                        </p>
+                      </div>
+
+                      {/* Likes */}
+                      <div className="w-14 flex-shrink-0 flex items-center justify-center gap-1 text-xs text-stone-400">
+                        <Heart className="w-3 h-3" />
+                        {post.likes || 0}
+                      </div>
+
+                      {/* Time - HH:mm format */}
+                      <p className="w-14 flex-shrink-0 text-xs text-stone-400 text-right">
+                        {new Date(post.created_at).toLocaleTimeString('ko-KR', { 
+                          hour: '2-digit', 
+                          minute: '2-digit',
+                          hour12: false 
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
       </main>
