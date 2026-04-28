@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
-  ArrowLeft, LogOut, LogIn, MessageSquare, Heart, Loader2, User, Megaphone, Eye
+  ArrowLeft, LogOut, LogIn, MessageSquare, Heart, Loader2, User, Megaphone, Eye, Pencil
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { 
@@ -51,6 +51,12 @@ function CommunityContent() {
   const [postComments, setPostComments] = useState<Record<string, any[]>>({});
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
+
+  // New post form state
+  const [isWritingPost, setIsWritingPost] = useState(false);
+  const [newPostTitle, setNewPostTitle] = useState('');
+  const [newPostContent, setNewPostContent] = useState('');
+  const [submittingPost, setSubmittingPost] = useState(false);
 
   // Get post ID from URL for deep linking
   const postId = searchParams.get('post');
@@ -109,6 +115,45 @@ function CommunityContent() {
       console.error('Error loading posts:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Add new post
+  const handleAddPost = async () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    if (!newPostTitle.trim() || !newPostContent.trim()) {
+      alert('제목과 내용을 모두 입력해주세요.');
+      return;
+    }
+    setSubmittingPost(true);
+    try {
+      const { data, error } = await getSupabase()
+        .from('reflections')
+        .insert({
+          user_id: user.id,
+          title: newPostTitle.trim(),
+          content: newPostContent.trim(),
+          verse_ref: '커뮤니티',
+          category: 'general',
+          is_public: true
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      // Reload posts to show the new post
+      await loadPosts();
+      // Reset form
+      setNewPostTitle('');
+      setNewPostContent('');
+      setIsWritingPost(false);
+    } catch (err) {
+      console.error('Error adding post:', err);
+      alert('글 등록에 실패했습니다.');
+    } finally {
+      setSubmittingPost(false);
     }
   };
 
@@ -295,6 +340,61 @@ function CommunityContent() {
             </div>
           </div>
         )}
+
+        {/* New Post Button */}
+        <div className="mb-4">
+          {!isWritingPost ? (
+            <button
+              onClick={() => {
+                if (!user) {
+                  router.push('/login');
+                  return;
+                }
+                setIsWritingPost(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              📝 새 글 쓰기
+            </button>
+          ) : (
+            <div className="bg-white rounded-xl border border-stone-200 p-4 space-y-3">
+              <input
+                type="text"
+                placeholder="글 제목을 입력하세요"
+                value={newPostTitle}
+                onChange={(e) => setNewPostTitle(e.target.value)}
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <textarea
+                placeholder="내용을 입력하세요"
+                value={newPostContent}
+                onChange={(e) => setNewPostContent(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddPost}
+                  disabled={submittingPost}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submittingPost ? '등록 중...' : '등록'}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsWritingPost(false);
+                    setNewPostTitle('');
+                    setNewPostContent('');
+                  }}
+                  className="py-2 px-4 bg-stone-200 text-stone-700 rounded-lg font-medium hover:bg-stone-300 transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Posts Section */}
         {loading ? (
