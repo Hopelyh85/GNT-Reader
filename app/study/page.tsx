@@ -148,6 +148,8 @@ export default function StudyPage() {
   // Bible data states
   const [bibleData, setBibleData] = useState<Record<string, any[]>>({});
   const [koreanBibleData, setKoreanBibleData] = useState<Record<string, string>>({});
+  const [kjvBibleData, setKjvBibleData] = useState<Record<string, string>>({});
+  const [netBibleData, setNetBibleData] = useState<Record<string, string>>({});
   const [lexiconData, setLexiconData] = useState<{ lexicon: Record<string, any>, morphology: Record<string, string> }>({ lexicon: {}, morphology: {} });
   const [koreanDict, setKoreanDict] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -167,6 +169,9 @@ export default function StudyPage() {
   const [myCommentary, setMyCommentary] = useState('');
   const [savingStudy, setSavingStudy] = useState(false);
   
+  // Accordion states for reading view
+  const [expandedStudyVerses, setExpandedStudyVerses] = useState<Set<number>>(new Set());
+  
   // Reflections states
   const [verseReflections, setVerseReflections] = useState<any[]>([]);
   const [reflectionComment, setReflectionComment] = useState('');
@@ -182,9 +187,11 @@ export default function StudyPage() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [bibleRes, koreanRes, lexiconRes, koreanDictRes] = await Promise.all([
+        const [bibleRes, koreanRes, kjvRes, netRes, lexiconRes, koreanDictRes] = await Promise.all([
           fetch('/data/parsed_original_bible.json'),
-          fetch('/data/nkrv.json'),
+          fetch('/data/krv.json'),
+          fetch('/data/kjv.json'),
+          fetch('/data/net.json'),
           fetch('/data/step_lexicon.json'),
           fetch('/data/korean_strongs_dict.json')
         ]);
@@ -199,10 +206,25 @@ export default function StudyPage() {
         setBibleData(bibleJson);
         setLexiconData(lexiconJson);
         
-        // Load Korean Bible if available
+        // Load Korean Bible (KRV)
         if (koreanRes.ok) {
           const koreanJson = await koreanRes.json();
           setKoreanBibleData(koreanJson);
+          console.log('✅ KRV loaded:', Object.keys(koreanJson).length, 'verses');
+        }
+        
+        // Load KJV Bible
+        if (kjvRes.ok) {
+          const kjvJson = await kjvRes.json();
+          setKjvBibleData(kjvJson);
+          console.log('✅ KJV loaded:', Object.keys(kjvJson).length, 'verses');
+        }
+        
+        // Load NET Bible
+        if (netRes.ok) {
+          const netJson = await netRes.json();
+          setNetBibleData(netJson);
+          console.log('✅ NET loaded:', Object.keys(netJson).length, 'verses');
         }
         
         // Load Korean Strongs dictionary
@@ -407,6 +429,18 @@ export default function StudyPage() {
   const getKoreanVerseText = (verseNum: number) => {
     const verseRef = `${selectedBook}_${selectedChapter}_${verseNum}`;
     return koreanBibleData[verseRef] || '';
+  };
+
+  // Get KJV Bible text for verse
+  const getKjvVerseText = (verseNum: number) => {
+    const verseRef = `${selectedBook}_${selectedChapter}_${verseNum}`;
+    return kjvBibleData[verseRef] || '';
+  };
+
+  // Get NET Bible text for verse
+  const getNetVerseText = (verseNum: number) => {
+    const verseRef = `${selectedBook}_${selectedChapter}_${verseNum}`;
+    return netBibleData[verseRef] || '';
   };
 
   useEffect(() => {
@@ -675,41 +709,121 @@ export default function StudyPage() {
                 </div>
               </div>
             ) : (
-              <div className="max-w-4xl mx-auto space-y-6">
+              <div className="max-w-4xl mx-auto space-y-8">
                 {Object.entries(getVerses()).map(([verseNum, words]) => {
                   const isHebrew = testament === 'OT';
                   const verseNumber = parseInt(verseNum);
+                  const isExpanded = expandedStudyVerses.has(verseNumber);
+                  const koreanText = getKoreanVerseText(verseNumber);
+                  const kjvText = getKjvVerseText(verseNumber);
+                  const netText = getNetVerseText(verseNumber);
+                  
                   return (
-                    <div key={verseNum} className="bg-white rounded-lg p-4 shadow-sm">
-                      {/* Verse Header: Number + Korean Text */}
-                      <div className={`flex items-start gap-2 ${isHebrew ? 'flex-row-reverse' : ''}`}>
-                        <span 
-                          className={`text-stone-400 text-sm font-medium cursor-pointer hover:text-blue-600 transition-colors ${isHebrew ? 'text-right' : ''}`}
-                          onClick={() => handleVerseClick(verseNumber)}
+                    <div key={verseNum} className="bg-white rounded-xl p-6 shadow-sm border border-stone-100">
+                      {/* 1. TOP: Original Language Text - Clean, no metadata */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-stone-400 text-sm font-medium">{verseNum}절</span>
+                        </div>
+                        <div 
+                          dir={isHebrew ? 'rtl' : 'ltr'}
+                          className={`leading-relaxed ${isHebrew ? 'text-right' : 'text-left'} ${isHebrew ? 'text-2xl' : 'text-xl'} font-serif text-stone-800`}
                         >
-                          {verseNum}절 🔍
-                        </span>
-                        {/* Korean Translation - Inline with verse number */}
-                        <span className={`text-stone-700 text-base ${isHebrew ? 'text-right' : ''}`}>
-                          {words.map((word: any, idx: number) => word.meaning || word.translation || '').join(' ')}
-                        </span>
+                          {words.map((word: any, idx: number) => (
+                            <span
+                              key={idx}
+                              onClick={() => handleWordClick(word)}
+                              className="inline-block cursor-pointer hover:bg-blue-50 px-1 py-0.5 rounded transition-colors mx-0.5"
+                            >
+                              {word.word}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      
-                      {/* Original Language Text with RTL support */}
-                      <div 
-                        dir={isHebrew ? 'rtl' : 'ltr'}
-                        className={`leading-loose mt-2 ${isHebrew ? 'text-right' : 'text-left'} ${isHebrew ? 'text-2xl' : 'text-xl'} font-serif text-stone-800`}
-                      >
-                        {words.map((word: any, idx: number) => (
-                          <span
-                            key={idx}
-                            onClick={() => handleWordClick(word)}
-                            className="inline-block cursor-pointer hover:bg-blue-100 px-1 py-0.5 rounded transition-colors mx-0.5"
-                            title={`${word.translation || ''} (${word.strong || ''})`}
-                          >
-                            {word.word}
+
+                      {/* 2. MIDDLE: Translations (KRV → KJV + NET) */}
+                      <div className="space-y-3 border-t border-stone-100 pt-4">
+                        {/* Korean (KRV) - First */}
+                        {koreanText && (
+                          <div className="bg-amber-50/50 rounded-lg p-3">
+                            <p className="text-sm text-amber-700 font-medium mb-1">개역한글 (KRV)</p>
+                            <p className="text-stone-800 leading-relaxed">{koreanText}</p>
+                          </div>
+                        )}
+                        
+                        {/* English (KJV + NET) - Below KRV */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {kjvText && (
+                            <div className="bg-blue-50/50 rounded-lg p-3">
+                              <p className="text-sm text-blue-700 font-medium mb-1">King James Version</p>
+                              <p className="text-stone-700 text-sm leading-relaxed">{kjvText}</p>
+                            </div>
+                          )}
+                          {netText && (
+                            <div className="bg-emerald-50/50 rounded-lg p-3">
+                              <p className="text-sm text-emerald-700 font-medium mb-1">NET Bible</p>
+                              <p className="text-stone-700 text-sm leading-relaxed">{netText}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3. BOTTOM: Accordion for Personal Translation & Commentary */}
+                      <div className="mt-4 border-t border-stone-100 pt-3">
+                        <button
+                          onClick={() => {
+                            const newExpanded = new Set(expandedStudyVerses);
+                            if (isExpanded) {
+                              newExpanded.delete(verseNumber);
+                            } else {
+                              newExpanded.add(verseNumber);
+                            }
+                            setExpandedStudyVerses(newExpanded);
+                          }}
+                          className="w-full flex items-center justify-between py-2 px-3 bg-stone-50 hover:bg-stone-100 rounded-lg transition-colors"
+                        >
+                          <span className="text-sm font-medium text-stone-700">
+                            나의 번역 & 묵상
                           </span>
-                        ))}
+                          <ChevronDown 
+                            className={`w-5 h-5 text-stone-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                          />
+                        </button>
+                        
+                        {isExpanded && (
+                          <div className="mt-3 space-y-3 p-3 bg-stone-50/50 rounded-lg">
+                            {/* Personal Translation */}
+                            <div>
+                              <label className="text-xs font-medium text-stone-500 block mb-1">
+                                나의 개인 번역
+                              </label>
+                              <textarea
+                                className="w-full p-2 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                rows={2}
+                                placeholder="이 구절에 대한 나만의 번역을 적어보세요..."
+                              />
+                            </div>
+                            
+                            {/* Commentary/Reflection */}
+                            <div>
+                              <label className="text-xs font-medium text-stone-500 block mb-1">
+                                구절 묵상 / 주석
+                              </label>
+                              <textarea
+                                className="w-full p-2 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                rows={3}
+                                placeholder="이 구절에 대한 묵상이나 주석을 적어보세요..."
+                              />
+                            </div>
+                            
+                            {/* Save Button */}
+                            <button
+                              className="w-full py-2 px-4 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-700 transition-colors"
+                            >
+                              저장하기
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
