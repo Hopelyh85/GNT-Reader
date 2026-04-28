@@ -433,21 +433,39 @@ export default function StudyPage() {
   };
 
   // Get Korean Bible text for verse
-  const getKoreanVerseText = (verseNum: number) => {
-    const verseRef = `${selectedBook}_${selectedChapter}_${verseNum}`;
-    return koreanBibleData[verseRef] || '';
+  const getKoreanVerseText = (verseNum: number): string => {
+    const chapterStr = String(selectedChapter);
+    const verseStr = String(verseNum);
+    const verseRef = `${selectedBook}_${chapterStr}_${verseStr}`;
+    const text = koreanBibleData[verseRef];
+    if (!text) {
+      console.log(`[KRV] Not found for key: ${verseRef}`);
+    }
+    return text || '';
   };
 
   // Get KJV Bible text for verse
-  const getKjvVerseText = (verseNum: number) => {
-    const verseRef = `${selectedBook}_${selectedChapter}_${verseNum}`;
-    return kjvBibleData[verseRef] || '';
+  const getKjvVerseText = (verseNum: number): string => {
+    const chapterStr = String(selectedChapter);
+    const verseStr = String(verseNum);
+    const verseRef = `${selectedBook}_${chapterStr}_${verseStr}`;
+    const text = kjvBibleData[verseRef];
+    if (!text) {
+      console.log(`[KJV] Not found for key: ${verseRef}, loaded keys:`, Object.keys(kjvBibleData).slice(0, 5));
+    }
+    return text || '';
   };
 
   // Get NET Bible text for verse
-  const getNetVerseText = (verseNum: number) => {
-    const verseRef = `${selectedBook}_${selectedChapter}_${verseNum}`;
-    return netBibleData[verseRef] || '';
+  const getNetVerseText = (verseNum: number): string => {
+    const chapterStr = String(selectedChapter);
+    const verseStr = String(verseNum);
+    const verseRef = `${selectedBook}_${chapterStr}_${verseStr}`;
+    const text = netBibleData[verseRef];
+    if (!text) {
+      console.log(`[NET] Not found for key: ${verseRef}, loaded keys:`, Object.keys(netBibleData).slice(0, 5));
+    }
+    return text || '';
   };
 
   // Load chapter-level commentary and reflections
@@ -970,29 +988,41 @@ export default function StudyPage() {
                       {/* [영역 B] 번역문 영역 - mt-4 p-4 bg-stone-50 */}
                       <div className="mt-4 p-4 bg-stone-50 rounded-lg space-y-3">
                         {/* KRV (개역한글) */}
-                        {krvText && (
-                          <div>
-                            <p className="text-xs text-stone-500 mb-1">개역한글 (KRV)</p>
+                        <div>
+                          <p className="text-xs text-stone-500 mb-1">개역한글 (KRV)</p>
+                          {krvText ? (
                             <p className="text-stone-800 leading-relaxed">{krvText}</p>
-                          </div>
-                        )}
+                          ) : (
+                            <p className="text-amber-600 text-sm italic">
+                              {loading ? '로딩 중...' : '번역 데이터를 찾을 수 없음 (KRV)'}
+                            </p>
+                          )}
+                        </div>
                         {/* KJV */}
-                        {kjvText && (
-                          <div>
-                            <p className="text-xs text-stone-500 mb-1">King James Version</p>
+                        <div>
+                          <p className="text-xs text-stone-500 mb-1">King James Version (KJV)</p>
+                          {kjvText ? (
                             <p className="text-stone-700 text-sm leading-relaxed">{kjvText}</p>
-                          </div>
-                        )}
+                          ) : (
+                            <p className="text-amber-600 text-sm italic">
+                              {loading ? '로딩 중...' : Object.keys(kjvBibleData).length === 0 ? 'KJV 데이터 로드되지 않음' : `번역 데이터를 찾을 수 없음 (KJV: ${selectedBook}_${selectedChapter}_${verseNum})`}
+                            </p>
+                          )}
+                        </div>
                         {/* NET */}
-                        {netText && (
-                          <div>
-                            <p className="text-xs text-stone-500 mb-1">NET Bible</p>
+                        <div>
+                          <p className="text-xs text-stone-500 mb-1">NET Bible</p>
+                          {netText ? (
                             <p className="text-stone-700 text-sm leading-relaxed">{netText}</p>
-                          </div>
-                        )}
+                          ) : (
+                            <p className="text-amber-600 text-sm italic">
+                              {loading ? '로딩 중...' : Object.keys(netBibleData).length === 0 ? 'NET 데이터 로드되지 않음' : `번역 데이터를 찾을 수 없음 (NET: ${selectedBook}_${selectedChapter}_${verseNum})`}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      {/* [영역 C] 구절 묵상 나눔터 (공동체 위키 스튜디오) */}
+                      {/* [영역 C] 위키 스튜디오 - 3단 레이아웃 */}
                       <div className="mt-4">
                         <button
                           onClick={() => {
@@ -1004,51 +1034,106 @@ export default function StudyPage() {
                             }
                             setExpandedStudyVerses(newExpanded);
                           }}
-                          className="w-full flex items-center justify-between py-2 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors"
+                          className="w-full flex items-center justify-between py-2 px-3 bg-purple-50 hover:bg-purple-100 border border-purple-100 rounded-lg transition-colors"
                         >
-                          <span className="text-sm font-medium text-blue-700 flex items-center gap-1">
-                            <MessageSquare className="w-4 h-4" />
-                            구절 묵상 나눔터
+                          <span className="text-sm font-medium text-purple-700 flex items-center gap-1">
+                            <BookMarked className="w-4 h-4" />
+                            위키 스튜디오 (번역·주석·묵상)
                           </span>
                           <ChevronDown
-                            className={`w-5 h-5 text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            className={`w-5 h-5 text-purple-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                           />
                         </button>
 
                         {isExpanded && (
-                          <div className="mt-3 p-4 bg-stone-50 rounded-lg border border-stone-100">
-                            {/* Reflection input for logged in users */}
-                            {isLoggedIn && (
-                              <div className="mb-4">
-                                <textarea
-                                  className="w-full p-3 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  rows={2}
-                                  placeholder={`${verseNum}절에 대한 묵상을 나눠보세요...`}
-                                />
-                                <button className="mt-2 w-full py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
-                                  <Send className="w-3 h-3 inline mr-1" />
-                                  묵상 공유하기
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Community reflections list */}
-                            <div className="space-y-3">
-                              {/* TODO: Load verse-specific reflections from Supabase */}
-                              <div className="p-3 bg-white rounded-lg border border-stone-100">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-medium text-stone-600">카시키아쿰</span>
-                                  <span className="text-xs text-stone-400">2026.04.28</span>
+                          <div className="mt-3 space-y-4">
+                            {/* === A. 동역자 사역(개인 번역) === */}
+                            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                              <h4 className="text-xs font-bold text-blue-700 mb-3 flex items-center gap-1">
+                                <MessageSquare className="w-3 h-3" />
+                                A. 동역자 사역 (개인 번역)
+                              </h4>
+                              {/* Translation list - sample data, replace with real data */}
+                              <div className="space-y-2">
+                                {/* TODO: Load verse translations from Supabase */}
+                                <div className="flex gap-3 p-2 bg-white rounded border border-blue-100">
+                                  <div className="w-16 flex-shrink-0">
+                                    <span className="text-xs font-medium text-blue-600">@user123</span>
+                                  </div>
+                                  <p className="text-sm text-stone-800 flex-1">이 구절의 개인적 번역 예시입니다...</p>
                                 </div>
-                                <p className="text-sm text-stone-800">
-                                  이 구절에서 원어의 미묘한 뉘앙스가 정말 중요합니다...
+                              </div>
+                              <p className="text-xs text-blue-600/70 text-center mt-2 italic">
+                                첫 번역을 남겨주세요
+                              </p>
+                              {/* Add translation form */}
+                              {isLoggedIn && (
+                                <div className="mt-3 pt-3 border-t border-blue-200">
+                                  <textarea
+                                    className="w-full p-2 text-sm border border-blue-200 rounded resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    rows={2}
+                                    placeholder={`${verseNum}절 개인 번역을 입력하세요...`}
+                                  />
+                                  <button className="mt-2 w-full py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
+                                    번역 제출
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* === B. 관리자 주석 (Admin Commentary) === */}
+                            <div className="p-4 bg-amber-50 rounded-lg border border-amber-100">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-xs font-bold text-amber-700 flex items-center gap-1">
+                                  <BookMarked className="w-3 h-3" />
+                                  B. 관리자 주석 (Admin Commentary)
+                                </h4>
+                                {isAdmin && (
+                                  <button className="text-xs px-2 py-1 bg-amber-200 text-amber-800 rounded hover:bg-amber-300">
+                                    {false ? '취소' : '작성/수정'}
+                                  </button>
+                                )}
+                              </div>
+                              {/* Admin commentary content - read only for non-admin */}
+                              <div className="p-3 bg-white rounded border border-amber-100 min-h-[80px]">
+                                <p className="text-sm text-stone-600 italic">
+                                  아직 관리자 주석이 등록되지 않았습니다.
                                 </p>
                               </div>
                             </div>
 
-                            <p className="text-xs text-stone-400 text-center mt-3">
-                              더 많은 동역자들의 묵상이 곧 추가됩니다
-                            </p>
+                            {/* === C. 동역자 묵상 나눔 === */}
+                            <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                              <h4 className="text-xs font-bold text-emerald-700 mb-3 flex items-center gap-1">
+                                <MessageSquare className="w-3 h-3" />
+                                C. 동역자 묵상 나눔
+                              </h4>
+                              {/* Reflection input */}
+                              {isLoggedIn && (
+                                <div className="mb-3">
+                                  <textarea
+                                    className="w-full p-2 text-sm border border-emerald-200 rounded resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    rows={2}
+                                    placeholder={`${verseNum}절에 대한 묵상을 나눠보세요...`}
+                                  />
+                                  <button className="mt-2 w-full py-1.5 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700">
+                                    <Send className="w-3 h-3 inline mr-1" />
+                                    묵상 공유하기
+                                  </button>
+                                </div>
+                              )}
+                              {/* Community reflections */}
+                              <div className="space-y-2">
+                                {/* TODO: Load verse reflections from Supabase */}
+                                <div className="p-2 bg-white rounded border border-emerald-100">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-medium text-emerald-600">@disciple1</span>
+                                    <span className="text-xs text-stone-400">2026.04.28</span>
+                                  </div>
+                                  <p className="text-sm text-stone-700">이 구절을 묵상하며 느낀 점을 나눕니다...</p>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
