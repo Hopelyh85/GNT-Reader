@@ -3,10 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/components/AuthProvider';
-import { getMyProfile, signOut, Profile, getGlobalNotice } from '@/app/lib/supabase';
+import { 
+  getMyProfile, signOut, Profile, getGlobalNotice, 
+  getSupabase, getLikesCount, hasUserLiked, addLike, removeLike, addReply, getReplies 
+} from '@/app/lib/supabase';
 import { 
   BookOpen, LogOut, LogIn, Menu, X, ArrowLeft, Search, BookMarked, 
-  ChevronDown, ChevronUp, XCircle, Info, BookmarkPlus, ExternalLink 
+  ChevronDown, ChevronUp, XCircle, Info, BookmarkPlus, ExternalLink,
+  Heart, MessageSquare, Send
 } from 'lucide-react';
 
 // Bible book lists
@@ -47,6 +51,7 @@ export default function StudyPage() {
   
   // Bible data states
   const [bibleData, setBibleData] = useState<Record<string, any[]>>({});
+  const [koreanBibleData, setKoreanBibleData] = useState<Record<string, string>>({});
   const [lexiconData, setLexiconData] = useState<{ lexicon: Record<string, any>, morphology: Record<string, string> }>({ lexicon: {}, morphology: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +65,18 @@ export default function StudyPage() {
   const [lexiconModalOpen, setLexiconModalOpen] = useState(false);
   const [fullDefExpanded, setFullDefExpanded] = useState(false);
   
+  // Verse detail modal states
+  const [selectedVerse, setSelectedVerse] = useState<number | null>(null);
+  const [verseDetailOpen, setVerseDetailOpen] = useState(false);
+  const [myTranslation, setMyTranslation] = useState('');
+  const [myCommentary, setMyCommentary] = useState('');
+  const [savingStudy, setSavingStudy] = useState(false);
+  
+  // Reflections states
+  const [verseReflections, setVerseReflections] = useState<any[]>([]);
+  const [reflectionComment, setReflectionComment] = useState('');
+  const [activeReflectionId, setActiveReflectionId] = useState<string | null>(null);
+  
   // User profile
   const [profile, setProfile] = useState<Profile | null>(null);
   const [globalNotice, setGlobalNotice] = useState<string | null>(null);
@@ -70,8 +87,9 @@ export default function StudyPage() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [bibleRes, lexiconRes] = await Promise.all([
+        const [bibleRes, koreanRes, lexiconRes] = await Promise.all([
           fetch('/data/parsed_original_bible.json'),
+          fetch('/data/nkrv.json'),
           fetch('/data/step_lexicon.json')
         ]);
         
@@ -84,6 +102,12 @@ export default function StudyPage() {
         
         setBibleData(bibleJson);
         setLexiconData(lexiconJson);
+        
+        // Load Korean Bible if available
+        if (koreanRes.ok) {
+          const koreanJson = await koreanRes.json();
+          setKoreanBibleData(koreanJson);
+        }
         
         // Default to first NT book
         if (NT_BOOKS.length > 0) {
@@ -141,6 +165,150 @@ export default function StudyPage() {
     if (!grammar) return '정보 없음';
     const decoded = lexiconData.morphology[grammar];
     return decoded || grammar;
+  };
+
+  // Handle verse click - open detail modal
+  const handleVerseClick = async (verseNum: number) => {
+    setSelectedVerse(verseNum);
+    setVerseDetailOpen(true);
+    
+    // Load verse data
+    await loadVerseData(verseNum);
+  };
+
+  // Load verse data (reflections, existing translation/commentary)
+  const loadVerseData = async (verseNum: number) => {
+    if (!selectedBook) return;
+    
+    const verseRef = `${selectedBook}_${selectedChapter}_${verseNum}`;
+    
+    try {
+      // Load reflections for this verse
+      const supabase = getSupabase();
+      const { data: reflections, error } = await supabase
+        .from('reflections')
+        .select(`
+          id, user_id, content, created_at, category, likes,
+          profiles:profiles(nickname, email, tier)
+        `)
+        .eq('verse_ref', verseRef)
+        .eq('is_public', true)
+        .order('created_at', { ascending: false });
+      
+      if (!error && reflections) {
+        // Load likes for each reflection
+        const reflectionsWithLikes = await Promise.all(
+          reflections.map(async (ref: any) => {
+            const likeCount = await getLikesCount(ref.id);
+            const hasLiked = user ? await hasUserLiked(ref.id) : false;
+            return { ...ref, likes: likeCount, liked: hasLiked };
+          })
+        );
+        setVerseReflections(reflectionsWithLikes);
+      }
+      
+      // Load user's translation/commentary if exists
+      if (user) {
+        const { data: studyNotes } = await supabase
+          .from('study_notes')
+          .select('translation, commentary')
+          .eq('user_id', user.id)
+          .eq('verse_ref', verseRef)
+          .single();
+        
+        if (studyNotes) {
+          setMyTranslation(studyNotes.translation || '');
+          setMyCommentary(studyNotes.commentary || '');
+        }
+      }
+    } catch (err) {
+      console.error('Error loading verse data:', err);
+    }
+  };
+
+  // Save translation and commentary
+  const handleSaveStudy = async () => {
+    if (!user || !selectedVerse) return;
+    
+    setSavingStudy(true);
+    try {
+      const supabase = getSupabase();
+      const verseRef = `${selectedBook}_${selectedChapter}_${selectedVerse}`;
+      
+      const { error } = await supabase
+        .from('study_notes')
+        .upsert({
+          user_id: user.id,
+          verse_ref: verseRef,
+          book: selectedBook,
+          chapter: selectedChapter,
+          verse: selectedVerse,
+          translation: myTranslation,
+          commentary: myCommentary,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,verse_ref' });
+      
+      if (error) throw error;
+      alert('저장되었습니다!');
+    } catch (err) {
+      console.error('Error saving study:', err);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setSavingStudy(false);
+    }
+  };
+
+  // Handle reflection like
+  const handleReflectionLike = async (reflectionId: string, liked: boolean) => {
+    if (!user) return;
+    
+    try {
+      if (liked) {
+        await removeLike(reflectionId);
+      } else {
+        await addLike(reflectionId);
+      }
+      
+      // Reload verse data
+      if (selectedVerse) {
+        await loadVerseData(selectedVerse);
+      }
+    } catch (err) {
+      console.error('Error toggling like:', err);
+    }
+  };
+
+  // Handle reflection comment
+  const handleReflectionComment = async (reflectionId: string) => {
+    if (!user || !reflectionComment.trim()) return;
+    
+    try {
+      await addReply(reflectionId, reflectionComment);
+      setReflectionComment('');
+      setActiveReflectionId(null);
+      
+      // Reload verse data
+      if (selectedVerse) {
+        await loadVerseData(selectedVerse);
+      }
+    } catch (err) {
+      console.error('Error adding comment:', err);
+      alert('댓글 작성 중 오류가 발생했습니다.');
+    }
+  };
+
+  // Get highlight color based on likes
+  const getHighlightColor = (likes: number) => {
+    if (likes >= 100) return 'bg-pink-50 border-pink-200';
+    if (likes >= 50) return 'bg-green-50 border-green-200';
+    if (likes >= 10) return 'bg-amber-50 border-amber-200';
+    return 'bg-white border-stone-200';
+  };
+
+  // Get Korean Bible text for verse
+  const getKoreanVerseText = (verseNum: number) => {
+    const verseRef = `${selectedBook}_${selectedChapter}_${verseNum}`;
+    return koreanBibleData[verseRef] || '';
   };
 
   useEffect(() => {
@@ -405,11 +573,15 @@ export default function StudyPage() {
               <div className="max-w-4xl mx-auto space-y-6">
                 {Object.entries(getVerses()).map(([verseNum, words]) => {
                   const isHebrew = testament === 'OT';
+                  const verseNumber = parseInt(verseNum);
                   return (
                     <div key={verseNum} className="bg-white rounded-lg p-4 shadow-sm">
-                      {/* Verse Number */}
-                      <div className={`text-stone-400 text-sm mb-2 ${isHebrew ? 'text-right' : ''}`}>
-                        {verseNum}절
+                      {/* Verse Number - Clickable */}
+                      <div 
+                        className={`text-stone-500 text-sm mb-2 cursor-pointer hover:text-blue-600 transition-colors ${isHebrew ? 'text-right' : ''}`}
+                        onClick={() => handleVerseClick(verseNumber)}
+                      >
+                        {verseNum}절 🔍
                       </div>
                       
                       {/* Verse Text with RTL support for Hebrew */}
@@ -625,6 +797,229 @@ export default function StudyPage() {
                   저장
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Verse Detail Modal */}
+      {verseDetailOpen && selectedVerse && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+              <div>
+                <h2 className="text-xl font-bold text-stone-800">
+                  {BOOK_NAMES_KR[selectedBook]} {selectedChapter}장 {selectedVerse}절
+                </h2>
+                <p className="text-sm text-stone-500">상세 연구 뷰</p>
+              </div>
+              <button
+                onClick={() => setVerseDetailOpen(false)}
+                className="p-2 hover:bg-stone-200 rounded-full transition-colors"
+              >
+                <XCircle className="w-6 h-6 text-stone-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column - Bible Texts */}
+                <div className="space-y-6">
+                  {/* Korean Bible */}
+                  <div className="bg-stone-50 rounded-xl p-5 border border-stone-200">
+                    <h3 className="text-sm font-bold text-stone-700 mb-3 flex items-center gap-2">
+                      <BookOpen className="w-4 h-4" />
+                      개역한글
+                    </h3>
+                    <p className="text-stone-800 leading-relaxed text-lg">
+                      {getKoreanVerseText(selectedVerse) || '개역한글 성경 데이터가 없습니다.'}
+                    </p>
+                  </div>
+
+                  {/* Original Language Bible */}
+                  <div className={`bg-stone-50 rounded-xl p-5 border border-stone-200 ${testament === 'OT' ? 'text-right' : ''}`}>
+                    <h3 className={`text-sm font-bold text-stone-700 mb-3 flex items-center gap-2 ${testament === 'OT' ? 'justify-end' : ''}`}>
+                      {testament === 'OT' ? '히브리어 원어' : '헬라어 원어'}
+                      <BookMarked className="w-4 h-4" />
+                    </h3>
+                    <div 
+                      dir={testament === 'OT' ? 'rtl' : 'ltr'}
+                      className={`leading-loose ${testament === 'OT' ? 'text-2xl' : 'text-xl'} font-serif text-stone-800`}
+                    >
+                      {(bibleData[`${selectedBook}_${selectedChapter}_${selectedVerse}`] || [])
+                        .map((word: any, idx: number) => (
+                          <span
+                            key={idx}
+                            onClick={() => {
+                              setSelectedWord(word);
+                              setLexiconModalOpen(true);
+                            }}
+                            className="inline-block cursor-pointer hover:bg-blue-100 px-1 py-0.5 rounded transition-colors mx-0.5"
+                            title={`${word.translation || ''} (${word.strong || ''})`}
+                          >
+                            {word.word}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Study & Reflections */}
+                <div className="space-y-6">
+                  {/* Translation & Commentary */}
+                  {user && (
+                    <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+                      <h3 className="text-sm font-bold text-blue-800 mb-4 flex items-center gap-2">
+                        <BookmarkPlus className="w-4 h-4" />
+                        나의 번역과 주석
+                      </h3>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-blue-600 font-medium">나의 번역</label>
+                          <textarea
+                            value={myTranslation}
+                            onChange={(e) => setMyTranslation(e.target.value)}
+                            className="w-full mt-1 p-3 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                            rows={3}
+                            placeholder="이 구절에 대한 나만의 번역을 적어보세요..."
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="text-xs text-blue-600 font-medium">묵상 주석</label>
+                          <textarea
+                            value={myCommentary}
+                            onChange={(e) => setMyCommentary(e.target.value)}
+                            className="w-full mt-1 p-3 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                            rows={3}
+                            placeholder="이 구절에 대한 묵상을 적어보세요..."
+                          />
+                        </div>
+                        
+                        <button
+                          onClick={handleSaveStudy}
+                          disabled={savingStudy}
+                          className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                          {savingStudy ? '저장 중...' : '💾 저장하기'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Community Reflections */}
+                  <div>
+                    <h3 className="text-sm font-bold text-stone-700 mb-4 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      동역자들의 묵상 ({verseReflections.length}개)
+                    </h3>
+                    
+                    <div className="space-y-3">
+                      {verseReflections.length === 0 ? (
+                        <p className="text-stone-400 text-center py-8 text-sm">
+                          아직 이 구절에 대한 묵상이 없습니다.<br/>
+                          첫 번째 묵상을 남겨보세요!
+                        </p>
+                      ) : (
+                        verseReflections.map((reflection: any) => (
+                          <div 
+                            key={reflection.id} 
+                            className={`rounded-xl p-4 border ${getHighlightColor(reflection.likes || 0)}`}
+                          >
+                            {/* Author Info */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-6 h-6 bg-stone-200 rounded-full flex items-center justify-center">
+                                <span className="text-xs text-stone-600">
+                                  {(reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명')[0]}
+                                </span>
+                              </div>
+                              <span className="text-sm font-medium text-stone-700">
+                                {reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명'}
+                              </span>
+                              <span className="text-xs text-stone-400">
+                                {new Date(reflection.created_at).toLocaleDateString('ko-KR')}
+                              </span>
+                            </div>
+                            
+                            {/* Content */}
+                            <p className="text-stone-800 text-sm leading-relaxed mb-3">
+                              {reflection.content}
+                            </p>
+                            
+                            {/* Actions */}
+                            <div className="flex items-center gap-3">
+                              {/* Like Button */}
+                              <button
+                                onClick={() => handleReflectionLike(reflection.id, reflection.liked)}
+                                className={`flex items-center gap-1 text-sm ${reflection.liked ? 'text-red-600' : 'text-stone-500 hover:text-red-600'}`}
+                              >
+                                <Heart className="w-4 h-4" fill={reflection.liked ? 'currentColor' : 'none'} />
+                                {reflection.likes || 0}
+                              </button>
+                              
+                              {/* Comment Button */}
+                              <button
+                                onClick={() => setActiveReflectionId(activeReflectionId === reflection.id ? null : reflection.id)}
+                                className="flex items-center gap-1 text-sm text-stone-500 hover:text-blue-600"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                                댓글
+                              </button>
+                              
+                              {/* Delete Tooltip (Hidden with tooltip) */}
+                              {user?.id === reflection.user_id && (
+                                <div className="relative group ml-auto">
+                                  <span className="text-xs text-stone-400 cursor-help">
+                                    🗑️ 삭제
+                                  </span>
+                                  <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-stone-800 text-white text-xs rounded-lg z-10">
+                                    삭제는 관리자에게 요청하세요
+                                    <div className="absolute top-full right-4 border-4 border-transparent border-t-stone-800"></div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Comment Input */}
+                            {activeReflectionId === reflection.id && (
+                              <div className="mt-3 pt-3 border-t border-stone-200">
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={reflectionComment}
+                                    onChange={(e) => setReflectionComment(e.target.value)}
+                                    className="flex-1 px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="댓글을 입력하세요..."
+                                  />
+                                  <button
+                                    onClick={() => handleReflectionComment(reflection.id)}
+                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                  >
+                                    <Send className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-stone-200 bg-stone-50">
+              <button
+                onClick={() => setVerseDetailOpen(false)}
+                className="w-full py-2 px-4 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors"
+              >
+                닫기
+              </button>
             </div>
           </div>
         </div>
