@@ -10,7 +10,7 @@ import {
 import { 
   BookOpen, LogOut, LogIn, Menu, X, ArrowLeft, Search, BookMarked, 
   ChevronDown, ChevronUp, XCircle, Info, BookmarkPlus, ExternalLink,
-  Heart, MessageSquare, Send
+  Heart, MessageSquare, Send, Crown
 } from 'lucide-react';
 
 // Bible book lists
@@ -26,6 +26,102 @@ const NT_BOOKS = [
   'PHP', 'COL', '1TH', '2TH', '1TI', '2TI', 'TIT', 'PHM', 'HEB', 'JAS',
   '1PE', '2PE', '1JN', '2JN', '3JN', 'JUD', 'REV'
 ];
+
+// 5-tier like highlight colors
+const getLikeHighlightClass = (likes: number): string => {
+  if (likes >= 500) return 'bg-pink-50';    // ❤️ 500+
+  if (likes >= 100) return 'bg-orange-50'; // ❤️ 100+
+  if (likes >= 50) return 'bg-blue-50';     // ❤️ 50+
+  if (likes >= 30) return 'bg-green-50';    // ❤️ 30+
+  if (likes >= 10) return 'bg-yellow-50';   // ❤️ 10+
+  return 'bg-white';
+};
+
+// 24-hour time format
+const formatTime24h = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+};
+
+// Reflection Card Component
+const ReflectionCard = ({ reflection, onLike, onComment, activeReflectionId, reflectionComment, setReflectionComment, user, setActiveReflectionId, handleReflectionComment, handleReflectionLike }: { reflection: any, onLike?: (id: string, liked: boolean) => void, onComment?: (id: string) => void, activeReflectionId?: string | null, reflectionComment?: string, setReflectionComment?: (v: string) => void, user?: any, setActiveReflectionId?: (id: string | null) => void, handleReflectionComment?: (id: string) => void, handleReflectionLike?: (id: string, liked: boolean) => void }) => (
+  <div className={`rounded-xl p-4 border ${getLikeHighlightClass(reflection.likes || 0)}`}>
+    {/* Author Info */}
+    <div className="flex items-center gap-2 mb-2">
+      <div className="w-6 h-6 bg-stone-200 rounded-full flex items-center justify-center">
+        <span className="text-xs text-stone-600">
+          {(reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명')[0]}
+        </span>
+      </div>
+      <span className="text-sm font-medium text-stone-700">
+        {reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명'}
+      </span>
+      <span className="text-xs text-stone-400">
+        {new Date(reflection.created_at).toLocaleDateString('ko-KR')} {formatTime24h(reflection.created_at)}
+      </span>
+    </div>
+    
+    {/* Content */}
+    <p className="text-stone-800 text-sm leading-relaxed mb-3">
+      {reflection.content}
+    </p>
+    
+    {/* Actions */}
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => handleReflectionLike?.(reflection.id, reflection.liked)}
+        className={`flex items-center gap-1 text-sm ${reflection.liked ? 'text-red-600' : 'text-stone-500 hover:text-red-600'}`}
+      >
+        <Heart className="w-4 h-4" fill={reflection.liked ? 'currentColor' : 'none'} />
+        {reflection.likes || 0}
+      </button>
+      
+      <button
+        onClick={() => setActiveReflectionId?.(activeReflectionId === reflection.id ? null : reflection.id)}
+        className="flex items-center gap-1 text-sm text-stone-500 hover:text-blue-600"
+      >
+        <MessageSquare className="w-4 h-4" />
+        댓글
+      </button>
+    </div>
+    
+    {/* Replies */}
+    {reflection.replies && reflection.replies.length > 0 && (
+      <div className="mt-3 pt-3 border-t border-stone-200 space-y-2">
+        {reflection.replies.map((reply: any) => (
+          <div key={reply.id} className="pl-4 border-l-2 border-stone-200">
+            <div className="flex items-center gap-1 text-xs text-stone-500">
+              <span>{reply.profiles?.nickname || reply.profiles?.email?.split('@')[0] || '익명'}</span>
+              <span>{formatTime24h(reply.created_at)}</span>
+            </div>
+            <p className="text-sm text-stone-700">{reply.content}</p>
+          </div>
+        ))}
+      </div>
+    )}
+    
+    {/* Reply Input */}
+    {activeReflectionId === reflection.id && (
+      <div className="mt-3 pt-3 border-t border-stone-200">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={reflectionComment}
+            onChange={(e) => setReflectionComment?.(e.target.value)}
+            className="flex-1 px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="대댓글을 입력하세요..."
+          />
+          <button
+            onClick={() => handleReflectionComment?.(reflection.id)}
+            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
 
 const BOOK_NAMES_KR: Record<string, string> = {
   GEN: '창세기', EXO: '출애굽기', LEV: '레위기', NUM: '민수기', DEU: '신명기',
@@ -124,27 +220,23 @@ export default function StudyPage() {
     loadData();
   }, []);
 
-  // Get available chapters for selected book
+  // Get chapters for selected book (hierarchical structure)
   const getChapters = () => {
-    const chapters = new Set<number>();
-    Object.keys(bibleData).forEach(key => {
-      const [book, chapter] = key.split('_');
-      if (book === selectedBook) {
-        chapters.add(parseInt(chapter));
-      }
-    });
-    return Array.from(chapters).sort((a, b) => a - b);
+    const bookData = bibleData[selectedBook];
+    if (!bookData) return [];
+    const chapters = Object.keys(bookData).map(ch => parseInt(ch));
+    return Array.from(new Set(chapters)).sort((a, b) => a - b);
   };
 
-  // Get verses for selected book and chapter
+  // Get verses for selected book and chapter (hierarchical structure: bibleData[book][chapter][verse])
   const getVerses = () => {
     const verses: Record<number, any[]> = {};
-    Object.entries(bibleData).forEach(([key, words]) => {
-      const [book, chapter, verse] = key.split('_');
-      if (book === selectedBook && parseInt(chapter) === selectedChapter) {
-        verses[parseInt(verse)] = words;
-      }
-    });
+    const chapterData = bibleData[selectedBook]?.[selectedChapter.toString()];
+    if (chapterData) {
+      Object.entries(chapterData).forEach(([verseNum, words]) => {
+        verses[parseInt(verseNum)] = words as any[];
+      });
+    }
     return verses;
   };
 
@@ -826,193 +918,102 @@ export default function StudyPage() {
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column - Bible Texts */}
-                <div className="space-y-6">
-                  {/* Korean Bible */}
-                  <div className="bg-stone-50 rounded-xl p-5 border border-stone-200">
-                    <h3 className="text-sm font-bold text-stone-700 mb-3 flex items-center gap-2">
-                      <BookOpen className="w-4 h-4" />
-                      개역한글
-                    </h3>
-                    <p className="text-stone-800 leading-relaxed text-lg">
-                      {getKoreanVerseText(selectedVerse) || '개역한글 성경 데이터가 없습니다.'}
-                    </p>
-                  </div>
+            {/* Modal Content - Single Column Vertical Layout */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* 1. Korean Bible (KRV) */}
+              <div className="bg-stone-50 rounded-xl p-5 border border-stone-200">
+                <h3 className="text-sm font-bold text-stone-700 mb-3 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  개역한글
+                </h3>
+                <p className="text-stone-800 leading-relaxed text-lg">
+                  {getKoreanVerseText(selectedVerse) || '개역한글 성경 데이터가 없습니다.'}
+                </p>
+              </div>
 
-                  {/* Original Language Bible */}
-                  <div className={`bg-stone-50 rounded-xl p-5 border border-stone-200 ${testament === 'OT' ? 'text-right' : ''}`}>
-                    <h3 className={`text-sm font-bold text-stone-700 mb-3 flex items-center gap-2 ${testament === 'OT' ? 'justify-end' : ''}`}>
-                      {testament === 'OT' ? '히브리어 원어' : '헬라어 원어'}
-                      <BookMarked className="w-4 h-4" />
-                    </h3>
-                    <div 
-                      dir={testament === 'OT' ? 'rtl' : 'ltr'}
-                      className={`leading-loose ${testament === 'OT' ? 'text-2xl' : 'text-xl'} font-serif text-stone-800`}
-                    >
-                      {(bibleData[`${selectedBook}_${selectedChapter}_${selectedVerse}`] || [])
-                        .map((word: any, idx: number) => (
-                          <span
-                            key={idx}
-                            onClick={() => {
-                              setSelectedWord(word);
-                              setLexiconModalOpen(true);
-                            }}
-                            className="inline-block cursor-pointer hover:bg-blue-100 px-1 py-0.5 rounded transition-colors mx-0.5"
-                            title={`${word.translation || ''} (${word.strong || ''})`}
-                          >
-                            {word.word}
-                          </span>
-                        ))}
-                    </div>
-                  </div>
+              {/* 2. Personal Translation */}
+              {user && (
+                <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+                  <h3 className="text-sm font-bold text-blue-800 mb-4 flex items-center gap-2">
+                    <BookmarkPlus className="w-4 h-4" />
+                    나의 번역 (Personal Translation)
+                  </h3>
+                  <textarea
+                    value={myTranslation}
+                    onChange={(e) => setMyTranslation(e.target.value)}
+                    className="w-full mt-1 p-3 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    rows={3}
+                    placeholder="이 구절에 대한 나만의 번역을 적어보세요..."
+                  />
+                  <button
+                    onClick={handleSaveStudy}
+                    disabled={savingStudy}
+                    className="mt-3 w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {savingStudy ? '저장 중...' : '💾 저장하기'}
+                  </button>
                 </div>
+              )}
 
-                {/* Right Column - Study & Reflections */}
-                <div className="space-y-6">
-                  {/* Translation & Commentary */}
-                  {user && (
-                    <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
-                      <h3 className="text-sm font-bold text-blue-800 mb-4 flex items-center gap-2">
-                        <BookmarkPlus className="w-4 h-4" />
-                        나의 번역과 주석
-                      </h3>
-                      
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs text-blue-600 font-medium">나의 번역</label>
-                          <textarea
-                            value={myTranslation}
-                            onChange={(e) => setMyTranslation(e.target.value)}
-                            className="w-full mt-1 p-3 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            rows={3}
-                            placeholder="이 구절에 대한 나만의 번역을 적어보세요..."
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="text-xs text-blue-600 font-medium">묵상 주석</label>
-                          <textarea
-                            value={myCommentary}
-                            onChange={(e) => setMyCommentary(e.target.value)}
-                            className="w-full mt-1 p-3 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            rows={3}
-                            placeholder="이 구절에 대한 묵상을 적어보세요..."
-                          />
-                        </div>
-                        
-                        <button
-                          onClick={handleSaveStudy}
-                          disabled={savingStudy}
-                          className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        >
-                          {savingStudy ? '저장 중...' : '💾 저장하기'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Community Reflections */}
-                  <div>
-                    <h3 className="text-sm font-bold text-stone-700 mb-4 flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4" />
-                      동역자들의 묵상 ({verseReflections.length}개)
-                    </h3>
-                    
-                    <div className="space-y-3">
-                      {verseReflections.length === 0 ? (
-                        <p className="text-stone-400 text-center py-8 text-sm">
-                          아직 이 구절에 대한 묵상이 없습니다.<br/>
-                          첫 번째 묵상을 남겨보세요!
-                        </p>
-                      ) : (
-                        verseReflections.map((reflection: any) => (
-                          <div 
-                            key={reflection.id} 
-                            className={`rounded-xl p-4 border ${getHighlightColor(reflection.likes || 0)}`}
-                          >
-                            {/* Author Info */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="w-6 h-6 bg-stone-200 rounded-full flex items-center justify-center">
-                                <span className="text-xs text-stone-600">
-                                  {(reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명')[0]}
-                                </span>
-                              </div>
-                              <span className="text-sm font-medium text-stone-700">
-                                {reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명'}
-                              </span>
-                              <span className="text-xs text-stone-400">
-                                {new Date(reflection.created_at).toLocaleDateString('ko-KR')}
-                              </span>
-                            </div>
-                            
-                            {/* Content */}
-                            <p className="text-stone-800 text-sm leading-relaxed mb-3">
-                              {reflection.content}
-                            </p>
-                            
-                            {/* Actions */}
-                            <div className="flex items-center gap-3">
-                              {/* Like Button */}
-                              <button
-                                onClick={() => handleReflectionLike(reflection.id, reflection.liked)}
-                                className={`flex items-center gap-1 text-sm ${reflection.liked ? 'text-red-600' : 'text-stone-500 hover:text-red-600'}`}
-                              >
-                                <Heart className="w-4 h-4" fill={reflection.liked ? 'currentColor' : 'none'} />
-                                {reflection.likes || 0}
-                              </button>
-                              
-                              {/* Comment Button */}
-                              <button
-                                onClick={() => setActiveReflectionId(activeReflectionId === reflection.id ? null : reflection.id)}
-                                className="flex items-center gap-1 text-sm text-stone-500 hover:text-blue-600"
-                              >
-                                <MessageSquare className="w-4 h-4" />
-                                댓글
-                              </button>
-                              
-                              {/* Delete Tooltip (Hidden with tooltip) */}
-                              {user?.id === reflection.user_id && (
-                                <div className="relative group ml-auto">
-                                  <span className="text-xs text-stone-400 cursor-help">
-                                    🗑️ 삭제
-                                  </span>
-                                  <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-stone-800 text-white text-xs rounded-lg z-10">
-                                    삭제는 관리자에게 요청하세요
-                                    <div className="absolute top-full right-4 border-4 border-transparent border-t-stone-800"></div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Comment Input */}
-                            {activeReflectionId === reflection.id && (
-                              <div className="mt-3 pt-3 border-t border-stone-200">
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    value={reflectionComment}
-                                    onChange={(e) => setReflectionComment(e.target.value)}
-                                    className="flex-1 px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="댓글을 입력하세요..."
-                                  />
-                                  <button
-                                    onClick={() => handleReflectionComment(reflection.id)}
-                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                  >
-                                    <Send className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+              {/* 3. Commentary */}
+              {user && (
+                <div className="bg-emerald-50 rounded-xl p-5 border border-emerald-200">
+                  <h3 className="text-sm font-bold text-emerald-800 mb-4 flex items-center gap-2">
+                    <BookMarked className="w-4 h-4" />
+                    공식 주석 (Commentary)
+                  </h3>
+                  <textarea
+                    value={myCommentary}
+                    onChange={(e) => setMyCommentary(e.target.value)}
+                    className="w-full mt-1 p-3 border border-emerald-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                    rows={3}
+                    placeholder="이 구절에 대한 주석을 적어보세요..."
+                  />
+                  <button
+                    onClick={handleSaveStudy}
+                    disabled={savingStudy}
+                    className="mt-3 w-full py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  >
+                    {savingStudy ? '저장 중...' : '💾 저장하기'}
+                  </button>
                 </div>
+              )}
+
+              {/* 4. Admin PIN Reflections */}
+              <div>
+                <h3 className="text-sm font-bold text-stone-700 mb-4 flex items-center gap-2">
+                  <Crown className="w-4 h-4" />
+                  관리자 PIN 묵상
+                </h3>
+                {verseReflections.filter((r: any) => r.is_pinned).length === 0 ? (
+                  <p className="text-stone-400 text-center py-4 text-sm">관리자가 고정한 묵상이 없습니다.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {verseReflections.filter((r: any) => r.is_pinned).map((reflection: any) => (
+                      <ReflectionCard key={reflection.id} reflection={reflection} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 5. Community Reflections */}
+              <div>
+                <h3 className="text-sm font-bold text-stone-700 mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  동역자들의 묵상 ({verseReflections.filter((r: any) => !r.is_pinned).length}개)
+                </h3>
+                {verseReflections.filter((r: any) => !r.is_pinned).length === 0 ? (
+                  <p className="text-stone-400 text-center py-8 text-sm">
+                    아직 이 구절에 대한 묵상이 없습니다.<br/>
+                    첫 번째 묵상을 남겨보세요!
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {verseReflections.filter((r: any) => !r.is_pinned).map((reflection: any) => (
+                      <ReflectionCard key={reflection.id} reflection={reflection} />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
