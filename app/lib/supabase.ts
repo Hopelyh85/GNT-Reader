@@ -204,6 +204,9 @@ export interface Profile {
   show_church: boolean;
   show_job: boolean;
   upgrade_requested: boolean;
+  // Permission fields for wiki studio
+  is_admin?: boolean;
+  is_translator?: boolean;
 }
 
 // Authentication

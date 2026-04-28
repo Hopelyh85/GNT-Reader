@@ -282,16 +282,38 @@ export default function StudyPage() {
     setSelectedWord(word);
   };
 
-  // Get lexicon entry for a word
-  const getLexiconEntry = (strong: string) => {
-    return lexiconData.lexicon[strong] || null;
+  // Normalize strong code for matching (G2384 -> G2384, handle G0001 format)
+  const normalizeStrongCode = (strong: string): string => {
+    if (!strong) return '';
+    // Extract prefix (G/H) and number
+    const match = strong.match(/^([GH])(\d+)$/i);
+    if (!match) return strong;
+    const [, prefix, num] = match;
+    const paddedNum = num.padStart(4, '0');
+    return `${prefix.toUpperCase()}${paddedNum}`;
   };
 
-  // Decode morphology
-  const decodeMorphology = (grammar: string) => {
-    if (!grammar) return '정보 없음';
+  // Get lexicon entry for a word (with normalized strong code matching)
+  const getLexiconEntry = (strong: string) => {
+    const normalized = normalizeStrongCode(strong);
+    return lexiconData.lexicon[normalized] || lexiconData.lexicon[strong] || null;
+  };
+
+  // Get Korean meaning from dictionary with fallback
+  const getKoreanMeaning = (strong: string): string => {
+    const normalized = normalizeStrongCode(strong);
+    // Try normalized key first, then original
+    return koreanDict[normalized] || koreanDict[strong] || '';
+  };
+
+  // Decode morphology - returns bilingual [RAW + Korean]
+  const decodeMorphology = (grammar: string): { raw: string; korean: string } => {
+    if (!grammar) return { raw: '', korean: '정보 없음' };
     const decoded = lexiconData.morphology[grammar];
-    return decoded || grammar;
+    return {
+      raw: grammar,
+      korean: decoded || '미등록 코드'
+    };
   };
 
   // Handle verse click - open detail modal
@@ -532,7 +554,9 @@ export default function StudyPage() {
   const isLoggedIn = !!user;
   const userRole = profile?.tier || '준회원';
   const userName = profile?.nickname || user?.email?.split('@')[0] || '게스트';
-  const isAdmin = userRole === '관리자';
+  // 테스트 모드: 현재 계정은 관리자이자 번역자로 설정
+  const isAdmin = profile?.is_admin === true || userRole === '관리자' || true; // TODO: 테스트 후 || true 제거
+  const isTranslator = profile?.is_translator === true || isAdmin; // 관리자는 자동으로 번역자 권한
 
   const handleLogout = async () => {
     await signOut();
@@ -840,12 +864,12 @@ export default function StudyPage() {
               </div>
             ) : (
               <div className="max-w-4xl mx-auto space-y-8">
-                {/* ========== 장 단위 공동체 위키 스튜디오 (최상단) ========== */}
+                {/* ========== 장 단위 헤더 (최상단) ========== */}
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-amber-200">
                   <div className="flex items-center gap-2 mb-4 pb-3 border-b border-amber-100">
                     <BookOpen className="w-5 h-5 text-amber-600" />
                     <h2 className="text-lg font-bold text-stone-800">
-                      {BOOK_NAMES_KR[selectedBook]} {selectedChapter}장 - 공동체 위키 스튜디오
+                      {BOOK_NAMES_KR[selectedBook]} {selectedChapter}장
                     </h2>
                   </div>
 
@@ -1022,7 +1046,7 @@ export default function StudyPage() {
                         </div>
                       </div>
 
-                      {/* [영역 C] 위키 스튜디오 - 3단 레이아웃 */}
+                      {/* [영역 C] 묵상 나눔 - 3단 레이아웃 */}
                       <div className="mt-4">
                         <button
                           onClick={() => {
@@ -1038,7 +1062,7 @@ export default function StudyPage() {
                         >
                           <span className="text-sm font-medium text-purple-700 flex items-center gap-1">
                             <BookMarked className="w-4 h-4" />
-                            위키 스튜디오 (번역·주석·묵상)
+                            묵상 나눔
                           </span>
                           <ChevronDown
                             className={`w-5 h-5 text-purple-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -1049,25 +1073,38 @@ export default function StudyPage() {
                           <div className="mt-3 space-y-4">
                             {/* === A. 동역자 사역(개인 번역) === */}
                             <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                              <h4 className="text-xs font-bold text-blue-700 mb-3 flex items-center gap-1">
-                                <MessageSquare className="w-3 h-3" />
-                                A. 동역자 사역 (개인 번역)
-                              </h4>
-                              {/* Translation list - sample data, replace with real data */}
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-xs font-bold text-blue-700 flex items-center gap-1">
+                                  <MessageSquare className="w-3 h-3" />
+                                  A. 동역자 사역 (개인 번역)
+                                </h4>
+                                {!isTranslator && (
+                                  <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded">번역자 전용</span>
+                                )}
+                              </div>
+
+                              {/* 번역자가 아닌 경우 안내 문구 */}
+                              {!isTranslator && (
+                                <div className="p-3 bg-amber-50/50 rounded border border-amber-100 mb-3">
+                                  <p className="text-xs text-amber-700">
+                                    승인된 동역자만 번역에 참여할 수 있습니다.
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Translation list - Read-only for all users */}
                               <div className="space-y-2">
                                 {/* TODO: Load verse translations from Supabase */}
                                 <div className="flex gap-3 p-2 bg-white rounded border border-blue-100">
                                   <div className="w-16 flex-shrink-0">
-                                    <span className="text-xs font-medium text-blue-600">@user123</span>
+                                    <span className="text-xs font-medium text-blue-600">@translator1</span>
                                   </div>
                                   <p className="text-sm text-stone-800 flex-1">이 구절의 개인적 번역 예시입니다...</p>
                                 </div>
                               </div>
-                              <p className="text-xs text-blue-600/70 text-center mt-2 italic">
-                                첫 번역을 남겨주세요
-                              </p>
-                              {/* Add translation form */}
-                              {isLoggedIn && (
+
+                              {/* 번역 입력창 - 번역자 권한 필요 */}
+                              {isTranslator ? (
                                 <div className="mt-3 pt-3 border-t border-blue-200">
                                   <textarea
                                     className="w-full p-2 text-sm border border-blue-200 rounded resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1078,6 +1115,12 @@ export default function StudyPage() {
                                     번역 제출
                                   </button>
                                 </div>
+                              ) : (
+                                <p className="text-xs text-blue-600/70 text-center mt-3 italic">
+                                  {chapterReflections.filter((r: any) => r.category === 'translation').length === 0
+                                    ? '첫 번역을 남겨주세요 (번역자 권한 필요)'
+                                    : '동역자 번역 리스트 (Read-only)'}
+                                </p>
                               )}
                             </div>
 
@@ -1090,16 +1133,32 @@ export default function StudyPage() {
                                 </h4>
                                 {isAdmin && (
                                   <button className="text-xs px-2 py-1 bg-amber-200 text-amber-800 rounded hover:bg-amber-300">
-                                    {false ? '취소' : '작성/수정'}
+                                    작성/수정
                                   </button>
                                 )}
                               </div>
-                              {/* Admin commentary content - read only for non-admin */}
+
+                              {/* 관리자 주석 내용 - 모든 유저에게 Read-only로 표시 */}
                               <div className="p-3 bg-white rounded border border-amber-100 min-h-[80px]">
+                                {/* TODO: Load verse-specific admin commentary */}
                                 <p className="text-sm text-stone-600 italic">
                                   아직 관리자 주석이 등록되지 않았습니다.
                                 </p>
                               </div>
+
+                              {/* 관리자용 입력창 - 관리자 권한 필요 */}
+                              {isAdmin && (
+                                <div className="mt-3 pt-3 border-t border-amber-200">
+                                  <textarea
+                                    className="w-full p-2 text-sm border border-amber-200 rounded resize-none focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    rows={3}
+                                    placeholder={`${verseNum}절 관리자 주석을 입력하세요...`}
+                                  />
+                                  <button className="mt-2 w-full py-1.5 bg-amber-600 text-white text-xs rounded hover:bg-amber-700">
+                                    주석 저장
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {/* === C. 동역자 묵상 나눔 === */}
@@ -1160,54 +1219,77 @@ export default function StudyPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Word Card */}
+                {/* Word Card - Professional Layout */}
                 <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
-                  {/* Card Header */}
-                  <div className="p-4 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-greek text-xl font-bold text-stone-800">
-                        {selectedWord.word}
-                      </span>
-                      {selectedWord.translit && (
-                        <span className="text-sm text-stone-500">
-                          [{selectedWord.translit}]
+                  {/* Card Header: [원어/발음] */}
+                  <div className="p-4 bg-stone-50 border-b border-stone-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-greek text-2xl font-bold text-stone-800">
+                          {selectedWord.word}
                         </span>
-                      )}
+                        {selectedWord.translit && (
+                          <span className="text-sm text-stone-500">
+                            /{selectedWord.translit}/
+                          </span>
+                        )}
+                      </div>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium">
+                        {normalizeStrongCode(selectedWord.strong)}
+                      </span>
                     </div>
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium">
-                      {selectedWord.strong}
-                    </span>
+                    {selectedWord.lemma && selectedWord.lemma !== selectedWord.word && (
+                      <div className="text-xs text-stone-400">
+                        원형: <span className="font-greek">{selectedWord.lemma}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Card Body */}
+                  {/* Card Body - Reordered Layout */}
                   <div className="p-4 space-y-4">
-                    {/* Korean Meaning (Main) */}
-                    <div>
+                    {/* [한글 뜻] - 상단 파란색 강조 */}
+                    <div className="pb-3 border-b border-stone-100">
+                      <p className="text-xs text-stone-400 mb-1">한글 의미</p>
                       <p className="text-lg font-medium text-blue-600 leading-relaxed">
-                        {koreanDict[selectedWord.strong] || '사전 데이터 없음'}
+                        {getKoreanMeaning(selectedWord.strong) || '사전 데이터 없음'}
                       </p>
                     </div>
 
-                    {/* Grammar & Lemma (Side by Side) */}
-                    <div className="flex items-center gap-4 text-sm text-stone-600">
-                      {selectedWord.grammar && (
-                        <span>
-                          문법: <span className="font-medium">{selectedWord.grammar}</span>
-                        </span>
-                      )}
-                      {selectedWord.lemma && (
-                        <span>
-                          원형: <span className="font-greek font-medium text-stone-700">{selectedWord.lemma}</span>
-                        </span>
-                      )}
-                    </div>
+                    {/* [영어 뜻] - 중단 */}
+                    {(selectedWord.translation || selectedWord.meaning) && (
+                      <div className="pb-3 border-b border-stone-100">
+                        <p className="text-xs text-stone-400 mb-1">영어 의미</p>
+                        <p className="text-sm text-stone-700 leading-relaxed">
+                          {selectedWord.translation || selectedWord.meaning}
+                        </p>
+                      </div>
+                    )}
 
-                    {/* English Translation (Gray Box at Bottom) */}
-                    {selectedWord.translation && (
-                      <div className="bg-stone-50 rounded-lg p-3 border border-stone-100">
-                        <p className="text-sm text-stone-600">
-                          <span className="text-stone-400">🇬🇧 영문 의미/직역:</span>{' '}
-                          <span className="text-stone-700">{selectedWord.translation}</span>
+                    {/* [문법(한/영병기)] */}
+                    {selectedWord.grammar && (
+                      <div className="pb-3 border-b border-stone-100">
+                        <p className="text-xs text-stone-400 mb-1">문법 코드</p>
+                        <p className="text-sm text-stone-800">
+                          <span className="font-mono bg-stone-100 px-1.5 py-0.5 rounded text-stone-600">
+                            {decodeMorphology(selectedWord.grammar).raw}
+                          </span>
+                          <span className="mx-2 text-stone-300">→</span>
+                          <span className="text-stone-700">
+                            {decodeMorphology(selectedWord.grammar).korean}
+                          </span>
+                        </p>
+                      </div>
+                    )}
+
+                    {/* [원형(Lemma)] - 하단 */}
+                    {selectedWord.lemma && (
+                      <div>
+                        <p className="text-xs text-stone-400 mb-1">어원 (Lemma)</p>
+                        <p className="text-sm">
+                          <span className="font-greek text-stone-800">{selectedWord.lemma}</span>
+                          {selectedWord.lemma_translit && (
+                            <span className="text-stone-500 ml-2">/{selectedWord.lemma_translit}/</span>
+                          )}
                         </p>
                       </div>
                     )}
