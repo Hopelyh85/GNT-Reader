@@ -5,7 +5,7 @@ const inputDir = path.resolve(__dirname, '../data/prep');
 const outputBiblePath = path.resolve(__dirname, '../public/data/parsed_original_bible.json');
 const outputLexiconPath = path.resolve(__dirname, '../public/data/step_lexicon.json');
 
-const bookMap = { 'Mat': 'MAT', 'Mrk': 'MRK', 'Luk': 'LUK', 'Jhn': 'JHN', 'Act': 'ACT', 'Rom': 'ROM', '1Co': '1CO', '2Co': '2CO', 'Gal': 'GAL', 'Eph': 'EPH', 'Php': 'PHP', 'Col': 'COL', '1Th': '1TH', '2Th': '2TH', '1Ti': '1TI', '2Ti': '2TI', 'Tit': 'TIT', 'Phm': 'PHM', 'Heb': 'HEB', 'Jas': 'JAS', '1Pe': '1PE', '2Pe': '2PE', '1Jn': '1JN', '2Jn': '2JN', '3Jn': '3JN', 'Jud': 'JUD', 'Rev': 'REV', 'Gen': 'GEN', 'Exo': 'EXO', 'Lev': 'LEV', 'Num': 'NUM', 'Deu': 'DEU', 'Jos': 'JOS', 'Jdg': 'JDG', 'Rut': 'RUT', '1Sa': '1SA', '2Sa': '2SA', '1Ki': '1KI', '2Ki': '2KI', '1Ch': '1CH', '2Ch': '2CH', 'Ezr': 'EZR', 'Neh': 'NEH', 'Est': 'EST', 'Job': 'JOB', 'Psa': 'PSA', 'Pro': 'PRO', 'Ecc': 'ECC', 'Sng': 'SNG', 'Isa': 'ISA', 'Jer': 'JER', 'Lam': 'LAM', 'Ezk': 'EZK', 'Dan': 'DAN', 'Hos': 'HOS', 'Jol': 'JOL', 'Amo': 'AMO', 'Oba': 'OBA', 'Jon': 'JON', 'Mic': 'MIC', 'Nam': 'NAM', 'Hab': 'HAB', 'Zep': 'ZEP', 'Hag': 'HAG', 'Zec': 'ZEC', 'Mal': 'MAL' };
+const bookMap = { 'Mat': 'MAT', 'Mrk': 'MRK', 'Luk': 'LUK', 'Jhn': 'JHN', 'Act': 'ACT', 'Rom': 'ROM', '1Co': '1CO', '2Co': '2CO', 'Gal': 'GAL', 'Eph': 'EPH', 'Php': 'PHP', 'Col': 'COL', '1Th': '1TH', '2Th': '2TH', '1Ti': '1TI', '2Ti': '2TI', 'Tit': 'TIT', 'Phm': 'PHM', 'Heb': 'HEB', 'Jas': 'JAS', '1Pe': '1PE', '2Pe': '2PE', '1Jn': '1JN', '2Jn': '2Jn', '3Jn': '3JN', 'Jud': 'JUD', 'Rev': 'REV', 'Gen': 'GEN', 'Exo': 'EXO', 'Lev': 'LEV', 'Num': 'NUM', 'Deu': 'DEU', 'Jos': 'JOS', 'Jdg': 'JDG', 'Rut': 'RUT', '1Sa': '1SA', '2Sa': '2SA', '1Ki': '1KI', '2Ki': '2KI', '1Ch': '1CH', '2Ch': '2CH', 'Ezr': 'EZR', 'Neh': 'NEH', 'Est': 'EST', 'Job': 'JOB', 'Psa': 'PSA', 'Pro': 'PRO', 'Ecc': 'ECC', 'Sng': 'SNG', 'Isa': 'ISA', 'Jer': 'JER', 'Lam': 'LAM', 'Ezk': 'EZK', 'Dan': 'DAN', 'Hos': 'HOS', 'Jol': 'JOL', 'Amo': 'AMO', 'Oba': 'OBA', 'Jon': 'JON', 'Mic': 'MIC', 'Nam': 'NAM', 'Hab': 'HAB', 'Zep': 'ZEP', 'Hag': 'HAG', 'Zec': 'ZEC', 'Mal': 'MAL' };
 
 const bibleResult = {};
 const lexicon = {};
@@ -64,7 +64,8 @@ allFiles.forEach(filePath => {
       const parts = trimmed.split('\t');
       if (parts.length < 5) return;
 
-      const refMatch = parts[0].match(/^([A-Za-z]+)\.(\d+)\.(\d+)/);
+      // [수정 포인트] 정규식 처음에 [1-3]?를 추가하여 숫자로 시작하는 책 이름을 인식하게 함
+      const refMatch = parts[0].match(/^([1-3]?[A-Za-z]+)\.(\d+)\.(\d+)/);
       if (!refMatch) return;
 
       const rawBook = refMatch[1];

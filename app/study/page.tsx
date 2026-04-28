@@ -177,7 +177,7 @@ export default function StudyPage() {
   const [reflectionComment, setReflectionComment] = useState('');
   const [activeReflectionId, setActiveReflectionId] = useState<string | null>(null);
 
-  // Chapter-level states (Wiki Studio)
+  // Chapter-level states (장 단위 연구 노트)
   const [chapterCommentary, setChapterCommentary] = useState<string>('');
   const [chapterReflections, setChapterReflections] = useState<any[]>([]);
   const [newChapterReflection, setNewChapterReflection] = useState('');
@@ -554,8 +554,8 @@ export default function StudyPage() {
   const isLoggedIn = !!user;
   const userRole = profile?.tier || '준회원';
   const userName = profile?.nickname || user?.email?.split('@')[0] || '게스트';
-  // 테스트 모드: 현재 계정은 관리자이자 번역자로 설정
-  const isAdmin = profile?.is_admin === true || userRole === '관리자' || true; // TODO: 테스트 후 || true 제거
+  // 권한 체크 (프로필 기반)
+  const isAdmin = profile?.is_admin === true || userRole === '관리자';
   const isTranslator = profile?.is_translator === true || isAdmin; // 관리자는 자동으로 번역자 권한
 
   const handleLogout = async () => {
@@ -1255,28 +1255,28 @@ export default function StudyPage() {
                       </p>
                     </div>
 
-                    {/* [영어 뜻] - 중단 */}
-                    {(selectedWord.translation || selectedWord.meaning) && (
+                    {/* [영어 뜻] - 중단 회색 박스 */}
+                    {(selectedWord.translation || selectedWord.meaning || getLexiconEntry(selectedWord.strong)?.brief_def) && (
                       <div className="pb-3 border-b border-stone-100">
                         <p className="text-xs text-stone-400 mb-1">영어 의미</p>
-                        <p className="text-sm text-stone-700 leading-relaxed">
-                          {selectedWord.translation || selectedWord.meaning}
-                        </p>
+                        <div className="bg-stone-100 rounded-lg p-3">
+                          <p className="text-sm text-stone-600 leading-relaxed">
+                            {selectedWord.translation || selectedWord.meaning || getLexiconEntry(selectedWord.strong)?.brief_def || getLexiconEntry(selectedWord.strong)?.full_def}
+                          </p>
+                        </div>
                       </div>
                     )}
 
                     {/* [문법(한/영병기)] */}
                     {selectedWord.grammar && (
                       <div className="pb-3 border-b border-stone-100">
-                        <p className="text-xs text-stone-400 mb-1">문법 코드</p>
-                        <p className="text-sm text-stone-800">
-                          <span className="font-mono bg-stone-100 px-1.5 py-0.5 rounded text-stone-600">
-                            {decodeMorphology(selectedWord.grammar).raw}
+                        <p className="text-xs text-stone-400 mb-1">문법 정보</p>
+                        <p className="text-sm text-stone-800 font-mono">
+                          [{decodeMorphology(selectedWord.grammar).raw}
+                          <span className="text-stone-500">
+                            {' '}({decodeMorphology(selectedWord.grammar).korean})
                           </span>
-                          <span className="mx-2 text-stone-300">→</span>
-                          <span className="text-stone-700">
-                            {decodeMorphology(selectedWord.grammar).korean}
-                          </span>
+                          ]
                         </p>
                       </div>
                     )}

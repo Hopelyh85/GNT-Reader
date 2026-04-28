@@ -195,7 +195,7 @@ export default function StudioPanel({ verseRef, book, chapter, verse }: StudioPa
       
       // Generate Markdown content
       const date = new Date().toISOString().split('T')[0];
-      let mdContent = `# K-GNT 위키 스튜디오 - 내 사역 노트\n\n`;
+      let mdContent = `# K-GNT 말씀 나눔 - 내 사역 노트\n\n`;
       mdContent += `**생성일:** ${date}\n`;
       mdContent += `**총 노트 수:** ${notes.length}개\n\n`;
       mdContent += `---\n\n`;
