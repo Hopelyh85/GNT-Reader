@@ -2,108 +2,157 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { BiblePanel } from '@/app/components/BiblePanel';
-import { StudyPanel } from '@/app/components/StudyPanel';
-import { CommunityPanel } from '@/app/components/CommunityPanel';
-import { useSBLGNT } from '@/app/hooks/useSBLGNT';
-import { SelectedVerse, SelectedWord } from '@/app/types';
-import { BookOpen, LogOut, LogIn, Menu, X, ExternalLink, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { getMyProfile, signOut, Profile, getGlobalNotice } from '@/app/lib/supabase';
+import { 
+  BookOpen, LogOut, LogIn, Menu, X, ArrowLeft, Search, BookMarked, 
+  ChevronDown, ChevronUp, XCircle, Info, BookmarkPlus, ExternalLink 
+} from 'lucide-react';
+
+// Bible book lists
+const OT_BOOKS = [
+  'GEN', 'EXO', 'LEV', 'NUM', 'DEU', 'JOS', 'JDG', 'RUT', '1SA', '2SA',
+  '1KI', '2KI', '1CH', '2CH', 'EZR', 'NEH', 'EST', 'JOB', 'PSA', 'PRO',
+  'ECC', 'SNG', 'ISA', 'JER', 'LAM', 'EZK', 'DAN', 'HOS', 'JOL', 'AMO',
+  'OBA', 'JON', 'MIC', 'NAM', 'HAB', 'ZEP', 'HAG', 'ZEC', 'MAL'
+];
+
+const NT_BOOKS = [
+  'MAT', 'MRK', 'LUK', 'JHN', 'ACT', 'ROM', '1CO', '2CO', 'GAL', 'EPH',
+  'PHP', 'COL', '1TH', '2TH', '1TI', '2TI', 'TIT', 'PHM', 'HEB', 'JAS',
+  '1PE', '2PE', '1JN', '2JN', '3JN', 'JUD', 'REV'
+];
+
+const BOOK_NAMES_KR: Record<string, string> = {
+  GEN: '창세기', EXO: '출애굽기', LEV: '레위기', NUM: '민수기', DEU: '신명기',
+  JOS: '여호수아', JDG: '사사기', RUT: '룻기', '1SA': '사무엘상', '2SA': '사무엘하',
+  '1KI': '열왕기상', '2KI': '열왕기하', '1CH': '역대상', '2CH': '역대하', EZR: '에스라',
+  NEH: '느헤미야', EST: '에스더', JOB: '욥기', PSA: '시편', PRO: '잠언',
+  ECC: '전도서', SNG: '아가', ISA: '이사야', JER: '예레미야', LAM: '예레미야애가',
+  EZK: '에스겔', DAN: '다니엘', HOS: '호세아', JOL: '요엘', AMO: '아모스',
+  OBA: '오바댜', JON: '요나', MIC: '미가', NAM: '나훔', HAB: '하박국',
+  ZEP: '스바냐', HAG: '학개', ZEC: '스가랴', MAL: '말라기',
+  MAT: '마태복음', MRK: '마가복음', LUK: '누가복음', JHN: '요한복음', ACT: '사도행전',
+  ROM: '로마서', '1CO': '고린도전서', '2CO': '고린도후서', GAL: '갈라디아서',
+  EPH: '에베소서', PHP: '빌립보서', COL: '골로새서', '1TH': '데살로니가전서',
+  '2TH': '데살로니가후서', '1TI': '디모데전서', '2TI': '디모데후서', TIT: '디도서',
+  PHM: '빌레몬서', HEB: '히브리서', JAS: '야고보서', '1PE': '베드로전서',
+  '2PE': '베드로후서', '1JN': '요한일서', '2JN': '요한이서', '3JN': '요한삼서',
+  JUD: '유다서', REV: '요한계시록'
+};
 
 export default function StudyPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { getBooks, loading, error } = useSBLGNT();
-  const books = getBooks();
-  const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
-  const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
+  
+  // Bible data states
+  const [bibleData, setBibleData] = useState<Record<string, any[]>>({});
+  const [lexiconData, setLexiconData] = useState<{ lexicon: Record<string, any>, morphology: Record<string, string> }>({ lexicon: {}, morphology: {} });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // UI states
+  const [testament, setTestament] = useState<'OT' | 'NT'>('NT');
+  const [selectedBook, setSelectedBook] = useState<string>('');
+  const [selectedChapter, setSelectedChapter] = useState<number>(1);
+  const [expandedBooks, setExpandedBooks] = useState<Set<string>>(new Set());
+  const [selectedWord, setSelectedWord] = useState<any>(null);
+  const [lexiconModalOpen, setLexiconModalOpen] = useState(false);
+  const [fullDefExpanded, setFullDefExpanded] = useState(false);
+  
+  // User profile
   const [profile, setProfile] = useState<Profile | null>(null);
   const [globalNotice, setGlobalNotice] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [initialPostId, setInitialPostId] = useState<string | null>(null);
-  const [activePanel, setActivePanel] = useState<'bible' | 'study' | 'community'>('bible');
-  const [focusPostId, setFocusPostId] = useState<string | null>(null);
   
-  // Navigate to verse from community post
-  const handleNavigateToVerse = (book: string, chapter: number, verse: number) => {
-    // Switch to bible panel (especially for mobile)
-    setActivePanel('bible');
-    
-    // Find book name from the books list - support both English and Korean book names
-    const bookData = books.find(b => {
-      const abbrev = b.name === '마태복음' ? 'Matt' :
-                    b.name === '마가복음' ? 'Mark' :
-                    b.name === '누가복음' ? 'Luke' :
-                    b.name === '요한복음' ? 'John' :
-                    b.name === '사도행전' ? 'Acts' :
-                    b.name === '로마서' ? 'Rom' :
-                    b.name === '고린도전서' ? '1Cor' :
-                    b.name === '고린도후서' ? '2Cor' :
-                    b.name === '갈라디아서' ? 'Gal' :
-                    b.name === '에베소서' ? 'Eph' :
-                    b.name === '빌립보서' ? 'Phil' :
-                    b.name === '골로새서' ? 'Col' :
-                    b.name === '데살로니가전서' ? '1Thess' :
-                    b.name === '데살로니가후서' ? '2Thess' :
-                    b.name === '디모데전서' ? '1Tim' :
-                    b.name === '디모데후서' ? '2Tim' :
-                    b.name === '디도서' ? 'Titus' :
-                    b.name === '빌레몬서' ? 'Phlm' :
-                    b.name === '히브리서' ? 'Heb' :
-                    b.name === '야고보서' ? 'Jas' :
-                    b.name === '베드로전서' ? '1Pet' :
-                    b.name === '베드로후서' ? '2Pet' :
-                    b.name === '요한일서' ? '1John' :
-                    b.name === '요한이서' ? '2John' :
-                    b.name === '요한삼서' ? '3John' :
-                    b.name === '유다서' ? 'Jude' :
-                    b.name === '요한계시록' ? 'Rev' : '';
-      // Match English abbreviation OR Korean book name
-      return abbrev.toLowerCase() === book.toLowerCase() || 
-             b.name === book || 
-             b.name.includes(book);
-    });
-    
-    if (bookData) {
-      const chapterData = bookData.chapters.find(c => c.number === chapter);
-      const verseWords = chapterData?.verses[verse - 1]; // verses is 0-indexed array
-      
-      if (verseWords) {
-        setSelectedVerse({
-          book,
-          bookName: bookData.name,
-          chapter,
-          verse,
-          text: verseWords.map((w: any) => w.text).join(' ')
-        });
-      }
-    }
-  };
-  
-  // Get post_id from URL for deep linking (client-side only)
-  // Handle deep link post ID
+  // Load bible and lexicon data
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      // Support both post=ID and post_id=ID for backwards compatibility
-      const postParam = params.get('post') || params.get('post_id');
-      setInitialPostId(postParam);
-    }
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [bibleRes, lexiconRes] = await Promise.all([
+          fetch('/data/parsed_original_bible.json'),
+          fetch('/data/step_lexicon.json')
+        ]);
+        
+        if (!bibleRes.ok || !lexiconRes.ok) {
+          throw new Error('Failed to load bible or lexicon data');
+        }
+        
+        const bibleJson = await bibleRes.json();
+        const lexiconJson = await lexiconRes.json();
+        
+        setBibleData(bibleJson);
+        setLexiconData(lexiconJson);
+        
+        // Default to first NT book
+        if (NT_BOOKS.length > 0) {
+          setSelectedBook(NT_BOOKS[0]);
+        }
+      } catch (err: any) {
+        console.error('Error loading data:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, []);
+
+  // Get available chapters for selected book
+  const getChapters = () => {
+    const chapters = new Set<number>();
+    Object.keys(bibleData).forEach(key => {
+      const [book, chapter] = key.split('_');
+      if (book === selectedBook) {
+        chapters.add(parseInt(chapter));
+      }
+    });
+    return Array.from(chapters).sort((a, b) => a - b);
+  };
+
+  // Get verses for selected book and chapter
+  const getVerses = () => {
+    const verses: Record<number, any[]> = {};
+    Object.entries(bibleData).forEach(([key, words]) => {
+      const [book, chapter, verse] = key.split('_');
+      if (book === selectedBook && parseInt(chapter) === selectedChapter) {
+        verses[parseInt(verse)] = words;
+      }
+    });
+    return verses;
+  };
+
+  // Handle word click - open lexicon modal
+  const handleWordClick = (word: any) => {
+    setSelectedWord(word);
+    setFullDefExpanded(false);
+    setLexiconModalOpen(true);
+  };
+
+  // Get lexicon entry for a word
+  const getLexiconEntry = (strong: string) => {
+    return lexiconData.lexicon[strong] || null;
+  };
+
+  // Decode morphology
+  const decodeMorphology = (grammar: string) => {
+    if (!grammar) return '정보 없음';
+    const decoded = lexiconData.morphology[grammar];
+    return decoded || grammar;
+  };
 
   useEffect(() => {
     if (user) {
       getMyProfile().then(setProfile).catch(console.error);
     }
-    // Load global notice
     getGlobalNotice().then(setGlobalNotice).catch(console.error);
   }, [user]);
 
   const isLoggedIn = !!user;
   const userRole = profile?.tier || '준회원';
   const userName = profile?.nickname || user?.email?.split('@')[0] || '게스트';
-  const userEmail = user?.email || '';
   const isAdmin = userRole === '관리자';
 
   const handleLogout = async () => {
@@ -264,63 +313,322 @@ export default function StudyPage() {
         </div>
       )}
 
-      {/* Main Content - 2 Column Grid Layout (Simplified) */}
-      <main className="flex-1 grid grid-cols-1 md:grid-cols-2 overflow-hidden">
-        {/* Left Panel - Bible Text */}
-        <div className="h-full border-r border-stone-200 overflow-hidden">
-          <BiblePanel
-            books={books}
-            selectedVerse={selectedVerse}
-            onSelectVerse={setSelectedVerse}
-            onSelectWord={setSelectedWord}
-            loading={loading}
-            userRole={userRole}
-            isLoggedIn={isLoggedIn}
-            userName={userName}
-            onFocusCommunity={(postId) => {
-              router.push('/community');
-            }}
-          />
+      {/* Main Content */}
+      <main className="flex-1 flex overflow-hidden">
+        {/* Left Panel - Bible Navigation & Text */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Header with Testament Toggle */}
+          <div className="p-4 border-b border-stone-200 bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-lg font-serif font-bold text-stone-800">
+                카시키아쿰 말씀 나눔터(원어)
+              </h1>
+              {/* Testament Toggle */}
+              <div className="flex bg-stone-100 rounded-lg p-1">
+                <button
+                  onClick={() => {
+                    setTestament('OT');
+                    setSelectedBook(OT_BOOKS[0]);
+                    setSelectedChapter(1);
+                    setExpandedBooks(new Set());
+                  }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    testament === 'OT'
+                      ? 'bg-white text-stone-900 shadow-sm'
+                      : 'text-stone-500 hover:text-stone-700'
+                  }`}
+                >
+                  구약 (히브리어)
+                </button>
+                <button
+                  onClick={() => {
+                    setTestament('NT');
+                    setSelectedBook(NT_BOOKS[0]);
+                    setSelectedChapter(1);
+                    setExpandedBooks(new Set());
+                  }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    testament === 'NT'
+                      ? 'bg-white text-stone-900 shadow-sm'
+                      : 'text-stone-500 hover:text-stone-700'
+                  }`}
+                >
+                  신약 (헬라어)
+                </button>
+              </div>
+            </div>
+
+            {/* Book & Chapter Selector */}
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedBook}
+                onChange={(e) => {
+                  setSelectedBook(e.target.value);
+                  setSelectedChapter(1);
+                }}
+                className="px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                {(testament === 'OT' ? OT_BOOKS : NT_BOOKS).map(book => (
+                  <option key={book} value={book}>
+                    {BOOK_NAMES_KR[book]}
+                  </option>
+                ))}
+              </select>
+              
+              <select
+                value={selectedChapter}
+                onChange={(e) => setSelectedChapter(parseInt(e.target.value))}
+                className="px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                {getChapters().map(ch => (
+                  <option key={ch} value={ch}>
+                    {ch}장
+                  </option>
+                ))}
+              </select>
+              
+              <span className="text-stone-500 text-sm ml-2">
+                {Object.keys(getVerses()).length}절
+              </span>
+            </div>
+          </div>
+
+          {/* Bible Text Area */}
+          <div className="flex-1 overflow-y-auto p-4 bg-stone-50">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin w-8 h-8 border-2 border-stone-300 border-t-stone-800 rounded-full" />
+              </div>
+            ) : error ? (
+              <div className="text-red-500 text-center p-8">{error}</div>
+            ) : (
+              <div className="max-w-4xl mx-auto space-y-6">
+                {Object.entries(getVerses()).map(([verseNum, words]) => {
+                  const isHebrew = testament === 'OT';
+                  return (
+                    <div key={verseNum} className="bg-white rounded-lg p-4 shadow-sm">
+                      {/* Verse Number */}
+                      <div className={`text-stone-400 text-sm mb-2 ${isHebrew ? 'text-right' : ''}`}>
+                        {verseNum}절
+                      </div>
+                      
+                      {/* Verse Text with RTL support for Hebrew */}
+                      <div 
+                        dir={isHebrew ? 'rtl' : 'ltr'}
+                        className={`leading-loose ${isHebrew ? 'text-right' : 'text-left'} ${isHebrew ? 'text-2xl' : 'text-xl'} font-serif text-stone-800`}
+                      >
+                        {words.map((word: any, idx: number) => (
+                          <span
+                            key={idx}
+                            onClick={() => handleWordClick(word)}
+                            className="inline-block cursor-pointer hover:bg-blue-100 px-1 py-0.5 rounded transition-colors mx-0.5"
+                            title={`${word.translation || ''} (${word.strong || ''})`}
+                          >
+                            {word.word}
+                          </span>
+                        ))}
+                      </div>
+                      
+                      {/* Korean Translation */}
+                      <div className={`mt-3 pt-3 border-t border-stone-100 text-stone-600 ${isHebrew ? 'text-right' : ''}`}>
+                        {words.map((word: any, idx: number) => (
+                          <span key={idx} className="inline-block mx-0.5">
+                            {word.meaning || word.translation || ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Panel - Study Notes */}
-        <div className="hidden md:block h-full overflow-hidden relative">
-          {/* Community Link Button */}
-          <div className="absolute top-3 right-3 z-10">
-            <button
-              onClick={() => router.push('/community')}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-800 text-white text-xs rounded-lg hover:bg-stone-700 transition-colors shadow-md"
-            >
-              <span>💬</span>
-              커뮤니티 게시판
-            </button>
-          </div>
-          <StudyPanel
-            selectedVerse={selectedVerse}
-            selectedWord={selectedWord}
-            isLoggedIn={isLoggedIn}
-            userRole={userRole}
-            userName={userName}
-          />
-        </div>
+        <div className="hidden lg:block w-96 border-l border-stone-200 bg-white overflow-y-auto">
+          <div className="p-4">
+            <h2 className="text-lg font-bold text-stone-800 mb-4 flex items-center gap-2">
+              <BookMarked className="w-5 h-5" />
+              단어 연구 노트
+            </h2>
+            
+            {!selectedWord ? (
+              <div className="text-stone-500 text-center py-8">
+                <Info className="w-12 h-12 mx-auto mb-3 text-stone-300" />
+                <p>왼쪽 본문의 단어를 클릭하면<br />상세한 사전 정보가 여기에 표시됩니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Selected Word Info */}
+                <div className="bg-stone-50 rounded-lg p-4">
+                  <h3 className="font-bold text-stone-800 text-lg mb-2">
+                    {selectedWord.word}
+                  </h3>
+                  <p className="text-stone-500 text-sm mb-3">
+                    {selectedWord.translit && `발음: [${selectedWord.translit}]`}
+                  </p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                      {selectedWord.strong}
+                    </span>
+                    <span className="text-stone-600">
+                      {selectedWord.translation}
+                    </span>
+                  </div>
+                </div>
 
-        {/* Mobile Bottom Sheet - StudyPanel */}
-        {(selectedVerse || selectedWord) && (
-          <div className="md:hidden">
-            <StudyPanel
-              selectedVerse={selectedVerse}
-              selectedWord={selectedWord}
-              isLoggedIn={isLoggedIn}
-              userRole={userRole}
-              userName={userName}
-              onClose={() => {
-                setSelectedWord(null);
-                // Keep verse selected, just close the panel
-              }}
-            />
+                {/* Save to Vocabulary Button */}
+                {user && (
+                  <button
+                    className="w-full py-2 px-4 bg-stone-800 text-white rounded-lg hover:bg-stone-700 transition-colors flex items-center justify-center gap-2"
+                    onClick={() => {
+                      // TODO: Implement vocabulary save
+                      alert('단어장 저장 기능은 곧 추가됩니다!');
+                    }}
+                  >
+                    <BookmarkPlus className="w-4 h-4" />
+                    단어장에 저장
+                  </button>
+                )}
+
+                {/* Word Study Notes Form */}
+                <div className="border-t border-stone-200 pt-4">
+                  <h4 className="font-medium text-stone-700 mb-2">나의 묵상</h4>
+                  <textarea
+                    className="w-full h-32 p-3 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="이 단어에 대한 나의 묵상을 적어보세요..."
+                  />
+                  <button className="mt-2 w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    저장
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </main>
+
+      {/* Lexicon Modal */}
+      {lexiconModalOpen && selectedWord && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+              <div>
+                <h2 className="text-2xl font-serif font-bold text-stone-800">
+                  {selectedWord.word}
+                </h2>
+                {selectedWord.translit && (
+                  <p className="text-stone-500 text-sm">
+                    [{selectedWord.translit}]
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setLexiconModalOpen(false)}
+                className="p-2 hover:bg-stone-200 rounded-full transition-colors"
+              >
+                <XCircle className="w-6 h-6 text-stone-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {/* Basic Info */}
+              <div className="mb-4 flex items-center gap-3">
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  {selectedWord.strong}
+                </span>
+                <span className="text-stone-700">
+                  {selectedWord.translation}
+                </span>
+              </div>
+
+              {/* Morphology */}
+              {selectedWord.grammar && (
+                <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <h3 className="font-medium text-amber-800 mb-1 flex items-center gap-1">
+                    <span>문법</span>
+                  </h3>
+                  <p className="text-amber-900 text-sm">
+                    {decodeMorphology(selectedWord.grammar)}
+                  </p>
+                  <p className="text-amber-600 text-xs mt-1">
+                    원본: {selectedWord.grammar}
+                  </p>
+                </div>
+              )}
+
+              {/* Lexicon Data */}
+              {(() => {
+                const entry = getLexiconEntry(selectedWord.strong);
+                if (!entry) return (
+                  <div className="text-stone-500 text-center py-4">
+                    사전 데이터를 찾을 수 없습니다.
+                  </div>
+                );
+                return (
+                  <div className="space-y-4">
+                    {/* Brief Definition */}
+                    {entry.brief_def && (
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                        <h3 className="font-medium text-green-800 mb-1">짧은 뜻</h3>
+                        <p className="text-green-900">{entry.brief_def}</p>
+                      </div>
+                    )}
+
+                    {/* Full Definition (Accordion) */}
+                    {entry.full_def && (
+                      <div className="border border-stone-200 rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => setFullDefExpanded(!fullDefExpanded)}
+                          className="w-full p-3 bg-stone-50 flex items-center justify-between hover:bg-stone-100 transition-colors"
+                        >
+                          <span className="font-medium text-stone-700">상세 정의</span>
+                          {fullDefExpanded ? (
+                            <ChevronUp className="w-5 h-5 text-stone-500" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 text-stone-500" />
+                          )}
+                        </button>
+                        {fullDefExpanded && (
+                          <div className="p-3 bg-white">
+                            <p className="text-stone-700 text-sm leading-relaxed whitespace-pre-wrap">
+                              {entry.full_def}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-stone-200 bg-stone-50 flex gap-2">
+              <button
+                onClick={() => setLexiconModalOpen(false)}
+                className="flex-1 py-2 px-4 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors"
+              >
+                닫기
+              </button>
+              {user && (
+                <button
+                  onClick={() => {
+                    alert('단어장 저장 기능은 곧 추가됩니다!');
+                  }}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <BookmarkPlus className="w-4 h-4" />
+                  저장
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
