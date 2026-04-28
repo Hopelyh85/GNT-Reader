@@ -83,7 +83,7 @@ export default function PrayerBoardPage() {
         .limit(10);
       
       if (!error && data) {
-        setUserPreviousPrayers(data);
+        setUserPreviousPrayers(data as any);
       }
     } catch (err) {
       console.error('Error loading previous prayers:', err);
@@ -134,10 +134,10 @@ export default function PrayerBoardPage() {
       }
       
       const prayersWithLikes = await Promise.all(
-        (data || []).map(async (post: PrayerPost) => {
+        (data || []).map(async (post: any) => {
           const likes = await getLikesCount(post.id);
           const liked = user ? await hasUserLiked(post.id) : false;
-          return { ...post, likes, liked };
+          return { ...post, likes, liked } as PrayerPost;
         })
       );
       
