@@ -75,7 +75,7 @@ function HomeContent() {
 
   // Portal menu items - Home Dashboard
   const portalItems = [
-    { id: 'read', title: '한글 성경', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
+    { id: 'read', title: '카시키아쿰 말씀 나눔터', subtitle: '공동체와 함께 한글 성경을 읽고 묵상을 나눕니다', href: '/read', icon: BookOpen, color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700' },
     { id: 'study', title: '성경 원어 연구소', subtitle: '헬라어 원문 성경을 깊이 연구하고 주석을 작성합니다', href: '/study', icon: Search, color: 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700' },
     { id: 'community', title: '커뮤니티 게시판', subtitle: '성경 묵상과 나눔의 공간', href: '/community', icon: MessageSquare, color: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' },
     { id: 'prayer', title: '기도 제목 게시판', subtitle: '함께 기도하며 중보하는 공간', href: '/community/prayer', icon: Heart, color: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700' },
@@ -85,7 +85,7 @@ function HomeContent() {
   // Navigation items - Community split into free and prayer boards
   const navItems = [
     { id: 'home', title: '홈', href: '/', icon: HomeIcon, active: true },
-    { id: 'read', title: '한글 성경', href: '/read', icon: BookOpen },
+    { id: 'read', title: '카시키아쿰 말씀 나눔터', href: '/read', icon: BookOpen },
     { id: 'scripture', title: '묵상 데이터', href: '/scripture-board', icon: Scroll },
     { id: 'study', title: '원어 연구', href: '/study', icon: Search },
     { id: 'community', title: '커뮤니티', href: '/community', icon: MessageSquare },

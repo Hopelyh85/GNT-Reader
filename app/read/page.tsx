@@ -365,7 +365,7 @@ function ReadContent() {
           </a>
           <div>
             <h1 className="text-lg font-serif font-bold text-stone-800">
-              말씀 나눔터(한글)
+              카시키아쿰 말씀 나눔터(한글)
             </h1>
             <p className="text-xs text-stone-500">{bookInfo?.name || ''} 성경을 읽고 묵상을 나눕니다</p>
           </div>
