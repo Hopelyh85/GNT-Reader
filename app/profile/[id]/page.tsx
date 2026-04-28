@@ -133,6 +133,78 @@ export default function UserProfilePage() {
     }
   };
 
+  // Korean to English book name mapping
+  const koreanToEnglishBook: Record<string, string> = {
+    '창세기': 'Gen', '출애굽기': 'Exo', '레위기': 'Lev', '민수기': 'Num', '신명기': 'Deu',
+    '여호수아': 'Jos', '사사기': 'Jdg', '룻기': 'Rut', '사무엘상': '1Sa', '사무엘하': '2Sa',
+    '열왕기상': '1Ki', '열왕기하': '2Ki', '역대상': '1Ch', '역대하': '2Ch', '에스라': 'Ezr',
+    '느헤미야': 'Neh', '에스더': 'Est', '욥기': 'Job', '시편': 'Psa', '잠언': 'Pro',
+    '전도서': 'Ecc', '아가': 'Sol', '이사야': 'Isa', '예레미야': 'Jer', '예레미야애가': 'Lam',
+    '에스겔': 'Eze', '다니엘': 'Dan', '호세아': 'Hos', '요엘': 'Joe', '아모스': 'Amo',
+    '오바댜': 'Oba', '요나': 'Jon', '미가': 'Mic', '나훔': 'Nah', '하박국': 'Hab',
+    '스바냐': 'Zep', '학개': 'Hag', '스가랴': 'Zec', '말라기': 'Mal',
+    '마태복음': 'Mat', '마가복음': 'Mar', '누가복음': 'Luk', '요한복음': 'Joh',
+    '사도행전': 'Act', '로마서': 'Rom', '고린도전서': '1Co', '고린도후서': '2Co',
+    '갈라디아서': 'Gal', '에베소서': 'Eph', '빌립보서': 'Phi', '골로새서': 'Col',
+    '데살로니가전서': '1Th', '데살로니가후서': '2Th', '디모데전서': '1Ti', '디모데후서': '2Ti',
+    '디도서': 'Tit', '빌레몬서': 'Phm', '히브리서': 'Heb', '야고보서': 'Jam',
+    '베드로전서': '1Pe', '베드로후서': '2Pe', '요한일서': '1Jo', '요한이서': '2Jo',
+    '요한삼서': '3Jo', '유다서': 'Jud', '요한계시록': 'Rev'
+  };
+
+  // Handle activity item click with conditional routing
+  const handleActivityClick = (ref: any) => {
+    const category = ref.category;
+    
+    // Prayer category (prayer_*)
+    if (category?.startsWith('prayer')) {
+      router.push(`/community/prayer/${ref.id}`);
+      return;
+    }
+    
+    // General posts - go to community board
+    if (category === 'general') {
+      router.push('/community');
+      return;
+    }
+    
+    // Reflection or Translation - navigate to verse
+    if (category === 'reflection' || category === 'translation') {
+      // Try to get book, chapter, verse from various sources
+      let book = ref.book;
+      let chapter = ref.chapter;
+      let verse = ref.verse;
+      
+      // If verse_ref exists, try to parse it
+      if (ref.verse_ref && !book) {
+        const match = ref.verse_ref.match(/^([A-Za-z0-9]+)_(\d+)_(\d+)$/);
+        if (match) {
+          book = match[1];
+          chapter = match[2];
+          verse = match[3];
+        }
+      }
+      
+      // Convert Korean book name to English if needed
+      if (book && koreanToEnglishBook[book]) {
+        book = koreanToEnglishBook[book];
+      }
+      
+      // Navigate if we have all required info
+      if (book && chapter && verse) {
+        router.push(`/read/${book}/${chapter}/${verse}`);
+        return;
+      }
+      
+      // Fallback to scripture board
+      router.push('/scripture-board');
+      return;
+    }
+    
+    // Default fallback
+    router.push('/community');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
@@ -200,6 +272,9 @@ export default function UserProfilePage() {
                     <Crown className="w-5 h-5 text-amber-600" />
                   )}
                 </div>
+                
+                {/* Email */}
+                <p className="text-sm text-stone-500 mb-2">{profile.email || ''}</p>
                 
                 {/* Badges */}
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -314,7 +389,7 @@ export default function UserProfilePage() {
                       <div 
                         key={ref.id} 
                         className="p-2 bg-stone-50 rounded text-sm cursor-pointer hover:bg-stone-100 transition-colors"
-                        onClick={() => router.push(`/community/post/${ref.id}`)}
+                        onClick={() => handleActivityClick(ref)}
                       >
                         <div className="text-xs text-stone-500 mb-1 flex justify-between">
                           <div className="flex items-center gap-2">
