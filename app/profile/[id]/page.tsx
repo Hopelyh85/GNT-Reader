@@ -282,7 +282,7 @@ export default function UserProfilePage() {
                     </span>
                   )}
                   <span className="inline-flex items-center px-3 py-1 bg-stone-100 text-stone-600 text-sm rounded-full">
-                    {TIER_MAP[profile.tier || ''] || profile.tier || '일반'}
+                    {TIER_MAP[(profile.tier as string) || ''] || profile.tier || '일반'}
                   </span>
                 </div>
                 

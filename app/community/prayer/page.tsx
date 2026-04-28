@@ -43,11 +43,14 @@ export default function PrayerBoardPage() {
 
   // New prayer form states
   const [isWritingPrayer, setIsWritingPrayer] = useState(false);
+  const [newPrayerTitle, setNewPrayerTitle] = useState('');
   const [newPrayerContent, setNewPrayerContent] = useState('');
   const [linkedPrayerId, setLinkedPrayerId] = useState<string | null>(null);
   const [userPreviousPrayers, setUserPreviousPrayers] = useState<PrayerPost[]>([]);
   const [submittingPrayer, setSubmittingPrayer] = useState(false);
   const [newPrayerCategory, setNewPrayerCategory] = useState('prayer_personal');
+  const [prayerCount, setPrayerCount] = useState(0);
+  const MAX_DAILY_PRAYERS = 5;
   
   // Category tabs state
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -62,11 +65,13 @@ export default function PrayerBoardPage() {
   useEffect(() => {
     loadPrayers();
     loadNotices();
+    loadUserPrayerCount();
   }, []);
 
   useEffect(() => {
     if (user && isWritingPrayer) {
       loadUserPreviousPrayers();
+      loadUserPrayerCount();
     }
   }, [user, isWritingPrayer]);
 
@@ -149,6 +154,26 @@ export default function PrayerBoardPage() {
     }
   };
 
+  const loadUserPrayerCount = async () => {
+    if (!user) return;
+    try {
+      const supabase = getSupabase();
+      const today = new Date().toISOString().split('T')[0];
+      const { count, error } = await supabase
+        .from('reflections')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', today)
+        .or('category.eq.prayer_personal,category.eq.prayer_church,category.eq.prayer_nation,category.eq.prayer_world');
+      
+      if (!error && count !== null) {
+        setPrayerCount(count);
+      }
+    } catch (err) {
+      console.error('Error loading prayer count:', err);
+    }
+  };
+
   // Filter posts by category
   const getFilteredPosts = () => {
     if (selectedCategory === 'all') {
@@ -193,13 +218,26 @@ export default function PrayerBoardPage() {
     });
   };
 
+  const handleSubmitPrayer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleAddPrayer();
+  };
+
   const handleAddPrayer = async () => {
     if (!user) {
       router.push('/login');
       return;
     }
-    if (!newPrayerContent.trim()) {
+    if (prayerCount >= MAX_DAILY_PRAYERS) {
+      alert('오늘의 기도 요청 횟수(5회)를 모두 사용했습니다. 내일 다시 시도해주세요.');
+      return;
+    }
+    if (!newPrayerTitle.trim()) {
       alert('기도 제목을 입력해주세요.');
+      return;
+    }
+    if (!newPrayerContent.trim()) {
+      alert('기도 내용을 입력해주세요.');
       return;
     }
     
@@ -210,6 +248,7 @@ export default function PrayerBoardPage() {
         .from('reflections')
         .insert({
           user_id: user.id,
+          title: newPrayerTitle.trim(),
           content: newPrayerContent.trim(),
           verse_ref: '기도제목',
           category: newPrayerCategory,
@@ -220,10 +259,12 @@ export default function PrayerBoardPage() {
       if (error) throw error;
       
       // Reset form and reload
+      setNewPrayerTitle('');
       setNewPrayerContent('');
       setLinkedPrayerId(null);
       setNewPrayerCategory('prayer_personal');
       setIsWritingPrayer(false);
+      setPrayerCount(prev => prev + 1);
       await loadPrayers();
       alert('기도 제목이 등록되었습니다.');
     } catch (err) {
@@ -255,89 +296,112 @@ export default function PrayerBoardPage() {
         {user && isWritingPrayer && (
           <div className="mb-6 bg-white rounded-xl border border-stone-200 p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium text-stone-800 flex items-center gap-2">
-                <Pencil className="w-4 h-4 text-blue-600" />
-                새 기도 제목
-              </h3>
-              <button
-                onClick={() => {
-                  setIsWritingPrayer(false);
-                  setNewPrayerContent('');
-                  setLinkedPrayerId(null);
-                }}
-                className="p-1 hover:bg-stone-100 rounded"
-              >
-                <X className="w-4 h-4 text-stone-500" />
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-sm">🙏</span>
+                </div>
+                <span className="font-medium text-stone-800">새 기도 요청</span>
+              </div>
+              <div className="text-sm text-stone-500">
+                오늘 남은 기도: <span className="font-bold text-blue-600">{MAX_DAILY_PRAYERS - prayerCount}/{MAX_DAILY_PRAYERS}</span>회
+              </div>
             </div>
-
-            {/* Category Selection */}
-            <div className="mb-3">
-              <label className="text-sm text-stone-600 flex items-center gap-1 mb-1">
-                📂 카테고리
-              </label>
-              <select
-                value={newPrayerCategory}
-                onChange={(e) => setNewPrayerCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="prayer_personal">🙏 개인 기도</option>
-                <option value="prayer_church">⛪ 교회 기도</option>
-                <option value="prayer_nation">🇰🇷 나라 기도</option>
-                <option value="prayer_world">🌍 세계 기도</option>
-              </select>
-            </div>
-
-            {/* Linked Previous Prayer Dropdown */}
-            {userPreviousPrayers.length > 0 && (
-              <div className="mb-3">
-                <label className="text-sm text-stone-600 flex items-center gap-1 mb-1">
-                  <Link2 className="w-3 h-3" />
-                  🔗 이전 기도 제목 불러오기 (선택)
-                </label>
+            
+            <form onSubmit={handleSubmitPrayer} className="space-y-3">
+              {/* Title Input */}
+              <div>
+                <label className="block text-sm text-stone-600 mb-1">제목</label>
+                <input
+                  type="text"
+                  value={newPrayerTitle}
+                  onChange={(e) => setNewPrayerTitle(e.target.value)}
+                  placeholder="기도 제목을 입력하세요..."
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              
+              {/* Category Selection */}
+              <div>
+                <label className="block text-sm text-stone-600 mb-1">카테고리</label>
                 <select
-                  value={linkedPrayerId || ''}
-                  onChange={(e) => setLinkedPrayerId(e.target.value || null)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={newPrayerCategory}
+                  onChange={(e) => setNewPrayerCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">이전 기도와 연결하지 않음</option>
-                  {userPreviousPrayers.map((prayer) => (
-                    <option key={prayer.id} value={prayer.id}>
-                      {prayer.content?.substring(0, 50)}{prayer.content?.length > 50 ? '...' : ''}
-                      {prayer.is_answered ? ' (응답됨)' : ''}
-                    </option>
-                  ))}
+                  <option value="prayer_personal">개인 기도</option>
+                  <option value="prayer_church">교회 기도</option>
+                  <option value="prayer_nation">나라 기도</option>
+                  <option value="prayer_world">세계 기도</option>
                 </select>
               </div>
-            )}
-
-            <textarea
-              value={newPrayerContent}
-              onChange={(e) => setNewPrayerContent(e.target.value)}
-              placeholder="기도 제목을 입력하세요..."
-              rows={4}
-              className="w-full px-3 py-2 border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-            />
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleAddPrayer}
-                disabled={submittingPrayer || !newPrayerContent.trim()}
-                className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submittingPrayer ? '등록 중...' : '등록하기'}
-              </button>
-              <button
-                onClick={() => {
-                  setIsWritingPrayer(false);
-                  setNewPrayerContent('');
-                  setLinkedPrayerId(null);
-                }}
-                className="py-2 px-4 bg-stone-200 text-stone-700 rounded-lg font-medium hover:bg-stone-300 transition-colors"
-              >
-                취소
-              </button>
-            </div>
+              
+              {/* Linked Prayer Selection */}
+              {userPreviousPrayers.length > 0 && (
+                <div>
+                  <label className="block text-sm text-stone-600 mb-1 flex items-center gap-1">
+                    <Link2 className="w-3 h-3" />
+                    이전 기도와 연결 (선택)
+                  </label>
+                  <select
+                    value={linkedPrayerId || ''}
+                    onChange={(e) => setLinkedPrayerId(e.target.value || null)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">연결 안 함</option>
+                    {userPreviousPrayers.map((prayer) => (
+                      <option key={prayer.id} value={prayer.id}>
+                        {prayer.created_at?.slice(0, 10)} - {prayer.content.slice(0, 30)}...
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              {/* Content Textarea */}
+              <textarea
+                value={newPrayerContent}
+                onChange={(e) => setNewPrayerContent(e.target.value)}
+                placeholder="기도 내용을 작성해주세요..."
+                className="w-full p-3 border border-stone-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={4}
+                required
+              />
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddPrayer}
+                  disabled={submittingPrayer || !newPrayerTitle.trim() || !newPrayerContent.trim() || prayerCount >= MAX_DAILY_PRAYERS}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submittingPrayer ? '등록 중...' : prayerCount >= MAX_DAILY_PRAYERS ? '오늘 한도 초과' : '등록하기'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsWritingPrayer(false);
+                    setNewPrayerTitle('');
+                    setNewPrayerContent('');
+                    setLinkedPrayerId(null);
+                  }}
+                  className="py-2 px-4 bg-stone-200 text-stone-700 rounded-lg font-medium hover:bg-stone-300 transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </form>
+            <button
+              type="button"
+              onClick={() => {
+                setIsWritingPrayer(false);
+                setNewPrayerTitle('');
+                setNewPrayerContent('');
+                setLinkedPrayerId(null);
+              }}
+              className="py-2 px-4 bg-stone-200 text-stone-700 rounded-lg font-medium hover:bg-stone-300 transition-colors"
+            >
+              취소
+            </button>
           </div>
         )}
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
