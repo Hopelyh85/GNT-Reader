@@ -849,6 +849,40 @@ export async function toggleUrgentPrayer(reflectionId: string, isUrgent: boolean
   if (error) throw error;
 }
 
+// Update prayer response status (Wait, Yes, No)
+export async function updatePrayerResponse(
+  reflectionId: string, 
+  response: 'Wait' | 'Yes' | 'No'
+): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('reflections')
+    .update({ prayer_response: response })
+    .eq('id', reflectionId);
+  
+  if (error) throw error;
+}
+
+// Get user's previous prayers for linking
+export async function getUserPrayersForLinking(userId: string): Promise<any[]> {
+  const supabase = getSupabase();
+  
+  const { data, error } = await supabase
+    .from('reflections')
+    .select('id, content, created_at, prayer_response')
+    .eq('user_id', userId)
+    .or('category.eq.prayer_general,category.eq.prayer_world')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  
+  if (error) {
+    console.error('Error fetching user prayers:', error.message);
+    return [];
+  }
+  
+  return data || [];
+}
+
 // Approve world prayer (admin only)
 export async function approveWorldPrayer(reflectionId: string): Promise<void> {
   const supabase = getSupabase();

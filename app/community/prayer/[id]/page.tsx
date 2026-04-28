@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { 
-  ArrowLeft, Heart, Loader2, User, AlertCircle, Send, MessageSquare
+  ArrowLeft, Heart, Loader2, User, AlertCircle, Send, MessageSquare,
+  CheckCircle2, XCircle, HelpCircle, Shield, Link2, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '@/app/components/AuthProvider';
 import { 
   getSupabase, addLike, removeLike, hasUserLiked, getLikesCount,
-  getReplies, addReply
+  getReplies, addReply, getMyProfile, toggleUrgentPrayer, updatePrayerResponse,
+  Profile
 } from '@/app/lib/supabase';
 
 interface Reply {
@@ -17,11 +19,21 @@ interface Reply {
   created_at: string;
   user_id: string;
   profiles?: {
-    nickname: string;
-    email: string;
+    nickname: string | null;
+    email: string | null;
     tier: string;
+    avatar_url?: string | null;
+    username?: string | null;
   };
 }
+
+interface LinkedPrayer {
+  id: string;
+  content: string;
+  created_at: string;
+}
+
+type AdminTier = '소장' | '부소장' | '매니저' | '스태프' | '관리자' | '스태프' | 'Admin' | 'Staff';
 
 interface PrayerPost {
   id: string;
@@ -32,15 +44,18 @@ interface PrayerPost {
   category: string;
   is_urgent: boolean;
   is_answered: boolean;
+  prayer_response?: 'Wait' | 'Yes' | 'No' | null;
+  linked_post_id?: string | null;
   testimony_note?: string;
   likes: number;
   liked?: boolean;
   profiles?: {
-    nickname: string;
-    email: string;
+    nickname: string | null;
+    email: string | null;
     tier: string;
-  };
+  } | null;
   replies: Reply[];
+  linked_prayer?: LinkedPrayer | null;
 }
 
 export default function PrayerDetailPage() {
@@ -53,6 +68,13 @@ export default function PrayerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  
+  // User profile for tier checking
+  const [myProfile, setMyProfile] = useState<Profile | null>(null);
+  
+  // Prayer response modal
+  const [responseModalOpen, setResponseModalOpen] = useState(false);
+  const [updatingResponse, setUpdatingResponse] = useState(false);
 
   useEffect(() => {
     if (prayerId) {
@@ -60,32 +82,50 @@ export default function PrayerDetailPage() {
     }
   }, [prayerId]);
 
+  useEffect(() => {
+    if (user) {
+      getMyProfile().then(setMyProfile).catch(console.error);
+    }
+  }, [user]);
+
   const loadPrayer = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const supabase = getSupabase();
       
-      // Get prayer post
-      const { data: post, error } = await supabase
+      // Load prayer post with profile and linked prayer
+      const { data: prayerData, error: prayerError } = await supabase
         .from('reflections')
-        .select('*, profiles(nickname, email, tier)')
+        .select(`
+          id, user_id, content, created_at, verse_ref, category, 
+          is_urgent, is_answered, prayer_response, linked_post_id, testimony_note,
+          profiles:profiles(nickname, email, tier),
+          linked_prayer:linked_post_id(id, content, created_at)
+        `)
         .eq('id', prayerId)
-        .maybeSingle();
-      
-      if (error) throw error;
-      if (!post) {
-        setPrayer(null);
-        return;
-      }
+        .single();
+        
+      if (prayerError) throw prayerError;
       
       // Load likes
-      const likes = await getLikesCount(post.id);
-      const liked = user ? await hasUserLiked(post.id) : false;
+      const likes = await getLikesCount(prayerId);
+      const liked = user ? await hasUserLiked(prayerId) : false;
       
-      // Load replies
+      // Load replies with profiles
       const replies = await getReplies(prayerId);
       
-      setPrayer({ ...post, likes, liked, replies: replies || [] } as PrayerPost);
+      setPrayer({
+        ...prayerData,
+        likes,
+        liked,
+        replies: replies || [],
+        linked_prayer: Array.isArray(prayerData.linked_prayer) 
+          ? prayerData.linked_prayer[0] 
+          : prayerData.linked_prayer,
+        profiles: Array.isArray(prayerData.profiles)
+          ? prayerData.profiles[0]
+          : prayerData.profiles
+      });
     } catch (err) {
       console.error('Error loading prayer:', err);
     } finally {
@@ -98,21 +138,74 @@ export default function PrayerDetailPage() {
       router.push('/login');
       return;
     }
+    
     try {
-      const currentlyLiked = prayer.liked || false;
-      if (currentlyLiked) {
+      if (prayer.liked) {
         await removeLike(prayer.id);
+        setPrayer({ ...prayer, liked: false, likes: prayer.likes - 1 });
       } else {
         await addLike(prayer.id);
+        setPrayer({ ...prayer, liked: true, likes: prayer.likes + 1 });
       }
-      setPrayer({ 
-        ...prayer, 
-        liked: !currentlyLiked, 
-        likes: prayer.likes + (currentlyLiked ? -1 : 1) 
-      });
     } catch (err) {
       console.error('Error toggling like:', err);
     }
+  };
+
+  // Check if user is admin/manager level
+  const isAdminLevel = () => {
+    const tier = myProfile?.tier;
+    const adminTiers: AdminTier[] = ['소장', '부소장', '매니저', '스태프', '관리자', '스태프', 'Admin', 'Staff'];
+    return adminTiers.includes(tier as AdminTier);
+  };
+
+  // Handle urgent prayer toggle
+  const handleToggleUrgent = async () => {
+    if (!prayer || !isAdminLevel()) return;
+    
+    try {
+      await toggleUrgentPrayer(prayer.id, !prayer.is_urgent);
+      setPrayer({ ...prayer, is_urgent: !prayer.is_urgent });
+    } catch (err) {
+      console.error('Error toggling urgent prayer:', err);
+      alert('긴급 기도 설정 중 오류가 발생했습니다.');
+    }
+  };
+
+  // Handle prayer response update
+  const handleUpdateResponse = async (response: 'Wait' | 'Yes' | 'No') => {
+    if (!prayer) return;
+    
+    setUpdatingResponse(true);
+    try {
+      await updatePrayerResponse(prayer.id, response);
+      setPrayer({ ...prayer, prayer_response: response });
+      setResponseModalOpen(false);
+    } catch (err) {
+      console.error('Error updating prayer response:', err);
+      alert('기도 응답 업데이트 중 오류가 발생했습니다.');
+    } finally {
+      setUpdatingResponse(false);
+    }
+  };
+
+  // Get prayer response badge
+  const getResponseBadge = () => {
+    if (!prayer?.prayer_response) return null;
+    
+    const config = {
+      Wait: { color: 'bg-amber-100 text-amber-800', icon: HelpCircle, label: '기다림' },
+      Yes: { color: 'bg-green-100 text-green-800', icon: CheckCircle2, label: '응답됨' },
+      No: { color: 'bg-red-100 text-red-800', icon: XCircle, label: '거절됨' }
+    };
+    
+    const { color, icon: Icon, label } = config[prayer.prayer_response];
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${color}`}>
+        <Icon className="w-3 h-3" />
+        응답: {label}
+      </span>
+    );
   };
 
   const handleSendReply = async () => {
@@ -180,7 +273,11 @@ export default function PrayerDetailPage() {
           >
             <ArrowLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-lg font-bold text-stone-800">기도 제목</h1>
+          <div className="flex-1 flex items-center gap-2">
+            <h1 className="text-lg font-bold text-stone-800">기도 제목</h1>
+            {/* Prayer Response Badge */}
+            {getResponseBadge()}
+          </div>
         </div>
       </header>
 
@@ -190,11 +287,50 @@ export default function PrayerDetailPage() {
         <div className={`bg-white rounded-xl border p-6 mb-4 ${
           prayer.is_urgent ? 'border-red-300' : 'border-stone-200'
         }`}>
+          {/* Admin: Urgent Prayer Toggle */}
+          {isAdminLevel() && (
+            <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-800">
+                  <Shield className="w-4 h-4" />
+                  <span className="text-sm font-medium">관리자 기능</span>
+                </div>
+                <button
+                  onClick={handleToggleUrgent}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    prayer.is_urgent
+                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                      : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                  }`}
+                >
+                  {prayer.is_urgent ? '🚨 긴급 해제' : '🚨 긴급 기도로 설정'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Urgent Badge */}
           {prayer.is_urgent && (
             <div className="flex items-center gap-1 text-red-600 text-sm font-medium mb-4">
               <AlertCircle className="w-5 h-5" />
               🚨 긴급 기도 제목
+            </div>
+          )}
+
+          {/* Linked Previous Prayer */}
+          {prayer.linked_prayer && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <button
+                onClick={() => router.push(`/community/prayer/${prayer.linked_prayer?.id}`)}
+                className="flex items-start gap-2 text-left w-full hover:opacity-80"
+              >
+                <Link2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-blue-600 font-medium mb-1">🔗 이전 기도</p>
+                  <p className="text-sm text-blue-800 truncate">{prayer.linked_prayer.content}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
+              </button>
             </div>
           )}
 
@@ -220,7 +356,7 @@ export default function PrayerDetailPage() {
           </p>
 
           {/* Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <button
               onClick={handleToggleLike}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
@@ -230,9 +366,19 @@ export default function PrayerDetailPage() {
               }`}
             >
               <Heart className="w-5 h-5" fill={prayer.liked ? 'currentColor' : 'none'} />
-              <span className="font-medium">기도합니다</span>
-              {prayer.likes > 0 && <span className="font-medium">({prayer.likes})</span>}
+              {prayer.liked ? '좋아요 취소' : '좋아요'} ({prayer.likes})
             </button>
+
+            {/* Author: Prayer Response Button */}
+            {user?.id === prayer.user_id && (
+              <button
+                onClick={() => setResponseModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+                ✅ 기도 완료 및 응답 기록
+              </button>
+            )}
           </div>
         </div>
 
@@ -293,6 +439,66 @@ export default function PrayerDetailPage() {
           )}
         </div>
       </main>
+
+      {/* Prayer Response Modal */}
+      {responseModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-stone-800 mb-4">
+              하나님의 응답을 기록합니다
+            </h3>
+            <p className="text-sm text-stone-600 mb-6">
+              이 기도 제목에 대한 하나님의 응답을 선택해주세요.
+            </p>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => handleUpdateResponse('Wait')}
+                disabled={updatingResponse}
+                className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors text-left"
+              >
+                <HelpCircle className="w-6 h-6 text-amber-600" />
+                <div>
+                  <p className="font-medium text-amber-800">기다림 (Wait)</p>
+                  <p className="text-xs text-amber-600">아직 응답을 기다리고 있습니다</p>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => handleUpdateResponse('Yes')}
+                disabled={updatingResponse}
+                className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-green-200 bg-green-50 hover:bg-green-100 transition-colors text-left"
+              >
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800">응답됨 (Yes)</p>
+                  <p className="text-xs text-green-600">하나님이 기도를 응답하셨습니다</p>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => handleUpdateResponse('No')}
+                disabled={updatingResponse}
+                className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-red-200 bg-red-50 hover:bg-red-100 transition-colors text-left"
+              >
+                <XCircle className="w-6 h-6 text-red-600" />
+                <div>
+                  <p className="font-medium text-red-800">거절됨 (No)</p>
+                  <p className="text-xs text-red-600">다른 길로 인도하십니다</p>
+                </div>
+              </button>
+            </div>
+            
+            <button
+              onClick={() => setResponseModalOpen(false)}
+              disabled={updatingResponse}
+              className="mt-6 w-full py-2 px-4 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
