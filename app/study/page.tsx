@@ -583,18 +583,24 @@ export default function StudyPage() {
                   const verseNumber = parseInt(verseNum);
                   return (
                     <div key={verseNum} className="bg-white rounded-lg p-4 shadow-sm">
-                      {/* Verse Number - Clickable */}
-                      <div 
-                        className={`text-stone-500 text-sm mb-2 cursor-pointer hover:text-blue-600 transition-colors ${isHebrew ? 'text-right' : ''}`}
-                        onClick={() => handleVerseClick(verseNumber)}
-                      >
-                        {verseNum}절 🔍
+                      {/* Verse Header: Number + Korean Text */}
+                      <div className={`flex items-start gap-2 ${isHebrew ? 'flex-row-reverse' : ''}`}>
+                        <span 
+                          className={`text-stone-400 text-sm font-medium cursor-pointer hover:text-blue-600 transition-colors ${isHebrew ? 'text-right' : ''}`}
+                          onClick={() => handleVerseClick(verseNumber)}
+                        >
+                          {verseNum}절 🔍
+                        </span>
+                        {/* Korean Translation - Inline with verse number */}
+                        <span className={`text-stone-700 text-base ${isHebrew ? 'text-right' : ''}`}>
+                          {words.map((word: any, idx: number) => word.meaning || word.translation || '').join(' ')}
+                        </span>
                       </div>
                       
-                      {/* Verse Text with RTL support for Hebrew */}
+                      {/* Original Language Text with RTL support */}
                       <div 
                         dir={isHebrew ? 'rtl' : 'ltr'}
-                        className={`leading-loose ${isHebrew ? 'text-right' : 'text-left'} ${isHebrew ? 'text-2xl' : 'text-xl'} font-serif text-stone-800`}
+                        className={`leading-loose mt-2 ${isHebrew ? 'text-right' : 'text-left'} ${isHebrew ? 'text-2xl' : 'text-xl'} font-serif text-stone-800`}
                       >
                         {words.map((word: any, idx: number) => (
                           <span
@@ -604,15 +610,6 @@ export default function StudyPage() {
                             title={`${word.translation || ''} (${word.strong || ''})`}
                           >
                             {word.word}
-                          </span>
-                        ))}
-                      </div>
-                      
-                      {/* Korean Translation */}
-                      <div className={`mt-3 pt-3 border-t border-stone-100 text-stone-600 ${isHebrew ? 'text-right' : ''}`}>
-                        {words.map((word: any, idx: number) => (
-                          <span key={idx} className="inline-block mx-0.5">
-                            {word.meaning || word.translation || ''}
                           </span>
                         ))}
                       </div>
