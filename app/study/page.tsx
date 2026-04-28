@@ -176,7 +176,14 @@ export default function StudyPage() {
   const [verseReflections, setVerseReflections] = useState<any[]>([]);
   const [reflectionComment, setReflectionComment] = useState('');
   const [activeReflectionId, setActiveReflectionId] = useState<string | null>(null);
-  
+
+  // Chapter-level states (Wiki Studio)
+  const [chapterCommentary, setChapterCommentary] = useState<string>('');
+  const [chapterReflections, setChapterReflections] = useState<any[]>([]);
+  const [newChapterReflection, setNewChapterReflection] = useState('');
+  const [showChapterCommentaryEdit, setShowChapterCommentaryEdit] = useState(false);
+  const [editingChapterCommentary, setEditingChapterCommentary] = useState('');
+
   // User profile
   const [profile, setProfile] = useState<Profile | null>(null);
   const [globalNotice, setGlobalNotice] = useState<string | null>(null);
@@ -189,9 +196,9 @@ export default function StudyPage() {
         setLoading(true);
         const [bibleRes, koreanRes, kjvRes, netRes, lexiconRes, koreanDictRes] = await Promise.all([
           fetch('/data/parsed_original_bible.json'),
-          fetch('/data/krv.json'),
-          fetch('/data/kjv.json'),
-          fetch('/data/net.json'),
+          fetch('/data/krv_bible.json'),
+          fetch('/data/kjv_bible.json'),
+          fetch('/data/net_bible.json'),
           fetch('/data/step_lexicon.json'),
           fetch('/data/korean_strongs_dict.json')
         ]);
@@ -443,6 +450,60 @@ export default function StudyPage() {
     return netBibleData[verseRef] || '';
   };
 
+  // Load chapter-level commentary and reflections
+  const loadChapterData = async () => {
+    if (!selectedBook) return;
+    const chapterRef = `${selectedBook}_${selectedChapter}`;
+
+    try {
+      const supabase = getSupabase();
+
+      // Load admin chapter commentary
+      const { data: commentaryData } = await supabase
+        .from('chapter_commentaries')
+        .select('content')
+        .eq('chapter_ref', chapterRef)
+        .eq('is_admin', true)
+        .single();
+
+      if (commentaryData) {
+        setChapterCommentary(commentaryData.content);
+      } else {
+        setChapterCommentary('');
+      }
+
+      // Load community chapter reflections
+      const { data: reflections, error } = await supabase
+        .from('reflections')
+        .select(`
+          id, user_id, content, created_at, likes,
+          profiles:profiles(nickname, email, tier)
+        `)
+        .eq('chapter_ref', chapterRef)
+        .eq('is_public', true)
+        .is('verse_ref', null)
+        .order('created_at', { ascending: false });
+
+      if (!error && reflections) {
+        const reflectionsWithLikes = await Promise.all(
+          reflections.map(async (ref: any) => {
+            const likeCount = await getLikesCount(ref.id);
+            const hasLiked = user ? await hasUserLiked(ref.id) : false;
+            return { ...ref, likes: likeCount, liked: hasLiked };
+          })
+        );
+        setChapterReflections(reflectionsWithLikes);
+      }
+    } catch (err) {
+      console.error('Error loading chapter data:', err);
+    }
+  };
+
+  // Load chapter data when book/chapter changes
+  useEffect(() => {
+    loadChapterData();
+  }, [selectedBook, selectedChapter]);
+
   useEffect(() => {
     if (user) {
       getMyProfile().then(setProfile).catch(console.error);
@@ -458,6 +519,57 @@ export default function StudyPage() {
   const handleLogout = async () => {
     await signOut();
     router.push('/');
+  };
+
+  // Save chapter commentary (admin only)
+  const handleSaveChapterCommentary = async () => {
+    if (!user || !isAdmin) return;
+    const chapterRef = `${selectedBook}_${selectedChapter}`;
+
+    try {
+      const supabase = getSupabase();
+      await supabase
+        .from('chapter_commentaries')
+        .upsert({
+          chapter_ref: chapterRef,
+          book: selectedBook,
+          chapter: selectedChapter,
+          content: editingChapterCommentary,
+          is_admin: true,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'chapter_ref' });
+
+      setChapterCommentary(editingChapterCommentary);
+      setShowChapterCommentaryEdit(false);
+      alert('장 주석이 저장되었습니다.');
+    } catch (err) {
+      console.error('Error saving chapter commentary:', err);
+      alert('저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // Post chapter reflection (community)
+  const handlePostChapterReflection = async () => {
+    if (!user || !newChapterReflection.trim()) return;
+    const chapterRef = `${selectedBook}_${selectedChapter}`;
+
+    try {
+      const supabase = getSupabase();
+      await supabase.from('reflections').insert({
+        user_id: user.id,
+        chapter_ref: chapterRef,
+        book: selectedBook,
+        chapter: selectedChapter,
+        content: newChapterReflection,
+        is_public: true
+      });
+
+      setNewChapterReflection('');
+      await loadChapterData();
+    } catch (err) {
+      console.error('Error posting chapter reflection:', err);
+      alert('묵상 작성 중 오류가 발생했습니다.');
+    }
   };
 
   return (
@@ -710,66 +822,178 @@ export default function StudyPage() {
               </div>
             ) : (
               <div className="max-w-4xl mx-auto space-y-8">
+                {/* ========== 장 단위 공동체 위키 스튜디오 (최상단) ========== */}
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-amber-200">
+                  <div className="flex items-center gap-2 mb-4 pb-3 border-b border-amber-100">
+                    <BookOpen className="w-5 h-5 text-amber-600" />
+                    <h2 className="text-lg font-bold text-stone-800">
+                      {BOOK_NAMES_KR[selectedBook]} {selectedChapter}장 - 공동체 위키 스튜디오
+                    </h2>
+                  </div>
+
+                  {/* A. 장 강해/주석 - 관리자 전용 작성/수정 */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-bold text-amber-700 flex items-center gap-1">
+                        <BookMarked className="w-4 h-4" />
+                        장 강해 / 주석 (Admin)
+                      </h3>
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setEditingChapterCommentary(chapterCommentary);
+                            setShowChapterCommentaryEdit(!showChapterCommentaryEdit);
+                          }}
+                          className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 transition-colors"
+                        >
+                          {showChapterCommentaryEdit ? '취소' : (chapterCommentary ? '수정' : '작성')}
+                        </button>
+                      )}
+                    </div>
+
+                    {showChapterCommentaryEdit && isAdmin ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editingChapterCommentary}
+                          onChange={(e) => setEditingChapterCommentary(e.target.value)}
+                          className="w-full p-3 text-sm border border-amber-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          rows={6}
+                          placeholder="이 장에 대한 강해와 주석을 작성하세요..."
+                        />
+                        <button
+                          onClick={handleSaveChapterCommentary}
+                          className="w-full py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 transition-colors"
+                        >
+                          저장하기
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50/50 rounded-lg p-4">
+                        {chapterCommentary ? (
+                          <div className="text-stone-800 text-sm leading-relaxed whitespace-pre-wrap">
+                            {chapterCommentary}
+                          </div>
+                        ) : (
+                          <p className="text-stone-400 text-sm italic">
+                            {isAdmin ? '관리자만 작성할 수 있는 장 주석 영역입니다.' : '아직 등록된 장 주석이 없습니다.'}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* B. 장 묵상 나눔 - 동역자 피드 */}
+                  <div>
+                    <h3 className="text-sm font-bold text-blue-700 flex items-center gap-1 mb-3">
+                      <MessageSquare className="w-4 h-4" />
+                      장 묵상 나눔 ({chapterReflections.length}개)
+                    </h3>
+
+                    {/* New reflection input */}
+                    {isLoggedIn && (
+                      <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <textarea
+                          value={newChapterReflection}
+                          onChange={(e) => setNewChapterReflection(e.target.value)}
+                          className="w-full p-2 text-sm border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          rows={2}
+                          placeholder="이 장에 대한 묵상을 나눠보세요..."
+                        />
+                        <button
+                          onClick={handlePostChapterReflection}
+                          disabled={!newChapterReflection.trim()}
+                          className="mt-2 w-full py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                          <Send className="w-3 h-3 inline mr-1" />
+                          묵상 남기기
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Reflections list */}
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {chapterReflections.length === 0 ? (
+                        <p className="text-stone-400 text-sm text-center py-4">
+                          아직 이 장에 대한 묵상이 없습니다. 첫 번째 묵상을 남겨보세요!
+                        </p>
+                      ) : (
+                        chapterReflections.map((reflection: any) => (
+                          <div key={reflection.id} className="p-3 bg-stone-50 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-medium text-stone-600">
+                                {reflection.profiles?.nickname || reflection.profiles?.email?.split('@')[0] || '익명'}
+                              </span>
+                              <span className="text-xs text-stone-400">
+                                {new Date(reflection.created_at).toLocaleDateString('ko-KR')}
+                              </span>
+                            </div>
+                            <p className="text-sm text-stone-800">{reflection.content}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ========== 구절(Verse) 렌더링 시작 ========== */}
                 {Object.entries(getVerses()).map(([verseNum, words]) => {
                   const isHebrew = testament === 'OT';
                   const verseNumber = parseInt(verseNum);
                   const isExpanded = expandedStudyVerses.has(verseNumber);
-                  const koreanText = getKoreanVerseText(verseNumber);
+                  const krvText = getKoreanVerseText(verseNumber);
                   const kjvText = getKjvVerseText(verseNumber);
                   const netText = getNetVerseText(verseNumber);
-                  
+
                   return (
                     <div key={verseNum} className="bg-white rounded-xl p-6 shadow-sm border border-stone-100">
-                      {/* 1. TOP: Original Language Text - Clean, no metadata */}
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-stone-400 text-sm font-medium">{verseNum}절</span>
-                        </div>
-                        <div 
-                          dir={isHebrew ? 'rtl' : 'ltr'}
-                          className={`leading-relaxed ${isHebrew ? 'text-right' : 'text-left'} ${isHebrew ? 'text-2xl' : 'text-xl'} font-serif text-stone-800`}
-                        >
-                          {words.map((word: any, idx: number) => (
-                            <span
-                              key={idx}
-                              onClick={() => handleWordClick(word)}
-                              className="inline-block cursor-pointer hover:bg-blue-50 px-1 py-0.5 rounded transition-colors mx-0.5"
-                            >
-                              {word.word}
-                            </span>
-                          ))}
-                        </div>
+                      {/* 절 번호 */}
+                      <div className="mb-3">
+                        <span className="text-stone-400 text-sm font-medium">{verseNum}절</span>
                       </div>
 
-                      {/* 2. MIDDLE: Translations (KRV → KJV + NET) */}
-                      <div className="space-y-3 border-t border-stone-100 pt-4">
-                        {/* Korean (KRV) - First */}
-                        {koreanText && (
-                          <div className="bg-amber-50/50 rounded-lg p-3">
-                            <p className="text-sm text-amber-700 font-medium mb-1">개역한글 (KRV)</p>
-                            <p className="text-stone-800 leading-relaxed">{koreanText}</p>
+                      {/* [영역 A] 원어 단어들만 표시 - 클릭 시 handleWordClick */}
+                      <div
+                        dir={isHebrew ? 'rtl' : 'ltr'}
+                        className={`leading-relaxed ${isHebrew ? 'text-right' : 'text-left'} ${isHebrew ? 'text-2xl' : 'text-xl'} font-serif text-stone-800 mb-4`}
+                      >
+                        {words.map((word: any, idx: number) => (
+                          <span
+                            key={idx}
+                            onClick={() => handleWordClick(word)}
+                            className="inline-block cursor-pointer hover:bg-blue-50 px-1 py-0.5 rounded transition-colors mx-0.5"
+                          >
+                            <span>{word.word}</span>
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* [영역 B] 번역문 영역 - mt-4 p-4 bg-stone-50 */}
+                      <div className="mt-4 p-4 bg-stone-50 rounded-lg space-y-3">
+                        {/* KRV (개역한글) */}
+                        {krvText && (
+                          <div>
+                            <p className="text-xs text-stone-500 mb-1">개역한글 (KRV)</p>
+                            <p className="text-stone-800 leading-relaxed">{krvText}</p>
                           </div>
                         )}
-                        
-                        {/* English (KJV + NET) - Below KRV */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {kjvText && (
-                            <div className="bg-blue-50/50 rounded-lg p-3">
-                              <p className="text-sm text-blue-700 font-medium mb-1">King James Version</p>
-                              <p className="text-stone-700 text-sm leading-relaxed">{kjvText}</p>
-                            </div>
-                          )}
-                          {netText && (
-                            <div className="bg-emerald-50/50 rounded-lg p-3">
-                              <p className="text-sm text-emerald-700 font-medium mb-1">NET Bible</p>
-                              <p className="text-stone-700 text-sm leading-relaxed">{netText}</p>
-                            </div>
-                          )}
-                        </div>
+                        {/* KJV */}
+                        {kjvText && (
+                          <div>
+                            <p className="text-xs text-stone-500 mb-1">King James Version</p>
+                            <p className="text-stone-700 text-sm leading-relaxed">{kjvText}</p>
+                          </div>
+                        )}
+                        {/* NET */}
+                        {netText && (
+                          <div>
+                            <p className="text-xs text-stone-500 mb-1">NET Bible</p>
+                            <p className="text-stone-700 text-sm leading-relaxed">{netText}</p>
+                          </div>
+                        )}
                       </div>
 
-                      {/* 3. BOTTOM: Accordion for Personal Translation & Commentary */}
-                      <div className="mt-4 border-t border-stone-100 pt-3">
+                      {/* [영역 C] 구절 묵상 나눔터 (공동체 위키 스튜디오) */}
+                      <div className="mt-4">
                         <button
                           onClick={() => {
                             const newExpanded = new Set(expandedStudyVerses);
@@ -780,48 +1004,51 @@ export default function StudyPage() {
                             }
                             setExpandedStudyVerses(newExpanded);
                           }}
-                          className="w-full flex items-center justify-between py-2 px-3 bg-stone-50 hover:bg-stone-100 rounded-lg transition-colors"
+                          className="w-full flex items-center justify-between py-2 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg transition-colors"
                         >
-                          <span className="text-sm font-medium text-stone-700">
-                            나의 번역 & 묵상
+                          <span className="text-sm font-medium text-blue-700 flex items-center gap-1">
+                            <MessageSquare className="w-4 h-4" />
+                            구절 묵상 나눔터
                           </span>
-                          <ChevronDown 
-                            className={`w-5 h-5 text-stone-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                          <ChevronDown
+                            className={`w-5 h-5 text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                           />
                         </button>
-                        
+
                         {isExpanded && (
-                          <div className="mt-3 space-y-3 p-3 bg-stone-50/50 rounded-lg">
-                            {/* Personal Translation */}
-                            <div>
-                              <label className="text-xs font-medium text-stone-500 block mb-1">
-                                나의 개인 번역
-                              </label>
-                              <textarea
-                                className="w-full p-2 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                rows={2}
-                                placeholder="이 구절에 대한 나만의 번역을 적어보세요..."
-                              />
+                          <div className="mt-3 p-4 bg-stone-50 rounded-lg border border-stone-100">
+                            {/* Reflection input for logged in users */}
+                            {isLoggedIn && (
+                              <div className="mb-4">
+                                <textarea
+                                  className="w-full p-3 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  rows={2}
+                                  placeholder={`${verseNum}절에 대한 묵상을 나눠보세요...`}
+                                />
+                                <button className="mt-2 w-full py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                                  <Send className="w-3 h-3 inline mr-1" />
+                                  묵상 공유하기
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Community reflections list */}
+                            <div className="space-y-3">
+                              {/* TODO: Load verse-specific reflections from Supabase */}
+                              <div className="p-3 bg-white rounded-lg border border-stone-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-medium text-stone-600">카시키아쿰</span>
+                                  <span className="text-xs text-stone-400">2026.04.28</span>
+                                </div>
+                                <p className="text-sm text-stone-800">
+                                  이 구절에서 원어의 미묘한 뉘앙스가 정말 중요합니다...
+                                </p>
+                              </div>
                             </div>
-                            
-                            {/* Commentary/Reflection */}
-                            <div>
-                              <label className="text-xs font-medium text-stone-500 block mb-1">
-                                구절 묵상 / 주석
-                              </label>
-                              <textarea
-                                className="w-full p-2 text-sm border border-stone-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                rows={3}
-                                placeholder="이 구절에 대한 묵상이나 주석을 적어보세요..."
-                              />
-                            </div>
-                            
-                            {/* Save Button */}
-                            <button
-                              className="w-full py-2 px-4 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-700 transition-colors"
-                            >
-                              저장하기
-                            </button>
+
+                            <p className="text-xs text-stone-400 text-center mt-3">
+                              더 많은 동역자들의 묵상이 곧 추가됩니다
+                            </p>
                           </div>
                         )}
                       </div>
