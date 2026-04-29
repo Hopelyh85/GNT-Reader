@@ -3,6 +3,37 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/components/AuthProvider';
+
+// 강력한 성경 코드 정규화 함수
+function normalizeBookCode(book: string): string {
+  if (!book) return "";
+  let cleanBook = book.trim().toUpperCase().replace(/\s+/g, '');
+
+    const bookMap: Record<string, string> = {
+      // 1. 숫자 포함 영문 풀네임 & 약어 완벽 대응
+      '1CORINTHIANS': '1CO', '1COR': '1CO', '2CORINTHIANS': '2CO', '2COR': '2CO',
+      '1THESSALONIANS': '1TH', '1THESS': '1TH', '2THESSALONIANS': '2TH', '2THESS': '2TH',
+      '1SAMUEL': '1SA', '1SAM': '1SA', '2SAMUEL': '2SA', '2SAM': '2SA',
+      '1KINGS': '1KI', '1KIN': '1KI', '2KINGS': '2KI', '2KIN': '2KI',
+      '1CHRONICLES': '1CH', '1CHRON': '1CH', '2CHRONICLES': '2CH', '2CHRON': '2CH',
+      '1PETER': '1PE', '1PET': '1PE', '2PETER': '2PE', '2PET': '2PE',
+      '1JOHN': '1JN', '2JOHN': '2JN', '3JOHN': '3JN',
+      'PHILEMON': 'PHM', 'PHILE': 'PHM',
+
+      // 2. 한글 풀네임 완벽 대응
+      '고린도전서': '1CO', '고린도후서': '2CO',
+      '데살로니가전서': '1TH', '데살로니가후서': '2TH',
+      '디모데전서': '1TI', '디모데후서': '2TI',
+      '베드로전서': '1PE', '베드로후서': '2PE',
+      '요한1서': '1JN', '요한일서': '1JN', '요한2서': '2JN', '요한이서': '2JN', '요한3서': '3JN', '요한삼서': '3JN',
+      '사무엘상': '1SA', '사무엘하': '2SA',
+      '열왕기상': '1KI', '열왕기하': '2KI',
+      '역대기상': '1CH', '역대기하': '2CH', '역대상': '1CH', '역대하': '2CH'
+    };
+
+  return bookMap[cleanBook] || bookMap[book] || cleanBook;
+}
+
 import { 
   getMyProfile, signOut, Profile, getGlobalNotice, 
   getSupabase, getLikesCount, hasUserLiked, addLike, removeLike, addReply, getReplies 
@@ -258,7 +289,7 @@ export default function StudyPage() {
 
   // Get chapters for selected book (hierarchical structure)
   const getChapters = () => {
-    const bookKey = selectedBook.toUpperCase();
+    const bookKey = normalizeBookCode(selectedBook);
     const bookData = bibleData[bookKey] as Record<string, any>;
     if (!bookData) return [];
     const chapters = Object.keys(bookData).map(ch => parseInt(ch));
@@ -268,7 +299,7 @@ export default function StudyPage() {
   // Get verses for selected book and chapter (hierarchical structure: bibleData[book][chapter][verse])
   const getVerses = () => {
     const verses: Record<number, any[]> = {};
-    const bookKey = selectedBook.toUpperCase();
+    const bookKey = normalizeBookCode(selectedBook);
     const bookData = bibleData[bookKey] as Record<string, any>;
     const chapterData = bookData ? bookData[selectedChapter.toString()] : null;
     if (chapterData) {
@@ -331,7 +362,7 @@ export default function StudyPage() {
   const loadVerseData = async (verseNum: number) => {
     if (!selectedBook) return;
     
-    const verseRef = `${selectedBook.toUpperCase()}_${selectedChapter}_${verseNum}`;
+    const verseRef = `${normalizeBookCode(selectedBook)}_${selectedChapter}_${verseNum}`;
     
     try {
       // Load reflections for this verse
@@ -384,14 +415,14 @@ export default function StudyPage() {
     setSavingStudy(true);
     try {
       const supabase = getSupabase();
-      const verseRef = `${selectedBook.toUpperCase()}_${selectedChapter}_${selectedVerse}`;
+      const verseRef = `${normalizeBookCode(selectedBook)}_${selectedChapter}_${selectedVerse}`;
       
       const { error } = await supabase
         .from('study_notes')
         .upsert({
           user_id: user.id,
           verse_ref: verseRef,
-          book: selectedBook.toUpperCase(),
+          book: normalizeBookCode(selectedBook),
           chapter: selectedChapter,
           verse: selectedVerse,
           translation: myTranslation,
@@ -458,7 +489,7 @@ export default function StudyPage() {
 
   // Get Korean Bible text for verse
   const getKoreanVerseText = (verseNum: number): string => {
-    const bookKey = selectedBook.toUpperCase();
+    const bookKey = normalizeBookCode(selectedBook);
     const chapterStr = String(selectedChapter);
     const verseStr = String(verseNum);
     const verseRef = `${bookKey}_${chapterStr}_${verseStr}`;
@@ -471,7 +502,7 @@ export default function StudyPage() {
 
   // Get KJV Bible text for verse
   const getKjvVerseText = (verseNum: number): string => {
-    const bookKey = selectedBook.toUpperCase();
+    const bookKey = normalizeBookCode(selectedBook);
     const chapterStr = String(selectedChapter);
     const verseStr = String(verseNum);
     const verseRef = `${bookKey}_${chapterStr}_${verseStr}`;
@@ -484,7 +515,7 @@ export default function StudyPage() {
 
   // Get NET Bible text for verse
   const getNetVerseText = (verseNum: number): string => {
-    const bookKey = selectedBook.toUpperCase();
+    const bookKey = normalizeBookCode(selectedBook);
     const chapterStr = String(selectedChapter);
     const verseStr = String(verseNum);
     const verseRef = `${bookKey}_${chapterStr}_${verseStr}`;
@@ -502,7 +533,7 @@ export default function StudyPage() {
   // Load chapter-level commentary and reflections
   const loadChapterData = async () => {
     if (!selectedBook) return;
-    const chapterRef = `${selectedBook.toUpperCase()}_${selectedChapter}`;
+    const chapterRef = `${normalizeBookCode(selectedBook)}_${selectedChapter}`;
 
     try {
       const supabase = getSupabase();
@@ -575,7 +606,7 @@ export default function StudyPage() {
   // Save chapter commentary (admin only)
   const handleSaveChapterCommentary = async () => {
     if (!user || !isAdmin) return;
-    const chapterRef = `${selectedBook.toUpperCase()}_${selectedChapter}`;
+    const chapterRef = `${normalizeBookCode(selectedBook)}_${selectedChapter}`;
 
     try {
       const supabase = getSupabase();
@@ -583,7 +614,7 @@ export default function StudyPage() {
         .from('chapter_commentaries')
         .upsert({
           chapter_ref: chapterRef,
-          book: selectedBook.toUpperCase(),
+          book: normalizeBookCode(selectedBook),
           chapter: selectedChapter,
           content: editingChapterCommentary,
           is_admin: true,
@@ -602,14 +633,14 @@ export default function StudyPage() {
   // Post chapter reflection (community)
   const handlePostChapterReflection = async () => {
     if (!user || !newChapterReflection.trim()) return;
-    const chapterRef = `${selectedBook.toUpperCase()}_${selectedChapter}`;
+    const chapterRef = `${normalizeBookCode(selectedBook)}_${selectedChapter}`;
 
     try {
       const supabase = getSupabase();
       await supabase.from('reflections').insert({
         user_id: user.id,
         chapter_ref: chapterRef,
-        book: selectedBook.toUpperCase(),
+        book: normalizeBookCode(selectedBook),
         chapter: selectedChapter,
         content: newChapterReflection,
         is_public: true
